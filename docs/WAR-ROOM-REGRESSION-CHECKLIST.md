@@ -278,3 +278,39 @@ After every bug, near-miss, or Mike “that felt weird”:
 3. Re-run that ID on every freeze until Conf ≥ 8 for three freezes, then keep it but don’t obsess.
 
 Target by Week 0 open: **40–50 critical scenarios**.
+
+---
+
+## Native iOS Build 20 additions
+
+These checks are mandatory before Build 20 upload. A simulator pass does not replace the physical-device rows.
+
+### Direct room invitations
+
+- [ ] Share from Home and Commissioner Command produces one `https://app.war-room-picks.com/invite/<64-character-token>` link plus the visible fallback code; the App Store URL is not the primary shared item.
+- [ ] Signed-in nonmember tap opens the correct league preview, suppresses the weekly opening film, and changes no membership or selected league before confirmation.
+- [ ] Cancel preserves the prior league and tab; confirm creates one membership and opens the invited league Home.
+- [ ] Repeated taps and repeated confirmation are idempotent; an already-member response opens the room without a duplicate membership.
+- [ ] Signed-out cold launch, login/signup, app termination, and relaunch preserve the pending invitation for up to seven days.
+- [ ] CFB invitation opened while NFL is selected, and NFL invitation opened while CFB is selected, land in the correct room only after confirmation.
+- [ ] Full, invalid, expired, revoked, deleted, offline, and final-seat-race states show safe actionable copy and never reveal roster, email, picks, standings, or Locker Room content.
+- [ ] Manual invite-code entry still works for both sports.
+- [ ] On a physical iPhone, Messages, Mail, and one social app open native War Room when installed; without the app, the same link opens the invitation landing page and App Store fallback.
+- [ ] Live AASA has the native app ID and `/invite/*`; APNs entitlement remains present after Associated Domains is added.
+
+### Global profile photo
+
+- [ ] A no-photo account selects an iPhone HEIC/JPEG/PNG, sees an accurate square crop/circular preview, confirms, uploads, and immediately sees the new portrait.
+- [ ] Picker cancel and crop cancel write nothing; failed replacement preserves the previous portrait.
+- [ ] Drag/zoom cannot expose a black edge, and the saved crop matches the preview on narrow and wide source images.
+- [ ] Oversized input is normalized to a metadata-free 1024px JPEG under the upload limit without freezing navigation.
+- [ ] Change and Remove refresh own profile plus retained CFB/NFL Home, Standings, Locker Room, Lobby/roster, commissioner, and public-profile surfaces without sign-out or relaunch.
+- [ ] Remove requires confirmation, restores initials everywhere, and preserves the equipped avatar border.
+- [ ] `Face of the Franchise` appears exactly once and only after a durable upload; cancel, decode failure, upload failure, and removal do not award duplicates.
+- [ ] A second authenticated user cannot overwrite another user’s avatar object or `profiles.avatar_url`.
+
+### Crystal Ball artifact
+
+- [ ] Fresh CFB and NFL Crystal Ball selection, confirm, locked receipt, and profile history use Village Nerd artwork.
+- [ ] Existing locked predictions upgrade to Village Nerd without changing the selected team.
+- [ ] Toilet Bowl and Crown of Shame keep their own artwork.

@@ -2,12 +2,23 @@
 
 **Purpose:** This file is the authority for deferred native iOS work targeted at Build 20. Chat history is context, not a release checklist. Anyone resuming this work should be able to understand the product decision, current implementation, known traps, required order of operations, and proof required before upload without reconstructing the conversation.
 
-**Last updated:** September 1, 2026
+**Last updated:** September 2, 2026
 
 **Native iOS baseline inspected:** version 3.2, Build 19, bundle ID `com.warroompicks.WarRoom`, Apple team `XWW458P3J7`
 
 **Working branch at capture:** `release/build-18-fixed`
 **Short-ledger commit:** `ab26024`
+
+## September 2 implementation checkpoint
+
+- Native Build number is set to 20. No archive, upload, TestFlight distribution, or App Store submission has occurred.
+- Direct invitation code is implemented locally: an authenticated member requests one reusable 256-bit token, the share sheet sends the league-specific Universal Link plus fallback code, root routing preserves the invite through authentication, and the native preview requires explicit Join/Open confirmation.
+- The server migration at `supabase/build20-secure-league-invites.sql` was applied to production on September 2, 2026. Read-back verified that `anon` and `authenticated` cannot use or select the private token schema/table; only anonymous preview and authenticated create/join have execute access. Invalid tokens return the same safe response, the one-active-link index exists, and the profile-photo trigger is enabled. No invite rows were created during migration.
+- The invitation landing bridge and corrected native AASA declaration were deployed to production on September 2, 2026 from clean `origin/main` commit `99a8d3f`. Vercel deployment `dpl_6N9UxBwDZ7n39LY2b6CxcVg3sNtQ` reached `READY`; live read-back returned HTTP 200 with `application/json`, the native app ID and `/invite/*`, while retaining the legacy app ID. A malformed 64-character invitation route returned the branded bridge without a 404, and the first-hour route-specific runtime error scan was clean. Valid-link browser and physical-device Universal Link proof remain open.
+- Native profile add/change/crop/remove is implemented locally. Uploads use a new owned object path before changing `profiles.avatar_url`; the old portrait remains authoritative on failed replacement. Live avatar storage/profile policies were read-only audited, but real iPhone photo-library proof is still required.
+- `Face of the Franchise` is drafted as a server trigger after a durable non-empty `avatar_url`; the trigger is part of the unapplied migration.
+- Crystal Ball profile trophy rows now use Village Nerd artwork. Full unlocked/locked CFB and NFL screenshot proof remains open.
+- Fresh simulator compile passed. The full native test plan passed, including unit and UI launch tests; existing Swift 6 actor-isolation warnings remain and are not release failures under the current Swift 5 mode.
 
 ## Release policy and boundaries
 
@@ -222,11 +233,11 @@ Do not reverse server/domain readiness and native release. Apple's association c
 
 #### Infrastructure
 
-- [ ] Live AASA contains `XWW458P3J7.com.warroompicks.WarRoom`.
+- [x] Live AASA contains `XWW458P3J7.com.warroompicks.WarRoom`.
 - [ ] Native entitlement contains `applinks:app.war-room-picks.com` and preserves APNs.
 - [ ] Marketing/storefront domains do not unintentionally open War Room.
 - [ ] Valid invite resolves in browser without app.
-- [ ] Invalid/expired/revoked links reveal no private data.
+- [x] Malformed/unknown-token browser path reveals no private data. Expired/revoked live cases still require disposable-token proof.
 
 #### Installed/signed in
 
@@ -331,7 +342,91 @@ The live/native Crystal Ball page still shows the shit/dumb icon where the Villa
 - [ ] No legitimate Toilet Bowl/Crown of Shame art replaced.
 - [ ] Simulator screenshots captured for CFB/NFL unlocked and locked states.
 
+## P1 — Native profile-photo upload and replacement
+
+### Product problem
+
+The native iOS profile currently reads and displays `profiles.avatar_url`, but it does not let a player choose, upload, replace, or remove a profile photo. The live UI exposes this gap with the placeholder copy `Portrait upload controls are next on the blueprint.` Existing website-uploaded portraits render in native iOS, which can make the feature look partially implemented even though a native-only player cannot manage the photo.
+
+This is one global account identity shared across every league and sport. Uploading a photo in CFB must immediately update the same player in NFL, standings, Locker Room, league rosters, profiles, and any future Fieldhouse surface. Do not create league-specific avatar records.
+
+### Binding behavior
+
+1. Add an obvious **Add Photo** action when no portrait exists.
+2. Add **Change Photo** and **Remove Photo** actions when a portrait exists.
+3. Use the native iOS photo picker. Do not request broad Photo Library access when PHPicker/PhotosPicker can provide the selected item.
+4. Present a crop/reposition step using a square crop with a circular preview before upload. Preserve enough resolution for the profile lightbox; do not upload the original full-resolution camera file.
+5. Confirm the chosen crop before any cloud write. Cancel must leave the existing photo untouched.
+6. Normalize supported input, including ordinary iPhone HEIC/HEIF images, to a consistently decoded JPEG or PNG upload. Correct image orientation before cropping/compression.
+7. Strip unnecessary metadata and upload a reasonably compressed image with an explicit maximum pixel dimension and file-size guard.
+8. Upload to the authenticated user's existing avatar storage path and update that same user's `profiles.avatar_url`. Never permit a client-selected user ID.
+9. Replacement must use a cache-busted URL or equivalent refresh mechanism so every surface shows the new image instead of a cached old portrait.
+10. Success must update the current profile immediately and propagate through shared profile reload/event handling without requiring logout, app restart, or league switching.
+11. Failure must preserve the previous portrait and show a useful retry message. Never clear `avatar_url` before a replacement upload and profile update both succeed.
+12. Removal requires explicit confirmation, clears the profile reference, removes the owned storage object when safe, and immediately restores the initials placeholder everywhere.
+13. Preserve avatar-border selection and rendering when the underlying photo changes or is removed.
+14. Award/reconcile the existing `Face of the Franchise` achievement only after a durable successful upload, not after picker selection.
+
+### Current-state source audit
+
+- `native-ios/WarRoom/ContentView.swift`
+  - `NativeProfileView` loads `profile.avatarURL` and renders `ProfileAvatar`.
+  - The profile identity section currently displays `Portrait upload controls are next on the blueprint.` when `avatarURL` is nil and `Website portrait secured. No re-upload required.` when it is present.
+  - No `PhotosPicker`, image cropper, native avatar upload action, replacement action, or removal action exists in the inspected Build 19 baseline.
+- `native-ios/WarRoom/SupabaseAPI.swift`
+  - Profile reads include `avatar_url`.
+  - Build 20 must add or verify narrowly scoped authenticated avatar storage upload, profile update, replacement, and removal methods rather than duplicating website code blindly.
+- Existing display consumers include standings, Locker Room, league/player profiles, rivalry views, and Lobby views. Every consumer must refresh after the global profile changes.
+
+### Implementation requirements
+
+- Prefer `PhotosPicker` with a transferable image representation and a dedicated native avatar editor/uploader component instead of placing the entire workflow inside `NativeProfileView`.
+- Keep cloud mutation inside `SupabaseAPI` or a focused profile service. UI code must not assemble arbitrary storage ownership paths.
+- Reuse the existing Supabase `avatars` bucket and the authenticated-user path contract after verifying its live policies. Do not create a second iOS-only bucket or profile column.
+- Verify live storage and `profiles` row-level policies before coding around a permissions error. A client workaround is not a policy fix.
+- Perform resize/compression off the main thread. All UI state changes return to the main actor.
+- Disable duplicate submissions while upload/remove is in flight and expose progress without trapping navigation.
+- Add accessibility labels for add/change/remove, crop controls, confirmation, progress, and error state.
+- Delete the blueprint/website-only placeholder copy once native management is available.
+
+### Acceptance checks
+
+- [ ] Fresh account with no avatar can choose an iPhone photo, crop it, confirm, upload it, and see it immediately.
+- [ ] Cancel from picker and cancel from cropper write nothing.
+- [ ] HEIC/HEIF, JPEG, and PNG inputs render with correct orientation.
+- [ ] Oversized photo is resized/compressed without blocking the interface or exceeding the upload limit.
+- [ ] Existing avatar can be replaced; old cached image does not remain on profile or other surfaces.
+- [ ] Failed replacement leaves the old avatar intact and offers retry.
+- [ ] Remove requires confirmation and restores initials everywhere.
+- [ ] Avatar border remains selected and renders around new photo and initials fallback.
+- [ ] Updated avatar appears without relaunch in own profile, another player's view of that profile, Standings, Locker Room, Lobby/roster, and relevant commissioner views.
+- [ ] Change made while CFB is selected appears identically after switching to NFL, and vice versa.
+- [ ] `Face of the Franchise` is awarded once after durable upload and not on cancellation/failure.
+- [ ] A user cannot overwrite another user's storage object or `profiles.avatar_url`.
+- [ ] Offline, expired-session, storage-policy, decoding, and upload failures have readable recovery states.
+- [ ] VoiceOver and Dynamic Type can operate the entire picker/crop/confirm/remove workflow.
+- [ ] Physical-device test uses a real iPhone library image; simulator-only proof is insufficient.
+
 ## Completed outside Build 20 — do not reimplement
+
+## Investigated for Picks — ESPN game intel
+
+### September 2 finding
+
+The undocumented ESPN site JSON feed can technically enrich all five current Week 1 CFB card games. A live sample returned ESPN event ID, kickoff, overall records, venue, broadcast networks, neutral-site flag, ranking metadata, and ESPN odds. Team-pair plus kickoff matching covered the current card. ESPN date-range behavior required extending the query one civil day past Monday to recover the Monday-night SMU–Florida State game, proving that direct phone-side date matching is not safe.
+
+### Release decision recommendation
+
+- Do **not** add direct ESPN requests to the native Picks page.
+- Do **not** make undocumented ESPN JSON a required Build 20 dependency. ESPN/Disney's current terms restrict automated extraction without written permission, and the endpoint has no public stability contract.
+- The existing server-side ESPN Top 25 enhancement is already a dependency risk to replace or formally authorize; expanding the surface would compound it.
+- If game intel is approved later, fetch through one server-side adapter, match by normalized away/home teams plus kickoff tolerance, persist a small snapshot with the card, cache it, and keep Picks fully usable when enrichment is absent.
+- Preferred compact UI: one optional line below each matchup — `RECORDS · KICKOFF · NETWORK` — followed by a second quiet line for `VENUE` and `NEUTRAL SITE` only when present. Do not add ESPN logos, betting links, moneylines, totals, injuries, news, or a second competing spread.
+- Provider path: use a licensed feed covering both CFB and NFL if one-provider parity is required. CollegeFootballData permits commercial display/caching but covers college only; SportsDataIO or Sportradar offer both football products and require commercial access arrangements.
+
+### Data contract if approved
+
+`espn_event_id` is intentionally not the permanent column name. Use provider-neutral fields such as `intel_provider`, `provider_event_id`, `away_record`, `home_record`, `venue_name`, `broadcast_names`, `neutral_site`, and `intel_refreshed_at`, so War Room can replace a vendor without another client rewrite.
 
 ### Autonomous football scorer eligibility
 

@@ -11,6 +11,16 @@ import Foundation
 
 struct WarRoomTests {
 
+    @Test func leagueInviteRouterAcceptsOnlyWarRoomJoinLinks() throws {
+        let token = String(repeating: "a", count: 64)
+        let valid = try #require(URL(string: "https://app.war-room-picks.com/invite/\(token)"))
+        #expect(LeagueInviteRouter.parse(valid)?.token == token)
+        #expect(LeagueInviteRouter.parse(URL(string: "https://app.war-room-picks.com/join?code=h54ksj")!)?.legacyCode == "H54KSJ")
+        #expect(LeagueInviteRouter.parse(URL(string: "https://example.com/join?code=H54KSJ")!) == nil)
+        #expect(LeagueInviteRouter.parse(URL(string: "https://app.war-room-picks.com/join?code=bad-code!")!) == nil)
+        #expect(LeagueInviteRouter.parse(URL(string: "https://app.war-room-picks.com/other?code=H54KSJ")!) == nil)
+    }
+
     @Test func rankedTeamsUseDistinctTopTenAndTopTwentyFiveTiers() {
         #expect(RankedTeamTier(rank: 1) == .topTen)
         #expect(RankedTeamTier(rank: 10) == .topTen)

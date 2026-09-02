@@ -74,11 +74,12 @@ struct NflExperienceTests {
         #expect(plan.submissions.first { $0.gameId == games[1].id }?.confidence == 5)
     }
 
-    @Test func leagueInvitationUsesThePermanentAppStoreProductLink() {
-        let message = LeagueInvitation.message(leagueName: "Fourth & Regret", sportId: "nfl", code: "abc123")
-        #expect(message.contains("https://apps.apple.com/app/id6802751064"))
+    @Test func leagueInvitationUsesTheLeagueSpecificUniversalLink() {
+        let url = URL(string: "https://app.war-room-picks.com/invite/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")!
+        let message = LeagueInvitation.message(leagueName: "Fourth & Regret", sportId: "nfl", code: "abc123", invitationURL: url)
+        #expect(message.contains(url.absoluteString))
         #expect(message.contains("Invite code: ABC123"))
-        #expect(!message.contains("app.war-room-picks.com"))
+        #expect(!message.contains("https://apps.apple.com/app/id6802751064"))
     }
 
     @Test func divisionalRoundReseedsLowestWildCardSurvivorToOneSeed() {

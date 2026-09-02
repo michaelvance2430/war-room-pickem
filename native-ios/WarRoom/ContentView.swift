@@ -10,6 +10,7 @@ struct RootView: View {
     @State private var showOpening: Bool
     @State private var pendingNotificationDestination: WarRoomNotificationRoute?
     @State private var suppressOpeningForLaunch: Bool
+    @State private var pendingLeagueInvite: PendingLeagueInvite?
 
     init() {
         // Keep the system back control readable against every sport skin. The
@@ -21,6 +22,9 @@ struct RootView: View {
         _showOpening = State(initialValue: false)
         _pendingNotificationDestination = State(initialValue: destination)
         _suppressOpeningForLaunch = State(initialValue: destination != nil)
+        // A signed-out invite is retained by LeagueInviteRouter and presented
+        // only after authentication succeeds.
+        _pendingLeagueInvite = State(initialValue: nil)
     }
 
     var body: some View {
@@ -38,6 +42,22 @@ struct RootView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onOpenURL { url in
+            guard let invite = LeagueInviteRouter.parse(url) else { return }
+            LeagueInviteRouter.store(invite)
+            pendingLeagueInvite = auth.user == nil ? nil : invite
+            suppressOpeningForLaunch = true
+            showOpening = false
+        }
+        .task(id: auth.user?.id) {
+            guard auth.user != nil, let invite = LeagueInviteRouter.pending() else { return }
+            pendingLeagueInvite = invite
+            suppressOpeningForLaunch = true
+            showOpening = false
+        }
+        .sheet(item: $pendingLeagueInvite) { invite in
+            DirectLeagueInviteView(invite: invite).environmentObject(auth)
+        }
         .task(id: auth.token) {
             guard auth.token != nil else { return }
             await auth.maintainSession()
@@ -229,6 +249,13 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .warRoomDeviceTokenChanged)) { _ in
             Task { await registerPushToken() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .warRoomProfilePhotoChanged)) { _ in
+            // Keep the profile editor in place, but force every other retained
+            // tab to fetch the new global account portrait on next selection.
+            for index in tabRootIds.indices where index != selectedTab {
+                tabRootIds[index] = UUID()
+            }
         }
         .sheet(isPresented: $showingPushAnnouncements) { NavigationStack { AnnouncementsView() } }
         .sheet(item: $notificationDispatchTarget) { target in
@@ -2159,7 +2186,7 @@ private struct PublicPlayerProfileView: View {
                         ForEach(displayTrophies) { trophy in
                             Button { selectedTrophy = trophy } label: {
                                 HStack(spacing: 13) {
-                                    Image(systemName: trophy.trophyType == "toilet_bowl" ? "toilet.fill" : "trophy.fill").font(.title2.weight(.black)).foregroundStyle(.yellow).frame(width: 42)
+                                    TrophyRowIcon(trophyType: trophy.trophyType, size: 42)
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(trophyTitle(trophy.trophyType)).font(.headline.weight(.black))
                                         Text(trophy.subtitle ?? "\(String(trophy.seasonYear)) · Permanent record").font(.caption).foregroundStyle(.secondary)
@@ -2386,14 +2413,11 @@ struct HomeView: View {
                             )
                         }
                         HStack(spacing: 10) {
-                            ShareLink(
-                                item: LeagueInvitation.appStoreURL,
-                                subject: Text("Join \(membership.leagues.name) on War Room Pick’Em"),
-                                message: Text(LeagueInvitation.message(
-                                    leagueName: membership.leagues.name,
-                                    sportId: membership.leagues.sportId,
-                                    code: membership.leagues.code
-                                ))
+                            LeagueInviteShareButton(
+                                leagueId: membership.leagueId,
+                                leagueName: membership.leagues.name,
+                                sportId: membership.leagues.sportId,
+                                code: membership.leagues.code
                             ) {
                                 CompactHomeUtilityButton(
                                     title: "SHARE · \(membership.leagues.code.uppercased())",
@@ -3623,12 +3647,11 @@ private struct Parallelogram: Shape {
 enum LeagueInvitation {
     static let appStoreURL = URL(string: "https://apps.apple.com/app/id6802751064")!
 
-    static func message(leagueName: String, sportId: String, code: String) -> String {
+    static func message(leagueName: String, sportId: String, code: String, invitationURL: URL) -> String {
         """
         You’re invited to \(leagueName) on War Room Pick’Em.
 
-        Download the app: \(appStoreURL.absoluteString)
-        Open War Room Pick’Em → Enter Lobby → Enter an Invite Code
+        Open this invitation: \(invitationURL.absoluteString)
         Invite code: \(code.uppercased())
 
         Desk: \(sportId.uppercased())
@@ -3655,20 +3678,17 @@ private struct CommissionerCommandCenterView: View {
                     commandHeader
                     weeklyStatus
                     primaryAction
-                    ShareLink(
-                        item: LeagueInvitation.appStoreURL,
-                        subject: Text("Join \(membership.leagues.name) on War Room Pick’Em"),
-                        message: Text(LeagueInvitation.message(
-                            leagueName: membership.leagues.name,
-                            sportId: membership.leagues.sportId,
-                            code: membership.leagues.code
-                        ))
+                    LeagueInviteShareButton(
+                        leagueId: membership.leagueId,
+                        leagueName: membership.leagues.name,
+                        sportId: membership.leagues.sportId,
+                        code: membership.leagues.code
                     ) {
                         HStack(spacing: 12) {
                             Image(systemName: "square.and.arrow.up.fill").font(.title2.weight(.black))
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("SHARE LEAGUE INVITATION").font(.headline.weight(.black))
-                                Text("APP STORE DOWNLOAD · INVITE CODE \(membership.leagues.code.uppercased())")
+                                Text("DIRECT ROOM LINK · INVITE CODE \(membership.leagues.code.uppercased())")
                                     .font(.system(size: 8, weight: .black)).tracking(0.6)
                             }
                             Spacer()
@@ -6230,9 +6250,8 @@ private struct YouView: View {
             .padding(15).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 17)).overlay(alignment: .leading) { Rectangle().fill(displayColor).frame(width: 3).padding(.vertical, 9) }.overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 17).stroke(displayColor.opacity(0.25)))
     }
     private func trophyRow(_ trophy: ProfileTrophy) -> some View {
-        let isShame = trophy.trophyType == "toilet_bowl"
         return HStack(spacing: 13) {
-            Image(systemName: isShame ? "toilet.fill" : "trophy.fill").font(.title2.weight(.black)).foregroundStyle(isShame ? .brown : (identity.isNFL ? .cyan : .yellow)).frame(width: 42)
+            TrophyRowIcon(trophyType: trophy.trophyType, size: 42)
             VStack(alignment: .leading, spacing: 3) { Text(trophyTitle(trophy.trophyType)).font(.headline.weight(.black)); Text(trophy.subtitle ?? "\(String(trophy.seasonYear)) · Permanent record").font(.caption).foregroundStyle(.secondary) }
             Spacer(); Text(verbatim: String(trophy.seasonYear)).font(.headline.weight(.black)).foregroundStyle(identity.isNFL ? .cyan : .yellow)
         }
@@ -7709,6 +7728,15 @@ private struct NativeProfileView: View {
                     }
                 }
                 .listRowBackground(Color.black.opacity(0.76))
+                Section("PROFILE PHOTO") {
+                    ProfilePhotoManager(
+                        avatarURL: $avatarURL,
+                        displayName: cleanName.isEmpty ? "Player" : cleanName,
+                        borderId: equippedBorderId,
+                        accent: identity.isNFL ? .cyan : .green
+                    )
+                }
+                .listRowBackground(Color.black.opacity(0.80))
                 Section("War Room account name") {
                     if loading {
                         ProgressView("Finding your reputation…")
@@ -7798,8 +7826,6 @@ private struct NativeProfileView: View {
                     } label: {
                         profileLoadoutRow("AVATAR BORDER", value: borderName)
                     }
-                    Text(avatarURL == nil ? "Portrait upload controls are next on the blueprint." : "Website portrait secured. No re-upload required.")
-                        .font(.caption).foregroundStyle(avatarURL == nil ? Color.secondary : Color.green)
                 }
                 .listRowBackground(Color.black.opacity(0.84))
             }
@@ -7810,6 +7836,9 @@ private struct NativeProfileView: View {
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
         .task { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: .warRoomProfilePhotoChanged)) { _ in
+            Task { await load() }
+        }
         .alert("Lock this birthday permanently?", isPresented: $confirmingBirthday) {
             Button("Not yet", role: .cancel) {}
             Button("LOCK IT") { Task { await lockBirthday() } }
@@ -8089,6 +8118,26 @@ private func loadoutBackdrop<Content: View>(sportId: String, @ViewBuilder conten
         else { Image("ProfileConstructionZone").resizable().scaledToFill().ignoresSafeArea().overlay(.black.opacity(0.38)).ignoresSafeArea() }
         ScrollView { content() }
     }.preferredColorScheme(.dark)
+}
+
+private struct TrophyRowIcon: View {
+    let trophyType: String
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if trophyType.lowercased() == "crystal_ball" {
+                Image("VillageNerdArtifact").resizable().scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+            } else {
+                Image(systemName: trophyType.lowercased() == "toilet_bowl" ? "toilet.fill" : "trophy.fill")
+                    .resizable().scaledToFit().padding(7)
+                    .foregroundStyle(trophyType.lowercased() == "toilet_bowl" ? .brown : .yellow)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
 }
 
 private enum ProfileLoadoutError: LocalizedError {
