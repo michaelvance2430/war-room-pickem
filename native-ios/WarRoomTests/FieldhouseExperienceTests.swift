@@ -1,0 +1,52 @@
+import XCTest
+@testable import WarRoom
+
+final class FieldhouseExperienceTests: XCTestCase {
+    func testFavoriteAndCrystalBallCatalogContainsFullDivisionOneDirectory() {
+        XCTAssertEqual(FieldhouseTeamCatalog.all.count, 362)
+        XCTAssertTrue(FieldhouseTeamCatalog.all.contains("Abilene Christian Wildcats"))
+        XCTAssertTrue(FieldhouseTeamCatalog.all.contains("UConn Huskies"))
+        XCTAssertTrue(FieldhouseTeamCatalog.all.contains("Youngstown State Penguins"))
+    }
+
+    func testOneHundredPlayerPostseasonCutIsSixteenSixtyEightSixteen() {
+        let counts = WarRoomPostseasonRule.counts(playerCount: 100)
+        XCTAssertEqual(counts.championship, 16)
+        XCTAssertEqual(counts.activeNoBrass, 68)
+        XCTAssertEqual(counts.toilet, 16)
+    }
+
+    func testBoundaryRanksAreCalculatedInsideEachRegion() {
+        let counts = WarRoomPostseasonRule.regionalCounts(playerCount: 25)
+        XCTAssertEqual(counts.championship, 4)
+        XCTAssertEqual(counts.activeNoBrass, 17)
+        XCTAssertEqual(counts.toilet, 4)
+        XCTAssertEqual(WarRoomPostseasonRule.status(rank: 4, playerCount: 25), .championship(seed: 4))
+        XCTAssertEqual(WarRoomPostseasonRule.status(rank: 5, playerCount: 25), .activeNoBrass)
+        XCTAssertEqual(WarRoomPostseasonRule.status(rank: 21, playerCount: 25), .activeNoBrass)
+        XCTAssertEqual(WarRoomPostseasonRule.status(rank: 22, playerCount: 25), .toilet(seed: 1))
+    }
+
+    func testFieldhouseStartsWithTwoRegularSeasonHellfires() {
+        var state = FieldhouseSeasonState()
+        XCTAssertEqual(state.regularHellfiresRemaining, 2)
+        state.regularHellfiresUsed = 2
+        XCTAssertEqual(state.regularHellfiresRemaining, 0)
+    }
+
+    func testWeeklyCardStartsBlankAndConfidenceCanBeDeselected() {
+        var state = FieldhouseSeasonState()
+        XCTAssertFalse(state.cardIsPublished)
+        XCTAssertTrue(state.sideSelections.isEmpty)
+        XCTAssertTrue(state.confidenceSelections.isEmpty)
+        XCTAssertNil(state.bestBetGame)
+        XCTAssertNil(state.propAnswer)
+
+        state.toggleConfidence(5, for: 1)
+        XCTAssertEqual(state.confidenceSelections[1], 5)
+        XCTAssertFalse(state.confidenceAvailable(5, for: 2))
+        state.toggleConfidence(5, for: 1)
+        XCTAssertNil(state.confidenceSelections[1])
+        XCTAssertTrue(state.confidenceAvailable(5, for: 2))
+    }
+}
