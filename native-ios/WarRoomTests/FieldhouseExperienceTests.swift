@@ -133,6 +133,49 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertTrue(FieldhouseTeamCatalog.all.contains("Youngstown State Penguins"))
     }
 
+    func testNCAAWUsesVerifiedDivisionOneNamesWithoutMensOnlyPrograms() {
+        let teams = FieldhouseTeamCatalog.teams(for: .ncaaw)
+        XCTAssertEqual(teams.count, 362)
+        XCTAssertTrue(teams.contains("Tennessee Lady Volunteers"))
+        XCTAssertTrue(teams.contains("Oklahoma State Cowgirls"))
+        XCTAssertTrue(teams.contains("Penn State Lady Lions"))
+        XCTAssertTrue(teams.contains("Lindenwood Lions"))
+        XCTAssertFalse(teams.contains("Tennessee Volunteers"))
+        XCTAssertFalse(teams.contains("The Citadel Bulldogs"))
+        XCTAssertEqual(Set(teams).count, teams.count)
+    }
+
+    func testNCAAMAndNCAAWShareRulesButKeepSeparateIdentity() {
+        var men = FieldhouseSeasonState()
+        var women = FieldhouseSeasonState()
+        women.selectLeague(.ncaaw)
+
+        XCTAssertEqual(men.regularHellfiresRemaining, women.regularHellfiresRemaining)
+        XCTAssertEqual(men.window, women.window)
+        XCTAssertEqual(men.postseasonStatus, women.postseasonStatus)
+        XCTAssertNotEqual(men.league, women.league)
+        XCTAssertNotEqual(men.championshipTrophyID, women.championshipTrophyID)
+        XCTAssertEqual(FieldhouseTrophyCatalog.options(for: men.league).count, 6)
+        XCTAssertEqual(FieldhouseTrophyCatalog.options(for: women.league).count, 6)
+    }
+
+    func testNCAAWUsesItsOwnBoardWithoutForkingGameplayRules() {
+        let men = FieldhouseGameCatalog.games(for: .ncaam)
+        let women = FieldhouseGameCatalog.games(for: .ncaaw)
+
+        XCTAssertEqual(men.count, women.count)
+        XCTAssertEqual(women.count, 12)
+        XCTAssertTrue(women.contains { $0.away == "Oklahoma State Cowgirls" })
+        XCTAssertTrue(women.contains { $0.home == "Tennessee Lady Volunteers" })
+        XCTAssertFalse(women.contains { $0.home == "Tennessee Volunteers" })
+        XCTAssertTrue(Set(men.map(\.id)).isDisjoint(with: Set(women.map(\.id))))
+
+        var state = FieldhouseSeasonState()
+        state.selectLeague(.ncaaw)
+        XCTAssertEqual(state.scoringGames, Array(women.prefix(FieldhouseGameCatalog.weeklyCardSize)))
+        XCTAssertEqual(state.scoringGames.count, FieldhouseGameCatalog.weeklyCardSize)
+    }
+
     func testOneHundredPlayerPostseasonCutIsSixteenSixtyEightSixteen() {
         let counts = WarRoomPostseasonRule.counts(playerCount: 100)
         XCTAssertEqual(counts.championship, 16)

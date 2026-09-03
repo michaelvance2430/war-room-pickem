@@ -9,7 +9,9 @@ struct WarRoomApp: App {
         WindowGroup {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--fieldhouse-preview") {
-                FieldhouseNativePreviewView()
+                FieldhouseNativePreviewView(
+                    initialLeague: ProcessInfo.processInfo.arguments.contains("--fieldhouse-ncaaw") ? .ncaaw : .ncaam
+                )
             } else {
                 RootView()
                     .environmentObject(auth)

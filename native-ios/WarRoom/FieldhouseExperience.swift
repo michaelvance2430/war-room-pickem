@@ -2,6 +2,33 @@ import SwiftUI
 import Combine
 import UserNotifications
 
+private struct FieldhouseLeagueEnvironmentKey: EnvironmentKey {
+    static let defaultValue: FieldhouseLeague = .activeBuild
+}
+
+private extension EnvironmentValues {
+    var fieldhouseLeague: FieldhouseLeague {
+        get { self[FieldhouseLeagueEnvironmentKey.self] }
+        set { self[FieldhouseLeagueEnvironmentKey.self] = newValue }
+    }
+}
+
+enum FieldhouseTheme {
+    static func accent(for league: FieldhouseLeague) -> Color {
+        switch league {
+        case .ncaam: .orange
+        case .ncaaw: Color(red: 0.25, green: 0.92, blue: 0.86)
+        }
+    }
+
+    static func secondary(for league: FieldhouseLeague) -> Color {
+        switch league {
+        case .ncaam: Color(red: 1.0, green: 0.32, blue: 0.08)
+        case .ncaaw: Color(red: 0.84, green: 0.32, blue: 1.0)
+        }
+    }
+}
+
 struct FieldhouseCardReminder: Equatable {
     let identifier: String
     let fireAt: Date
@@ -283,8 +310,49 @@ enum FieldhouseRegion: String, CaseIterable, Identifiable, Codable {
 }
 
 enum FieldhouseTeamCatalog {
-    // Snapshot of ESPN's current Division I men's basketball directory (362 programs).
+    // Shared Division I institutional baseline; NCAAW applies women-specific program names and membership.
     static let all: [String] = raw.split(separator: "|").map(String.init)
+    static func teams(for league: FieldhouseLeague) -> [String] {
+        guard league == .ncaaw else { return all }
+        let replacements = Dictionary(uniqueKeysWithValues: ncaawNamePairs)
+        let removed = Set(["Mercyhurst Lakers", "The Citadel Bulldogs", "VMI Keydets"])
+        let renamed = all.compactMap { team -> String? in
+            guard !removed.contains(team) else { return nil }
+            return replacements[team] ?? team
+        }
+        return (renamed + ["Lindenwood Lions", "Queens University Royals", "Southern Indiana Screaming Eagles"]).sorted()
+    }
+
+    private static let ncaawNamePairs: [(String, String)] = [
+        ("Alabama State Hornets", "Alabama State Lady Hornets"),
+        ("Alcorn State Braves", "Alcorn State Lady Braves"),
+        ("East Tennessee State Buccaneers", "East Tennessee State Bucs"),
+        ("Georgia Bulldogs", "Georgia Lady Bulldogs"),
+        ("Grambling Tigers", "Grambling Lady Tigers"),
+        ("Hampton Pirates", "Hampton Lady Pirates"),
+        ("Jackson State Tigers", "Jackson State Lady Tigers"),
+        ("Louisiana Tech Bulldogs", "Louisiana Tech Lady Techsters"),
+        ("Massachusetts Minutemen", "Massachusetts Minutewomen"),
+        ("McNeese Cowboys", "McNeese Cowgirls"),
+        ("Mississippi Valley State Delta Devils", "Mississippi Valley State Devilettes"),
+        ("Missouri State Bears", "Missouri State Lady Bears"),
+        ("Montana Grizzlies", "Montana Lady Griz"),
+        ("Morgan State Bears", "Morgan State Lady Bears"),
+        ("Northwestern State Demons", "Northwestern State Lady Demons"),
+        ("Oklahoma State Cowboys", "Oklahoma State Cowgirls"),
+        ("Penn State Nittany Lions", "Penn State Lady Lions"),
+        ("Prairie View A&M Panthers", "Prairie View A&M Lady Panthers"),
+        ("SE Louisiana Lions", "SE Louisiana Lady Lions"),
+        ("South Carolina State Bulldogs", "South Carolina State Lady Bulldogs"),
+        ("Southern Miss Golden Eagles", "Southern Miss Lady Eagles"),
+        ("Stephen F. Austin Lumberjacks", "Stephen F. Austin Ladyjacks"),
+        ("Tennessee State Tigers", "Tennessee State Lady Tigers"),
+        ("Tennessee Volunteers", "Tennessee Lady Volunteers"),
+        ("Texas Tech Red Raiders", "Texas Tech Lady Raiders"),
+        ("UNLV Rebels", "UNLV Lady Rebels"),
+        ("Western Kentucky Hilltoppers", "Western Kentucky Lady Toppers"),
+        ("Wyoming Cowboys", "Wyoming Cowgirls")
+    ]
     private static let raw = "Abilene Christian Wildcats|Air Force Falcons|Akron Zips|Alabama A&M Bulldogs|Alabama Crimson Tide|Alabama State Hornets|Alcorn State Braves|American University Eagles|App State Mountaineers|Arizona State Sun Devils|Arizona Wildcats|Arkansas Razorbacks|Arkansas State Red Wolves|Arkansas-Pine Bluff Golden Lions|Army Black Knights|Auburn Tigers|Austin Peay Governors|BYU Cougars|Ball State Cardinals|Baylor Bears|Bellarmine Knights|Belmont Bruins|Bethune-Cookman Wildcats|Binghamton Bearcats|Boise State Broncos|Boston College Eagles|Boston University Terriers|Bowling Green Falcons|Bradley Braves|Brown Bears|Bryant Bulldogs|Bucknell Bison|Buffalo Bulls|Butler Bulldogs|Cal Poly Mustangs|Cal State Bakersfield Roadrunners|Cal State Fullerton Titans|Cal State Northridge Matadors|California Baptist Lancers|California Golden Bears|Campbell Fighting Camels|Canisius Golden Griffins|Central Arkansas Bears|Central Connecticut Blue Devils|Central Michigan Chippewas|Charleston Cougars|Charleston Southern Buccaneers|Charlotte 49ers|Chattanooga Mocs|Chicago State Cougars|Cincinnati Bearcats|Clemson Tigers|Cleveland State Vikings|Coastal Carolina Chanticleers|Colgate Raiders|Colorado Buffaloes|Colorado State Rams|Columbia Lions|Coppin State Eagles|Cornell Big Red|Creighton Bluejays|Dartmouth Big Green|Davidson Wildcats|Dayton Flyers|DePaul Blue Demons|Delaware Blue Hens|Delaware State Hornets|Denver Pioneers|Detroit Mercy Titans|Drake Bulldogs|Drexel Dragons|Duke Blue Devils|Duquesne Dukes|East Carolina Pirates|East Tennessee State Buccaneers|East Texas A&M Lions|Eastern Illinois Panthers|Eastern Kentucky Colonels|Eastern Michigan Eagles|Eastern Washington Eagles|Elon Phoenix|Evansville Purple Aces|Fairfield Stags|Fairleigh Dickinson Knights|Florida A&M Rattlers|Florida Atlantic Owls|Florida Gators|Florida Gulf Coast Eagles|Florida International Panthers|Florida State Seminoles|Fordham Rams|Fresno State Bulldogs|Furman Paladins|Gardner-Webb Runnin' Bulldogs|George Mason Patriots|George Washington Revolutionaries|Georgetown Hoyas|Georgia Bulldogs|Georgia Southern Eagles|Georgia State Panthers|Georgia Tech Yellow Jackets|Gonzaga Bulldogs|Grambling Tigers|Grand Canyon Lopes|Green Bay Phoenix|Hampton Pirates|Harvard Crimson|Hawai'i Rainbow Warriors|High Point Panthers|Hofstra Pride|Holy Cross Crusaders|Houston Christian Huskies|Houston Cougars|Howard Bison|IU Indianapolis Jaguars|Idaho State Bengals|Idaho Vandals|Illinois Fighting Illini|Illinois State Redbirds|Incarnate Word Cardinals|Indiana Hoosiers|Indiana State Sycamores|Iona Gaels|Iowa Hawkeyes|Iowa State Cyclones|Jackson State Tigers|Jacksonville Dolphins|Jacksonville State Gamecocks|James Madison Dukes|Kansas City Roos|Kansas Jayhawks|Kansas State Wildcats|Kennesaw State Owls|Kent State Golden Flashes|Kentucky Wildcats|LSU New Orleans Privateers|LSU Tigers|La Salle Explorers|Lafayette Leopards|Lamar Cardinals|Le Moyne Dolphins|Lehigh Mountain Hawks|Liberty Flames|Lipscomb Bisons|Little Rock Trojans|Long Beach State Beach|Long Island University Sharks|Longwood Lancers|Louisiana Ragin' Cajuns|Louisiana Tech Bulldogs|Louisville Cardinals|Loyola Chicago Ramblers|Loyola Maryland Greyhounds|Loyola Marymount Lions|Maine Black Bears|Manhattan Jaspers|Marist Red Foxes|Marquette Golden Eagles|Marshall Thundering Herd|Maryland Eastern Shore Hawks|Maryland Terrapins|Massachusetts Minutemen|McNeese Cowboys|Memphis Tigers|Mercer Bears|Mercyhurst Lakers|Merrimack Warriors|Miami (OH) RedHawks|Miami Hurricanes|Michigan State Spartans|Michigan Wolverines|Middle Tennessee Blue Raiders|Milwaukee Panthers|Minnesota Golden Gophers|Mississippi State Bulldogs|Mississippi Valley State Delta Devils|Missouri State Bears|Missouri Tigers|Monmouth Hawks|Montana Grizzlies|Montana State Bobcats|Morehead State Eagles|Morgan State Bears|Mount St. Mary's Mountaineers|Murray State Racers|NC State Wolfpack|NJIT Highlanders|Navy Midshipmen|Nebraska Cornhuskers|Nevada Wolf Pack|New Hampshire Wildcats|New Haven Chargers|New Mexico Lobos|New Mexico State Aggies|Niagara Purple Eagles|Nicholls Colonels|Norfolk State Spartans|North Alabama Lions|North Carolina A&T Aggies|North Carolina Central Eagles|North Carolina Tar Heels|North Dakota Fighting Hawks|North Dakota State Bison|North Florida Ospreys|North Texas Mean Green|Northeastern Huskies|Northern Arizona Lumberjacks|Northern Colorado Bears|Northern Illinois Huskies|Northern Iowa Panthers|Northern Kentucky Norse|Northwestern State Demons|Northwestern Wildcats|Notre Dame Fighting Irish|Oakland Golden Grizzlies|Ohio Bobcats|Ohio State Buckeyes|Oklahoma Sooners|Oklahoma State Cowboys|Old Dominion Monarchs|Ole Miss Rebels|Omaha Mavericks|Oral Roberts Golden Eagles|Oregon Ducks|Oregon State Beavers|Pacific Tigers|Penn State Nittany Lions|Pennsylvania Quakers|Pepperdine Waves|Pittsburgh Panthers|Portland Pilots|Portland State Vikings|Prairie View A&M Panthers|Presbyterian Blue Hose|Princeton Tigers|Providence Friars|Purdue Boilermakers|Purdue Fort Wayne Mastodons|Quinnipiac Bobcats|Radford Highlanders|Rhode Island Rams|Rice Owls|Richmond Spiders|Rider Broncs|Robert Morris Colonials|Rutgers Scarlet Knights|SE Louisiana Lions|SIU Edwardsville Cougars|SMU Mustangs|Sacramento State Hornets|Sacred Heart Pioneers|Saint Joseph's Hawks|Saint Louis Billikens|Saint Mary's Gaels|Saint Peter's Peacocks|Sam Houston Bearkats|Samford Bulldogs|San Diego State Aztecs|San Diego Toreros|San Francisco Dons|San José State Spartans|Santa Clara Broncos|Seattle U Redhawks|Seton Hall Pirates|Siena Saints|South Alabama Jaguars|South Carolina Gamecocks|South Carolina State Bulldogs|South Carolina Upstate Spartans|South Dakota Coyotes|South Dakota State Jackrabbits|South Florida Bulls|Southeast Missouri State Redhawks|Southern Illinois Salukis|Southern Jaguars|Southern Miss Golden Eagles|Southern Utah Thunderbirds|St. Bonaventure Bonnies|St. John's Red Storm|St. Thomas Tommies|Stanford Cardinal|Stephen F. Austin Lumberjacks|Stetson Hatters|Stonehill Skyhawks|Stony Brook Seawolves|Syracuse Orange|TCU Horned Frogs|Tarleton State Texans|Temple Owls|Tennessee State Tigers|Tennessee Tech Golden Eagles|Tennessee Volunteers|Texas A&M Aggies|Texas A&M-Corpus Christi Islanders|Texas Longhorns|Texas Southern Tigers|Texas State Bobcats|Texas Tech Red Raiders|The Citadel Bulldogs|Toledo Rockets|Towson Tigers|Troy Trojans|Tulane Green Wave|Tulsa Golden Hurricane|UAB Blazers|UAlbany Great Danes|UC Davis Aggies|UC Irvine Anteaters|UC Riverside Highlanders|UC San Diego Tritons|UC Santa Barbara Gauchos|UCF Knights|UCLA Bruins|UConn Huskies|UIC Flames|UL Monroe Warhawks|UMBC Retrievers|UMass Lowell River Hawks|UNC Asheville Bulldogs|UNC Greensboro Spartans|UNC Wilmington Seahawks|UNLV Rebels|USC Trojans|UT Arlington Mavericks|UT Martin Skyhawks|UT Rio Grande Valley Vaqueros|UTEP Miners|UTSA Roadrunners|Utah State Aggies|Utah Tech Trailblazers|Utah Utes|Utah Valley Wolverines|VCU Rams|VMI Keydets|Valparaiso Beacons|Vanderbilt Commodores|Vermont Catamounts|Villanova Wildcats|Virginia Cavaliers|Virginia Tech Hokies|Wagner Seahawks|Wake Forest Demon Deacons|Washington Huskies|Washington State Cougars|Weber State Wildcats|West Florida Argonauts|West Georgia Wolves|West Virginia Mountaineers|Western Carolina Catamounts|Western Illinois Leathernecks|Western Kentucky Hilltoppers|Western Michigan Broncos|Wichita State Shockers|William & Mary Tribe|Winthrop Eagles|Wisconsin Badgers|Wofford Terriers|Wright State Raiders|Wyoming Cowboys|Xavier Musketeers|Yale Bulldogs|Youngstown State Penguins"
 }
 
@@ -477,6 +545,25 @@ enum FieldhouseGameCatalog {
         FieldhouseGame(id: "texas-tech-baylor", away: "Texas Tech Red Raiders", home: "Baylor Bears", spread: "Baylor -3.5", tip: "SUN · 2:00 PM", dayOffset: 6, tipHour: 14),
         FieldhouseGame(id: "villanova-st-johns", away: "Villanova Wildcats", home: "St. John's Red Storm", spread: "St. John's -4.5", tip: "SUN · 5:00 PM", dayOffset: 6, tipHour: 17)
     ]
+
+    static let ncaawWindowOne = [
+        FieldhouseGame(id: "w-uconn-south-carolina", away: "UConn Huskies", home: "South Carolina Gamecocks", spread: "South Carolina -2.5", tip: "THU · 7:00 PM", tipHour: 19),
+        FieldhouseGame(id: "w-ucla-texas", away: "UCLA Bruins", home: "Texas Longhorns", spread: "UCLA -1.5", tip: "THU · 7:30 PM", tipHour: 19, tipMinute: 30),
+        FieldhouseGame(id: "w-lsu-notre-dame", away: "LSU Tigers", home: "Notre Dame Fighting Irish", spread: "LSU -3.5", tip: "THU · 8:00 PM", tipHour: 20),
+        FieldhouseGame(id: "w-usc-duke", away: "USC Trojans", home: "Duke Blue Devils", spread: "USC -4.5", tip: "THU · 8:30 PM", tipHour: 20, tipMinute: 30),
+        FieldhouseGame(id: "w-south-carolina-state-tennessee", away: "South Carolina State Lady Bulldogs", home: "Tennessee Lady Volunteers", spread: "Tennessee -12.5", tip: "THU · 9:00 PM", tipHour: 21),
+        FieldhouseGame(id: "w-iowa-ohio-state", away: "Iowa Hawkeyes", home: "Ohio State Buckeyes", spread: "Iowa -2.5", tip: "THU · 9:30 PM", tipHour: 21, tipMinute: 30),
+        FieldhouseGame(id: "w-oklahoma-state-baylor", away: "Oklahoma State Cowgirls", home: "Baylor Bears", spread: "Baylor -1.5", tip: "THU · 10:00 PM", tipHour: 22),
+        FieldhouseGame(id: "w-stanford-nc-state", away: "Stanford Cardinal", home: "NC State Wolfpack", spread: "NC State -3.5", tip: "THU · 10:30 PM", tipHour: 22, tipMinute: 30),
+        FieldhouseGame(id: "w-maryland-penn-state", away: "Maryland Terrapins", home: "Penn State Lady Lions", spread: "Maryland -5.5", tip: "SAT · 3:30 PM", dayOffset: 5, tipHour: 15, tipMinute: 30),
+        FieldhouseGame(id: "w-gonzaga-oregon", away: "Gonzaga Bulldogs", home: "Oregon Ducks", spread: "Oregon -2.5", tip: "SAT · 6:00 PM", dayOffset: 5, tipHour: 18),
+        FieldhouseGame(id: "w-louisville-kentucky", away: "Louisville Cardinals", home: "Kentucky Wildcats", spread: "Louisville -3.5", tip: "SUN · 2:00 PM", dayOffset: 6, tipHour: 14),
+        FieldhouseGame(id: "w-iowa-state-tcu", away: "Iowa State Cyclones", home: "TCU Horned Frogs", spread: "TCU -4.5", tip: "SUN · 5:00 PM", dayOffset: 6, tipHour: 17)
+    ]
+
+    static func games(for league: FieldhouseLeague) -> [FieldhouseGame] {
+        league == .ncaaw ? ncaawWindowOne : windowOne
+    }
 }
 
 enum FieldhousePropKind: String, CaseIterable, Identifiable, Codable {
@@ -717,6 +804,13 @@ struct FieldhouseSeasonState: Codable, Equatable {
     mutating func selectLeague(_ newLeague: FieldhouseLeague) {
         league = newLeague
         championshipTrophyID = FieldhouseTrophyCatalog.options(for: newLeague)[0].id
+        let games = Array(FieldhouseGameCatalog.games(for: newLeague).prefix(FieldhouseGameCatalog.weeklyCardSize))
+        scoringGames = games
+        scoringResults = Dictionary(uniqueKeysWithValues: games.enumerated().map { index, game in
+            let phase: FieldhouseGamePhase = index < 6 ? .final : .live(period: index == 6 ? "2H · 11:42" : "1H · 7:08")
+            return (game.id, FieldhouseGameResult(gameID: game.id, awayScore: 68 + index, homeScore: 72 + index, phase: phase))
+        })
+        scoringSelections = Dictionary(uniqueKeysWithValues: games.enumerated().map { ($0.offset, $0.element.away) })
     }
 
     @discardableResult
@@ -792,21 +886,48 @@ struct FieldhouseStateStore: FieldhouseStatePersisting {
 }
 
 struct FieldhouseNativePreviewView: View {
+    private var accent: Color { FieldhouseTheme.accent(for: state.league) }
     @State private var desk: FieldhouseDesk = .home
-    @State private var state = FieldhouseSeasonState()
+    @State private var state: FieldhouseSeasonState
     @State private var strikePresentation: StrikePresentation?
     @State private var showingEntrance = true
     @State private var showingSetup = false
     @Environment(\.scenePhase) private var scenePhase
     private let stateStore = FieldhouseStateStore()
-    private let stateScope = FieldhouseStateScope(
-        userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,
-        leagueID: FieldhousePreviewIdentity.leagueID
-    )
+    private let initialLeague: FieldhouseLeague
+    private var stateScope: FieldhouseStateScope {
+        FieldhouseStateScope(
+            userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,
+            leagueID: state.league == .ncaam
+                ? FieldhousePreviewIdentity.leagueID
+                : UUID(uuidString: "F13D0000-0000-4000-8000-000000000004")!
+        )
+    }
+
+    init(initialLeague: FieldhouseLeague = .activeBuild) {
+        self.initialLeague = initialLeague
+        var initialState = FieldhouseSeasonState()
+        initialState.selectLeague(initialLeague)
+        let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
+        let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
+        if reviewMode {
+            initialState.favoriteTeam = initialLeague == .ncaaw ? "South Carolina Gamecocks" : "Duke Blue Devils"
+            initialState.crystalBallChampion = initialLeague == .ncaaw ? "UConn Huskies" : "UConn Huskies"
+        }
+        if reviewPicks {
+            _ = initialState.publishCard(
+                games: Array(FieldhouseGameCatalog.games(for: initialLeague).prefix(FieldhouseGameCatalog.weeklyCardSize)),
+                prop: .teamScores90
+            )
+        }
+        _state = State(initialValue: initialState)
+        _desk = State(initialValue: reviewPicks ? .picks : .home)
+        _showingEntrance = State(initialValue: !reviewMode)
+    }
 
     var body: some View {
         ZStack {
-            FieldhouseBackdrop().ignoresSafeArea()
+            FieldhouseBackdrop(leagueOverride: state.league).ignoresSafeArea()
             VStack(spacing: 0) {
                 if desk != .home {
                     FieldhouseHeader(state: state, canGoBack: true) { desk = .home }
@@ -836,12 +957,14 @@ struct FieldhouseNativePreviewView: View {
                 FieldhouseBottomNavigation(selection: $desk, hasOutstandingPickTask: state.hasOutstandingPickTask(at: context.date))
             }
         }
+        .environment(\.fieldhouseLeague, state.league)
+        .accentColor(FieldhouseTheme.accent(for: state.league))
         .preferredColorScheme(.dark)
         .fullScreenCover(item: $strikePresentation) { presentation in
             WeaponStrikeVideoView(presentation: presentation) { strikePresentation = nil }
         }
         .fullScreenCover(isPresented: $showingEntrance) {
-            FieldhouseEntranceView {
+            FieldhouseEntranceView(league: state.league) {
                 showingEntrance = false
                 showingSetup = state.favoriteTeam == nil || state.crystalBallChampion == nil
             }
@@ -850,7 +973,21 @@ struct FieldhouseNativePreviewView: View {
             FieldhouseSeasonSetupView(state: $state) { showingSetup = false }
         }
         .onAppear {
-            if let saved = stateStore.load(scope: stateScope) { state = saved }
+            var initialState = FieldhouseSeasonState()
+            initialState.selectLeague(initialLeague)
+            if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review") {
+                initialState.favoriteTeam = initialLeague == .ncaaw ? "South Carolina Gamecocks" : "Duke Blue Devils"
+                initialState.crystalBallChampion = "UConn Huskies"
+            }
+            let initialScope = FieldhouseStateScope(
+                userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,
+                leagueID: initialLeague == .ncaam
+                    ? FieldhousePreviewIdentity.leagueID
+                    : UUID(uuidString: "F13D0000-0000-4000-8000-000000000004")!
+            )
+            state = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
+                ? initialState
+                : (stateStore.load(scope: initialScope) ?? initialState)
             refreshLifecycle(at: Date())
         }
         .onChange(of: state) { _, newState in
@@ -868,18 +1005,21 @@ struct FieldhouseNativePreviewView: View {
 }
 
 private struct FieldhouseSeasonSetupView: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     let finish: () -> Void
     @State private var step = 0
     @State private var pendingTeam: String?
     @State private var searchText = ""
+    private var catalog: [String] { FieldhouseTeamCatalog.teams(for: state.league) }
     private var teams: [String] {
-        searchText.isEmpty ? FieldhouseTeamCatalog.all : FieldhouseTeamCatalog.all.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        return searchText.isEmpty ? catalog : catalog.filter { $0.localizedCaseInsensitiveContains(searchText) }
     }
 
     var body: some View {
         ZStack {
-            FieldhouseBackdrop().ignoresSafeArea()
+            FieldhouseBackdrop(leagueOverride: state.league).ignoresSafeArea()
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     if pendingTeam != nil {
@@ -889,14 +1029,14 @@ private struct FieldhouseSeasonSetupView: View {
                         }.buttonStyle(.plain).accessibilityLabel("Back to team list")
                     }
                     Text(step == 0 ? "COURTSIDE IDENTITY" : "SEALED PROPHECY")
-                        .font(.system(size: 10, weight: .black)).tracking(2).foregroundStyle(.orange)
+                        .font(.system(size: 10, weight: .black)).tracking(2).foregroundStyle(accent)
                 }
                 Text(step == 0 ? "PICK YOUR\nFAVORITE TEAM" : "PICK YOUR\nCHAMPION")
                     .font(.system(size: 42, weight: .black)).fontWidth(.condensed)
                 Text(step == 0 ? "This follows your profile across every Fieldhouse league. You can change your favorite team later from You." : "The Crystal Ball is mandatory. This championship call locks when you confirm it.")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
                 if pendingTeam == nil {
-                    TextField("Search all \(FieldhouseTeamCatalog.all.count) NCAAM Division I teams", text: $searchText)
+                    TextField("Search all \(catalog.count) \(state.league.rawValue) Division I teams", text: $searchText)
                         .textInputAutocapitalization(.words).autocorrectionDisabled()
                         .padding(13).background(.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
                     ScrollView {
@@ -911,10 +1051,10 @@ private struct FieldhouseSeasonSetupView: View {
                     }
                 } else if let pendingTeam {
                     VStack(spacing: 14) {
-                        Image(systemName: step == 0 ? "heart.fill" : "sparkles").font(.system(size: 54, weight: .black)).foregroundStyle(.orange)
+                        Image(systemName: step == 0 ? "heart.fill" : "sparkles").font(.system(size: 54, weight: .black)).foregroundStyle(accent)
                         Text(pendingTeam).font(.title2.weight(.black)).multilineTextAlignment(.center)
                         Button("CHANGE SELECTION") { self.pendingTeam = nil }
-                            .font(.caption.weight(.black)).foregroundStyle(.orange)
+                            .font(.caption.weight(.black)).foregroundStyle(accent)
                     }.frame(maxWidth: .infinity).padding(28).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 20))
                 }
                 Spacer()
@@ -932,7 +1072,7 @@ private struct FieldhouseSeasonSetupView: View {
                 } label: {
                     Text(step == 0 ? "CONFIRM FAVORITE TEAM" : "CONFIRM CRYSTAL BALL")
                         .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(17)
-                        .foregroundStyle(.black).background(pendingTeam == nil ? Color.gray : Color.orange, in: RoundedRectangle(cornerRadius: 16))
+                        .foregroundStyle(.black).background(pendingTeam == nil ? Color.gray : accent, in: RoundedRectangle(cornerRadius: 16))
                 }.buttonStyle(.plain).disabled(pendingTeam == nil)
             }.padding(22).padding(.top, 22)
         }.preferredColorScheme(.dark)
@@ -940,24 +1080,37 @@ private struct FieldhouseSeasonSetupView: View {
 }
 
 private struct FieldhouseBackdrop: View {
+    @Environment(\.fieldhouseLeague) private var league
+    let leagueOverride: FieldhouseLeague?
+    init(leagueOverride: FieldhouseLeague? = nil) { self.leagueOverride = leagueOverride }
+    private var activeLeague: FieldhouseLeague { leagueOverride ?? league }
+    private var accent: Color { FieldhouseTheme.accent(for: activeLeague) }
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(red: 0.035, green: 0.018, blue: 0.008), Color(red: 0.15, green: 0.055, blue: 0.012), .black], startPoint: .topLeading, endPoint: .bottomTrailing)
+            LinearGradient(
+                colors: activeLeague == .ncaam
+                    ? [Color(red: 0.035, green: 0.018, blue: 0.008), Color(red: 0.15, green: 0.055, blue: 0.012), .black]
+                    : [Color(red: 0.018, green: 0.018, blue: 0.08), Color(red: 0.13, green: 0.025, blue: 0.17), .black],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
             Canvas { context, size in
-                let paint = Color.orange.opacity(0.075)
+                let paint = accent.opacity(0.075)
                 for x in stride(from: 0.0, through: size.width, by: 34) {
                     context.fill(Path(CGRect(x: x, y: 0, width: 1, height: size.height)), with: .color(paint))
                 }
                 context.stroke(Path { path in
                     path.move(to: CGPoint(x: size.width / 2, y: 0)); path.addLine(to: CGPoint(x: size.width / 2, y: size.height))
                     path.addEllipse(in: CGRect(x: size.width / 2 - 92, y: size.height / 2 - 92, width: 184, height: 184))
-                }, with: .color(Color.orange.opacity(0.15)), lineWidth: 2)
+                }, with: .color(accent.opacity(0.15)), lineWidth: 2)
             }
         }
     }
 }
 
 private struct FieldhouseHeader: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     let state: FieldhouseSeasonState
     let canGoBack: Bool
     let back: () -> Void
@@ -970,18 +1123,20 @@ private struct FieldhouseHeader: View {
                             .frame(width: 36, height: 36).background(.white.opacity(0.10), in: Circle())
                     }.buttonStyle(.plain).accessibilityLabel("Back to Fieldhouse home")
                 }
-                Label("COLLEGE BASKETBALL", systemImage: "basketball.fill").font(.system(size: 9, weight: .black)).tracking(1.8).foregroundStyle(.orange)
+                Label("COLLEGE BASKETBALL", systemImage: "basketball.fill").font(.system(size: 9, weight: .black)).tracking(1.8).foregroundStyle(accent)
                 Spacer(); Text("NATIVE FIELDHOUSE").font(.system(size: 8, weight: .black)).tracking(1.2).foregroundStyle(.white.opacity(0.42))
             }
             Text(state.league.displayName).font(.system(size: 29, weight: .black)).fontWidth(.condensed)
             Text("WINDOW \(state.window) · FOUR REGIONS · ONE ROAD TO THE MIDDLE").font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.55))
         }
         .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 13)
-        .background(.black.opacity(0.78)).overlay(alignment: .bottom) { Rectangle().fill(LinearGradient(colors: [.clear, .orange, .clear], startPoint: .leading, endPoint: .trailing)).frame(height: 2) }
+        .background(.black.opacity(0.78)).overlay(alignment: .bottom) { Rectangle().fill(LinearGradient(colors: [.clear, accent, .clear], startPoint: .leading, endPoint: .trailing)).frame(height: 2) }
     }
 }
 
 private struct FieldhouseBottomNavigation: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var selection: FieldhouseDesk
     let hasOutstandingPickTask: Bool
     var body: some View {
@@ -996,7 +1151,7 @@ private struct FieldhouseBottomNavigation: View {
                                     .font(.system(size: 8, weight: .black))
                                     .foregroundStyle(.black)
                                     .frame(width: 16, height: 16)
-                                    .background(Color.orange, in: Circle())
+                                    .background(accent, in: Circle())
                                     .overlay(Circle().stroke(.black, lineWidth: 2))
                                     .offset(x: 10, y: -7)
                                     .accessibilityLabel("One pick task remaining")
@@ -1004,7 +1159,7 @@ private struct FieldhouseBottomNavigation: View {
                         }
                         Text(desk.rawValue).font(.system(size: 10, weight: .bold))
                     }
-                    .foregroundStyle(selection == desk ? Color.orange : Color.white.opacity(0.78))
+                    .foregroundStyle(selection == desk ? accent : Color.white.opacity(0.78))
                     .frame(maxWidth: .infinity).frame(height: 58)
                     .background(selection == desk ? Color.white.opacity(0.10) : .clear, in: RoundedRectangle(cornerRadius: 18))
                 }.buttonStyle(.plain)
@@ -1018,27 +1173,29 @@ private struct FieldhouseBottomNavigation: View {
 }
 
 private struct FieldhouseEntranceView: View {
+    private var accent: Color { FieldhouseTheme.accent(for: league) }
+    let league: FieldhouseLeague
     let enter: () -> Void
     var body: some View {
         ZStack {
-            FieldhouseBackdrop().ignoresSafeArea()
+            FieldhouseBackdrop(leagueOverride: league).ignoresSafeArea()
             VStack(spacing: 18) {
                 Spacer()
                 Image(systemName: "basketball.fill")
-                    .font(.system(size: 78, weight: .black)).foregroundStyle(.orange)
-                    .shadow(color: .orange.opacity(0.75), radius: 28)
-                Text("COURTSIDE PASS").font(.system(size: 12, weight: .black)).tracking(4).foregroundStyle(.orange)
+                    .font(.system(size: 78, weight: .black)).foregroundStyle(accent)
+                    .shadow(color: accent.opacity(0.75), radius: 28)
+                Text("COURTSIDE PASS").font(.system(size: 12, weight: .black)).tracking(4).foregroundStyle(accent)
                 Text("THE\nFIELDHOUSE").font(.system(size: 58, weight: .black)).fontWidth(.condensed).multilineTextAlignment(.center)
-                Text("NCAAM").font(.system(size: 12, weight: .black)).tracking(3).foregroundStyle(.orange)
+                Text(league.rawValue).font(.system(size: 12, weight: .black)).tracking(3).foregroundStyle(accent)
                 Text("FOUR REGIONS · ONE ROAD TO THE MIDDLE")
                     .font(.system(size: 10, weight: .black)).tracking(1.8).foregroundStyle(.white.opacity(0.58))
                 Spacer()
                 Button(action: enter) {
                     Label("TAKE THE FLOOR", systemImage: "arrow.right.circle.fill")
                         .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(17)
-                        .foregroundStyle(.black).background(.orange, in: RoundedRectangle(cornerRadius: 16))
+                        .foregroundStyle(.black).background(accent, in: RoundedRectangle(cornerRadius: 16))
                 }.buttonStyle(.plain)
-                Text("DIVISION I MEN'S BASKETBALL · SIX TROPHIES · ONE FIELDHOUSE")
+                Text("DIVISION I \(league == .ncaam ? "MEN'S" : "WOMEN'S") BASKETBALL · SIX TROPHIES · ONE FIELDHOUSE")
                     .font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(.white.opacity(0.42))
             }.padding(24).padding(.bottom, 18)
         }.preferredColorScheme(.dark)
@@ -1046,6 +1203,8 @@ private struct FieldhouseEntranceView: View {
 }
 
 private struct FieldhouseHomePage: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @Binding var desk: FieldhouseDesk
     @State private var showingLeagueSwitcher = false
@@ -1149,15 +1308,17 @@ private struct FieldhouseHomePage: View {
     private var postseasonCard: some View {
         let counts = WarRoomPostseasonRule.counts(playerCount: state.playerCount)
         return VStack(alignment: .leading, spacing: 8) {
-            Text("THE REGIONAL CUT · 4 REGIONS OF 25").font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(.orange)
+            Text("THE REGIONAL CUT · 4 REGIONS OF 25").font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(accent)
             HStack { cut("TOP", counts.championship, "CHAMPIONSHIP", .yellow); cut("MIDDLE", counts.activeNoBrass, "PICKS · NO BRASS", .white); cut("BOTTOM", counts.toilet, "TOILET BOWL", .purple) }
             Text("Each region sends its top 4 to the Championship and bottom 4 to the Toilet Bowl. Everyone else keeps picking without brass eligibility.").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
-        }.padding(16).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.38)))
+        }.padding(16).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.38)))
     }
     private func cut(_ label: String, _ value: Int, _ note: String, _ color: Color) -> some View { VStack(spacing: 3) { Text("\(value)").font(.title2.weight(.black)).foregroundStyle(color); Text(label).font(.system(size: 7, weight: .black)); Text(note).font(.system(size: 6, weight: .black)).foregroundStyle(.white.opacity(0.42)) }.frame(maxWidth: .infinity) }
 }
 
 private struct FieldhouseCommissionerCommand: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @Environment(\.dismiss) private var dismiss
     @State private var showingCardBuilder = false
@@ -1184,14 +1345,14 @@ private struct FieldhouseCommissionerCommand: View {
                         .disabled(state.cardIsPublished)
                         commandRow("PLAYERS", detail: "25 active · late entry seed \(FieldhouseLateEntryRule.entryScore(existingScores: demoScores)) points", icon: "person.2.fill", status: FieldhouseLateEntryRule.acceptsEntries(during: state.phase) ? "OPEN" : "CLOSED", color: .green)
                         commandRow("WEEK \(state.scoringWindow) · ON THE FLOOR", detail: "\(state.scoringFinalGames) final · \(state.scoringLiveGames) live", icon: "basketball.fill", status: "SCORING", color: .green)
-                        commandRow("REGION ASSIGNMENTS", detail: "East · West · South · Midwest", icon: "square.grid.2x2.fill", status: state.canRebalanceRegions ? "EDIT" : "LOCKED", color: state.canRebalanceRegions ? .orange : .red)
-                        commandRow("SEASON PHASE", detail: "Transitions control entry eligibility and regional seeding", icon: "calendar.badge.clock", status: state.phase.rawValue, color: .orange)
+                        commandRow("REGION ASSIGNMENTS", detail: "East · West · South · Midwest", icon: "square.grid.2x2.fill", status: state.canRebalanceRegions ? "EDIT" : "LOCKED", color: state.canRebalanceRegions ? accent : .red)
+                        commandRow("SEASON PHASE", detail: "Transitions control entry eligibility and regional seeding", icon: "calendar.badge.clock", status: state.phase.rawValue, color: accent)
                         VStack(alignment: .leading, spacing: 7) {
-                            Text("HARD RULES").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
+                            Text("HARD RULES").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(accent)
                             Label("Region rebalancing locks when the season begins.", systemImage: "lock.fill")
                             Label("Late entries receive the rounded average of the bottom 15%.", systemImage: "person.badge.plus")
                             Label("New entries close when postseason begins.", systemImage: "calendar.badge.exclamationmark")
-                        }.font(.caption.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading).padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.28)))
+                        }.font(.caption.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading).padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.28)))
                         trophySelector
                     }.padding(14).padding(.bottom, 28)
                 }
@@ -1224,19 +1385,19 @@ private struct FieldhouseCommissionerCommand: View {
 
     private func commandRow(_ title: String, detail: String, icon: String, status: String, color: Color) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: icon).font(.title3.weight(.black)).foregroundStyle(.orange).frame(width: 42, height: 42).background(.orange.opacity(0.12), in: Circle())
+            Image(systemName: icon).font(.title3.weight(.black)).foregroundStyle(accent).frame(width: 42, height: 42).background(accent.opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 4) { Text(title).font(.headline.weight(.black)); Text(detail).font(.caption).foregroundStyle(.white.opacity(0.52)) }
             Spacer(); Text(status).font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(color).padding(.horizontal, 9).padding(.vertical, 6).background(color.opacity(0.12), in: Capsule())
-        }.padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.22)))
+        }.padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.22)))
     }
 
     private var trophySelector: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("\(state.league.rawValue) · CHAMPIONSHIP TROPHY").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
+                Text("\(state.league.rawValue) · CHAMPIONSHIP TROPHY").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(accent)
                 Spacer()
                 Label(state.canSelectChampionshipTrophy ? "SELECT" : "LOCKED", systemImage: state.canSelectChampionshipTrophy ? "hand.tap.fill" : "lock.fill")
-                    .font(.system(size: 8, weight: .black)).foregroundStyle(state.canSelectChampionshipTrophy ? .orange : .red)
+                    .font(.system(size: 8, weight: .black)).foregroundStyle(state.canSelectChampionshipTrophy ? accent : .red)
             }
             Text(state.canSelectChampionshipTrophy ? "Choose the league hardware before the season's first tip." : "The season has tipped. Championship hardware is permanently locked.")
                 .font(.caption).foregroundStyle(.white.opacity(0.52))
@@ -1250,25 +1411,28 @@ private struct FieldhouseCommissionerCommand: View {
                             Text(trophy.detail).font(.system(size: 8, weight: .semibold)).foregroundStyle(.white.opacity(0.55)).multilineTextAlignment(.center).lineLimit(2)
                         }
                         .frame(maxWidth: .infinity).padding(10)
-                        .background(selected ? .orange.opacity(0.16) : .black.opacity(0.74), in: RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(selected ? .orange : .white.opacity(0.10), lineWidth: selected ? 2 : 1))
+                        .background(selected ? accent.opacity(0.16) : .black.opacity(0.74), in: RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(selected ? accent : .white.opacity(0.10), lineWidth: selected ? 2 : 1))
                     }.buttonStyle(.plain).disabled(!state.canSelectChampionshipTrophy)
                 }
             }
         }
         .padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15))
-        .overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.28)))
+        .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.28)))
     }
 }
 
 private struct FieldhouseCardBuilder: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     let window: Int
     let publish: ([FieldhouseGame], FieldhousePropKind) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var oddsLoaded = false
     @State private var selectedIDs: Set<String> = []
     @State private var selectedProp: FieldhousePropKind?
-    private var selectedGames: [FieldhouseGame] { FieldhouseGameCatalog.windowOne.filter { selectedIDs.contains($0.id) } }
+    private var availableGames: [FieldhouseGame] { FieldhouseGameCatalog.games(for: themedLeague) }
+    private var selectedGames: [FieldhouseGame] { availableGames.filter { selectedIDs.contains($0.id) } }
     private let cardSize = FieldhouseGameCatalog.weeklyCardSize
     private var ready: Bool { selectedGames.count == cardSize && selectedProp != nil }
     var body: some View {
@@ -1277,7 +1441,7 @@ private struct FieldhouseCardBuilder: View {
                 FieldhouseBackdrop().ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("WINDOW \(window) · COMMISSIONER").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
+                        Text("WINDOW \(window) · COMMISSIONER").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(accent)
                         Text("BUILD THE CARD").font(.system(size: 36, weight: .black)).fontWidth(.condensed)
                         Text("Pull the Division I board for this Monday–Sunday window, select exactly ten games, confirm the spreads, then choose an automatically scored three-point floor prop.")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
@@ -1288,8 +1452,8 @@ private struct FieldhouseCardBuilder: View {
                                 Image(systemName: oddsLoaded ? "checkmark.circle.fill" : "arrow.down.circle.fill")
                                     .font(.title2.weight(.black))
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(oddsLoaded ? "ODDS LOADED" : "PULL NCAAM ODDS").font(.headline.weight(.black))
-                                    Text(oddsLoaded ? "\(FieldhouseGameCatalog.windowOne.count) eligible games · Monday–Sunday" : "Load eligible Division I games and current spreads")
+                                    Text(oddsLoaded ? "ODDS LOADED" : "PULL \(themedLeague.rawValue) ODDS").font(.headline.weight(.black))
+                                    Text(oddsLoaded ? "\(availableGames.count) eligible games · Monday–Sunday" : "Load eligible Division I games and current spreads")
                                         .font(.caption.weight(.bold)).opacity(0.72)
                                 }
                                 Spacer()
@@ -1297,21 +1461,21 @@ private struct FieldhouseCardBuilder: View {
                             }
                             .frame(maxWidth: .infinity).padding(16)
                             .foregroundStyle(oddsLoaded ? Color.green : Color.black)
-                            .background(oddsLoaded ? Color.green.opacity(0.12) : Color.orange, in: RoundedRectangle(cornerRadius: 15))
-                            .overlay(RoundedRectangle(cornerRadius: 15).stroke(oddsLoaded ? Color.green.opacity(0.55) : Color.orange))
+                            .background(oddsLoaded ? Color.green.opacity(0.12) : accent, in: RoundedRectangle(cornerRadius: 15))
+                            .overlay(RoundedRectangle(cornerRadius: 15).stroke(oddsLoaded ? Color.green.opacity(0.55) : accent))
                         }
                         .buttonStyle(.plain)
                         .disabled(oddsLoaded)
 
                         if oddsLoaded {
-                            ForEach(FieldhouseGameCatalog.windowOne) { game in
+                            ForEach(availableGames) { game in
                                 let selected = selectedIDs.contains(game.id)
                                 Button {
                                     if selected { selectedIDs.remove(game.id) }
                                     else if selectedIDs.count < cardSize { selectedIDs.insert(game.id) }
                                 } label: {
                                     HStack(spacing: 11) {
-                                        Image(systemName: selected ? "checkmark.circle.fill" : "circle").font(.title3).foregroundStyle(selected ? .orange : .white.opacity(0.38))
+                                        Image(systemName: selected ? "checkmark.circle.fill" : "circle").font(.title3).foregroundStyle(selected ? accent : .white.opacity(0.38))
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text("\(game.away) at \(game.home)").font(.subheadline.weight(.black)).multilineTextAlignment(.leading)
                                             Text("\(game.spread) · \(game.tip)").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.48))
@@ -1320,10 +1484,10 @@ private struct FieldhouseCardBuilder: View {
                                     }
                                 }.buttonStyle(.plain)
                                 .disabled(!selected && selectedIDs.count == cardSize)
-                                .padding(13).background(selected ? .orange.opacity(0.14) : .black.opacity(0.70), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? .orange : .white.opacity(0.10)))
+                                .padding(13).background(selected ? accent.opacity(0.14) : .black.opacity(0.70), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? accent : .white.opacity(0.10)))
                             }
                             VStack(alignment: .leading, spacing: 7) {
-                                Text("WEEKLY PROP · 3 POINTS · AUTO-SCORED").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.orange)
+                                Text("WEEKLY PROP · 3 POINTS · AUTO-SCORED").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(accent)
                                 Menu {
                                     ForEach(FieldhousePropKind.allCases) { prop in
                                         Button(prop.question) { selectedProp = prop }
@@ -1331,11 +1495,11 @@ private struct FieldhouseCardBuilder: View {
                                 } label: {
                                     HStack(spacing: 10) {
                                         Image(systemName: selectedProp == nil ? "chevron.down.circle" : "checkmark.circle.fill")
-                                            .foregroundStyle(selectedProp == nil ? .orange : .green)
+                                            .foregroundStyle(selectedProp == nil ? accent : .green)
                                         Text(selectedProp?.question ?? "CHOOSE AN AUTO-SCORED PROP")
                                             .font(.subheadline.weight(.bold)).multilineTextAlignment(.leading)
                                         Spacer()
-                                        Image(systemName: "chevron.up.chevron.down").foregroundStyle(.orange)
+                                        Image(systemName: "chevron.up.chevron.down").foregroundStyle(accent)
                                     }
                                     .padding(14).background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
                                 }
@@ -1345,7 +1509,7 @@ private struct FieldhouseCardBuilder: View {
                             }
                             Button { if let selectedProp { publish(selectedGames, selectedProp) } } label: {
                                 Text("PUBLISH WINDOW \(window)").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
-                                    .foregroundStyle(.black).background(ready ? Color.orange : Color.gray, in: RoundedRectangle(cornerRadius: 15))
+                                    .foregroundStyle(.black).background(ready ? accent : Color.gray, in: RoundedRectangle(cornerRadius: 15))
                             }.buttonStyle(.plain).disabled(!ready)
                         }
                     }.padding().padding(.bottom, 24)
@@ -1365,61 +1529,67 @@ private struct FieldhouseCardBuilder: View {
             Spacer()
             Text("\(max(0, cardSize - selectedGames.count)) REMAINING")
                 .font(.caption.weight(.black))
-                .foregroundStyle(selectedGames.count == cardSize ? .green : .orange)
+                .foregroundStyle(selectedGames.count == cardSize ? .green : accent)
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .background(.black.opacity(0.97))
-        .overlay(alignment: .bottom) { Rectangle().fill(.orange.opacity(0.55)).frame(height: 1) }
+        .overlay(alignment: .bottom) { Rectangle().fill(accent.opacity(0.55)).frame(height: 1) }
     }
 }
 
 private struct FieldhouseHomeMasthead: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     let state: FieldhouseSeasonState
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Label("FIELDHOUSE // LIVE", systemImage: "circle.fill")
-                    .font(.system(size: 10, weight: .black)).tracking(1.8).foregroundStyle(.orange)
+                    .font(.system(size: 10, weight: .black)).tracking(1.8).foregroundStyle(accent)
                 Spacer()
                 Text("COMMAND").font(.caption.weight(.black)).tracking(1.2)
                     .foregroundStyle(.black).padding(.horizontal, 16).padding(.vertical, 9).background(.yellow, in: Capsule())
             }
             HStack(spacing: 14) {
                 Image(systemName: "basketball.fill").font(.system(size: 38, weight: .black)).foregroundStyle(.black)
-                    .frame(width: 68, height: 68).background(.orange, in: RoundedRectangle(cornerRadius: 17))
+                    .frame(width: 68, height: 68).background(accent, in: RoundedRectangle(cornerRadius: 17))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(state.league.displayName).font(.system(size: 28, weight: .black)).fontWidth(.condensed)
                     Text("\(state.league.rawValue) · \(FieldhouseSeasonCalendar.windowLabel(state.window)) · \(state.phase.rawValue)")
                         .font(.system(size: 9, weight: .black)).tracking(1.2).foregroundStyle(.white.opacity(0.55))
                 }
             }
-            Divider().overlay(.orange.opacity(0.45))
+            Divider().overlay(accent.opacity(0.45))
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 HStack {
                     Label("SHOT CLOCK", systemImage: "timer").font(.caption2.weight(.black)).tracking(1.3)
                     Spacer()
                     Text(FieldhouseSeasonCalendar.lockClock(at: context.date, window: state.window, games: state.publishedGames)).font(.caption.weight(.black))
-                }.foregroundStyle(.orange)
+                }.foregroundStyle(accent)
             }
         }
         .padding(18)
-        .background(LinearGradient(colors: [.orange.opacity(0.25), .black.opacity(0.86)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 22))
-        .overlay(RoundedRectangle(cornerRadius: 22).stroke(.orange.opacity(0.58), lineWidth: 1.5))
+        .background(LinearGradient(colors: [accent.opacity(0.25), .black.opacity(0.86)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(accent.opacity(0.58), lineWidth: 1.5))
     }
 }
 
 private struct FieldhouseHomeButton: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     let title: String
     let icon: String
     var body: some View {
         Label(title, systemImage: icon).font(.system(size: 10, weight: .black)).tracking(0.6)
-            .foregroundStyle(.orange).frame(maxWidth: .infinity).padding(.vertical, 17)
+            .foregroundStyle(accent).frame(maxWidth: .infinity).padding(.vertical, 17)
             .background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 15))
-            .overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.34)))
+            .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.34)))
     }
 }
 
 private struct FieldhouseLeagueSwitcher: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var league: FieldhouseLeague
     let dismiss: () -> Void
     var body: some View {
@@ -1437,7 +1607,7 @@ private struct FieldhouseLeagueSwitcher: View {
                 ForEach([FieldhouseLeague.activeBuild]) { option in
                     Button { league = option; dismiss() } label: {
                         HStack {
-                            Image(systemName: "basketball.fill").foregroundStyle(.orange).frame(width: 30)
+                            Image(systemName: "basketball.fill").foregroundStyle(accent).frame(width: 30)
                             VStack(alignment: .leading) { Text(option.rawValue).font(.caption.weight(.black)); Text(option.displayName).font(.headline.weight(.black)) }
                             Spacer(); Image(systemName: league == option ? "checkmark.circle.fill" : "chevron.right")
                         }.padding(14).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
@@ -1455,6 +1625,8 @@ private enum FieldhousePicksLane: String {
 }
 
 private struct FieldhousePicksPage: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
     @State private var confirmingLock = false
@@ -1472,7 +1644,7 @@ private struct FieldhousePicksPage: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
             .background(.black.opacity(0.97))
-            .overlay(alignment: .bottom) { Rectangle().fill(.orange.opacity(0.28)).frame(height: 1) }
+            .overlay(alignment: .bottom) { Rectangle().fill(accent.opacity(0.28)).frame(height: 1) }
             .zIndex(2)
 
             ScrollView {
@@ -1521,20 +1693,20 @@ private struct FieldhousePicksPage: View {
                     gameCard(index: index, game: game)
                 }
                 VStack(alignment: .leading, spacing: 9) {
-                    Text("FLOOR PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.orange)
+                    Text("FLOOR PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(accent)
                     Text(state.publishedProp?.question ?? "PROP NOT PUBLISHED").font(.headline.weight(.black))
                     HStack(spacing: 9) { propButton("YES"); propButton("NO") }
-                }.padding(15).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.28)))
+                }.padding(15).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.28)))
                 if state.picksLocked {
                     VStack(spacing: 9) {
                         Label("WINDOW \(state.window) PICKS LOCKED", systemImage: "lock.fill").font(.headline.weight(.black)).foregroundStyle(.green)
                         Button("REOPEN PICKS BEFORE FIRST TIP") { _ = state.reopenPicks(at: Date()) }
-                            .font(.caption.weight(.black)).foregroundStyle(.orange)
+                            .font(.caption.weight(.black)).foregroundStyle(accent)
                     }.frame(maxWidth: .infinity).padding(16).background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.green.opacity(0.45)))
                 } else {
                     Button { confirmingLock = true } label: {
                         Label("LOCK WINDOW \(state.window) PICKS", systemImage: "lock.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(17)
-                            .foregroundStyle(.black).background(state.cardIsComplete ? Color.orange : Color.gray, in: RoundedRectangle(cornerRadius: 15))
+                            .foregroundStyle(.black).background(state.cardIsComplete ? accent : Color.gray, in: RoundedRectangle(cornerRadius: 15))
                     }.buttonStyle(.plain).disabled(!state.cardIsComplete)
                     if !state.cardIsComplete {
                         Text("Pick all ten games, use confidence 1–10 once each, mark one Best Bet, and answer the prop.")
@@ -1552,7 +1724,7 @@ private struct FieldhousePicksPage: View {
             HStack {
                 Text("\(made)/\(FieldhouseGameCatalog.weeklyCardSize) PICKS MADE").font(.caption.weight(.black))
                 Spacer()
-                Text("\(remaining) REMAINING").font(.caption.weight(.black)).foregroundStyle(remaining == 0 ? .green : .orange)
+                Text("\(remaining) REMAINING").font(.caption.weight(.black)).foregroundStyle(remaining == 0 ? .green : accent)
             }
             HStack(spacing: 8) {
                 requirementChip("CONFIDENCE", ready: confidenceReady)
@@ -1562,7 +1734,7 @@ private struct FieldhousePicksPage: View {
         }
         .padding(11)
         .background(.black, in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).stroke(.orange.opacity(0.55)))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(accent.opacity(0.55)))
         .shadow(color: .black.opacity(0.7), radius: 8, y: 4)
     }
 
@@ -1586,7 +1758,7 @@ private struct FieldhousePicksPage: View {
         }
         .padding(6)
         .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 17))
-        .overlay(RoundedRectangle(cornerRadius: 17).stroke(.orange.opacity(0.34)))
+        .overlay(RoundedRectangle(cornerRadius: 17).stroke(accent.opacity(0.34)))
     }
 
     private func laneButton(_ target: FieldhousePicksLane, week: Int, title: String, icon: String, urgent: Bool = false) -> some View {
@@ -1597,7 +1769,7 @@ private struct FieldhousePicksPage: View {
             }
             .foregroundStyle(urgent ? .white : (lane == target ? .black : .white.opacity(0.62)))
             .frame(maxWidth: .infinity).padding(.vertical, 11)
-            .background(urgent ? Color.red : (lane == target ? Color.orange : .clear), in: RoundedRectangle(cornerRadius: 12))
+            .background(urgent ? Color.red : (lane == target ? accent : .clear), in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(urgent ? Color.white.opacity(0.72) : .clear, lineWidth: urgent ? 2 : 0))
             .shadow(color: urgent ? .red.opacity(0.75) : .clear, radius: urgent ? 10 : 0)
         }.buttonStyle(.plain)
@@ -1617,7 +1789,7 @@ private struct FieldhousePicksPage: View {
                 let coverWinner = result?.coverWinner(in: game)
                 HStack(spacing: 10) {
                     Image(systemName: isFinal ? "checkmark.circle.fill" : "dot.radiowaves.left.and.right")
-                        .foregroundStyle(isFinal ? .green : .orange)
+                        .foregroundStyle(isFinal ? .green : accent)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("\(game.away) at \(game.home)").font(.caption.weight(.black))
                         Text("\(game.spread) · \(resultStatus(result))")
@@ -1642,7 +1814,7 @@ private struct FieldhousePicksPage: View {
                     VStack(alignment: .trailing, spacing: 3) {
                         if let result { Text("\(result.awayScore)–\(result.homeScore)").font(.headline.weight(.black)) }
                         Text(isFinal ? "FINAL" : periodLabel(result))
-                            .font(.caption2.weight(.black)).foregroundStyle(isFinal ? .green : .orange)
+                            .font(.caption2.weight(.black)).foregroundStyle(isFinal ? .green : accent)
                         if let gamePoints = state.scoringGamePoints(at: index) {
                             Text("+\(gamePoints)").font(.headline.weight(.black)).foregroundStyle(gamePoints > 0 ? .green : .white.opacity(0.35))
                         }
@@ -1660,17 +1832,17 @@ private struct FieldhousePicksPage: View {
         let correctCall = result.map { state.scoringPropAnswer == ($0 ? "YES" : "NO") }
         return VStack(alignment: .leading, spacing: 7) {
             HStack {
-                Text("FLOOR PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.orange)
+                Text("FLOOR PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(accent)
                 Spacer()
                 Text(result == nil ? "PENDING" : (result == true ? "YES" : "NO"))
-                    .font(.caption.weight(.black)).foregroundStyle(result == nil ? .orange : .green)
+                    .font(.caption.weight(.black)).foregroundStyle(result == nil ? accent : .green)
             }
             Text(state.scoringProp.question).font(.subheadline.weight(.black))
             Text(result == nil ? "Resolves automatically after all ten games are final." : "YOUR CALL · \(state.scoringPropAnswer) · \(correctCall == true ? "+3" : "+0")")
                 .font(.caption2.weight(.black)).foregroundStyle(correctCall == true ? .green : .white.opacity(0.50))
         }
         .padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke((result == nil ? Color.orange : Color.green).opacity(0.35)))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke((result == nil ? accent : Color.green).opacity(0.35)))
     }
 
     private func resultStatus(_ result: FieldhouseGameResult?) -> String {
@@ -1698,23 +1870,23 @@ private struct FieldhousePicksPage: View {
             )
             ForEach(Array(state.publishedGames.enumerated()), id: \.element.id) { index, game in
                 HStack(spacing: 10) {
-                    Image(systemName: "lock.fill").foregroundStyle(.orange)
+                    Image(systemName: "lock.fill").foregroundStyle(accent)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(game.away) at \(game.home)").font(.caption.weight(.black))
                         Text("YOUR PICK · \(state.sideSelections[index] ?? "—") · CONF \(state.confidenceSelections[index] ?? 0)")
                             .font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.58))
                     }
                     Spacer()
-                    Text("ROOM SEALED").font(.system(size: 8, weight: .black)).foregroundStyle(.orange)
+                    Text("ROOM SEALED").font(.system(size: 8, weight: .black)).foregroundStyle(accent)
                 }
                 .padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 13))
-                .overlay(RoundedRectangle(cornerRadius: 13).stroke(.orange.opacity(0.22)))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(accent.opacity(0.22)))
             }
             Button(state.hellfireDeployedOnCurrentCard ? "HELLFIRE CARD CANNOT REOPEN" : "REOPEN PICKS BEFORE FIRST TIP") { _ = state.reopenPicks(at: Date()) }
-                .font(.caption.weight(.black)).foregroundStyle(.orange)
+                .font(.caption.weight(.black)).foregroundStyle(accent)
                 .frame(maxWidth: .infinity).padding(15)
                 .background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 15))
-                .overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.35)))
+                .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.35)))
                 .disabled(state.hellfireDeployedOnCurrentCard || !state.canEditPicks(at: Date()))
                 .opacity(!state.hellfireDeployedOnCurrentCard && state.canEditPicks(at: Date()) ? 1 : 0.45)
         }
@@ -1737,7 +1909,7 @@ private struct FieldhousePicksPage: View {
         let selected = state.sideSelections[index]
         return VStack(alignment: .leading, spacing: 11) {
             HStack {
-                Text("COURT \(index + 1) · FIRST TIP \(matchup.tip)").font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(.orange)
+                Text("COURT \(index + 1) · FIRST TIP \(matchup.tip)").font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(accent)
                 Spacer()
                 Button {
                     state.bestBetGame = state.bestBetGame == index ? nil : index
@@ -1762,11 +1934,11 @@ private struct FieldhousePicksPage: View {
                     } label: {
                         Text("\(value)").font(.caption.weight(.black)).frame(width: 32, height: 32)
                             .foregroundStyle(chosen ? .black : (available ? .white : .white.opacity(0.22)))
-                            .background(chosen ? Color.orange : Color.white.opacity(0.07), in: Circle())
+                            .background(chosen ? accent : Color.white.opacity(0.07), in: Circle())
                     }.buttonStyle(.plain).disabled(!available || state.picksLocked || !state.canEditPicks(at: now))
                 }
             }
-        }.padding(14).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(selected == nil ? .white.opacity(0.12) : .orange.opacity(0.42)))
+        }.padding(14).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(selected == nil ? .white.opacity(0.12) : accent.opacity(0.42)))
     }
 
     private func sideButton(_ team: String, game: Int, selected: String?) -> some View {
@@ -1774,7 +1946,7 @@ private struct FieldhousePicksPage: View {
             Text(team.uppercased()).font(.caption.weight(.black)).minimumScaleFactor(0.7).lineLimit(1)
                 .frame(maxWidth: .infinity).padding(.vertical, 12)
                 .foregroundStyle(selected == team ? .black : .white)
-                .background(selected == team ? Color.orange : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
+                .background(selected == team ? accent : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
         }.buttonStyle(.plain).disabled(state.picksLocked || !state.canEditPicks(at: now))
     }
 
@@ -1782,7 +1954,7 @@ private struct FieldhousePicksPage: View {
         Button { state.propAnswer = state.propAnswer == answer ? nil : answer } label: {
             Text(answer).font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(13)
                 .foregroundStyle(state.propAnswer == answer ? .black : .white)
-                .background(state.propAnswer == answer ? Color.orange : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
+                .background(state.propAnswer == answer ? accent : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
         }.buttonStyle(.plain).disabled(state.picksLocked || !state.canEditPicks(at: now))
     }
 
@@ -1793,6 +1965,8 @@ private struct FieldhousePicksPage: View {
 }
 
 private struct FieldhouseStandingsPage: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @State private var showingOverall = false
     private let players = ["Riley V.", "Full Court Mess", "Bracket Buster", "The Sixth Man", "Baseline Bandit", "March Sadness", "Bank Shot", "Coach's Favorite", "Paint Patrol", "Buzzer Beater", "Zone Defense", "Heat Check", "One Shining Mistake", "Fast Break", "The Transfer Portal", "Double Bonus", "Shot Clock", "Backboard Damage", "Cinderella Story", "Technical Foul", "Bubble Trouble", "Air Ball", "Traveling", "Bench Mob", "Wooden Spoon"]
@@ -1816,23 +1990,23 @@ private struct FieldhouseStandingsPage: View {
                     if !showingOverall && index == 20 { cutLine("TOILET BOWL CUT", color: .purple) }
                 }
             }
-            Text("EAST + WEST + SOUTH + MIDWEST  →  CENTER COURT").font(.caption.weight(.black)).tracking(1).foregroundStyle(.orange).padding(14).frame(maxWidth: .infinity).background(.orange.opacity(0.1), in: Capsule())
+            Text("EAST + WEST + SOUTH + MIDWEST  →  CENTER COURT").font(.caption.weight(.black)).tracking(1).foregroundStyle(accent).padding(14).frame(maxWidth: .infinity).background(accent.opacity(0.1), in: Capsule())
             VStack(alignment: .leading, spacing: 12) {
-                Text("CHAMPIONSHIP WEEK · POWER FOUR").font(.caption2.weight(.black)).tracking(1.6).foregroundStyle(.orange)
+                Text("CHAMPIONSHIP WEEK · POWER FOUR").font(.caption2.weight(.black)).tracking(1.6).foregroundStyle(accent)
                 Text("FOUR TROPHIES BEFORE THE BRACKET").font(.title2.weight(.black)).fontWidth(.condensed)
                 ForEach(["ACC CHAMPIONSHIP", "BIG 12 CHAMPIONSHIP", "BIG TEN CHAMPIONSHIP", "SEC CHAMPIONSHIP"], id: \.self) { title in
                     HStack {
                         Image(systemName: "trophy.fill").foregroundStyle(.yellow)
                         Text(title).font(.subheadline.weight(.black))
                         Spacer()
-                        Text("PICK").font(.caption2.weight(.black)).foregroundStyle(.orange)
+                        Text("PICK").font(.caption2.weight(.black)).foregroundStyle(accent)
                         Image(systemName: "chevron.right")
                     }
                     .padding(13).background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 12))
                 }
             }
             .padding(16).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(.orange.opacity(0.32)))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.32)))
             FieldhouseBracketPreview(state: $state)
         }
     }
@@ -1842,21 +2016,21 @@ private struct FieldhouseStandingsPage: View {
             Text(title).font(.system(size: 10, weight: .black)).tracking(1)
                 .foregroundStyle(selected ? .black : .white.opacity(0.72))
                 .padding(.horizontal, 13).padding(.vertical, 9)
-                .background(selected ? Color.orange : Color.black.opacity(0.72), in: Capsule())
-                .overlay(Capsule().stroke(.orange.opacity(selected ? 1 : 0.28)))
+                .background(selected ? accent : Color.black.opacity(0.72), in: Capsule())
+                .overlay(Capsule().stroke(accent.opacity(selected ? 1 : 0.28)))
         }.buttonStyle(.plain)
     }
 
     private func standingRow(rank: Int, player: String, points: Int) -> some View {
         HStack(spacing: 12) {
             Text("\(rank)").font(.title3.weight(.black)).foregroundStyle(rank <= 4 ? .yellow : .white.opacity(0.58)).frame(width: 30)
-            Circle().fill(.orange.opacity(0.18)).frame(width: 42, height: 42).overlay(Text(String(player.prefix(1))).font(.headline.weight(.black)).foregroundStyle(.orange))
+            Circle().fill(accent.opacity(0.18)).frame(width: 42, height: 42).overlay(Text(String(player.prefix(1))).font(.headline.weight(.black)).foregroundStyle(accent))
             VStack(alignment: .leading, spacing: 3) {
                 Text(player).font(.headline.weight(.black))
                 Text(showingOverall ? "FIELDHOUSE OVERALL" : "\(state.selectedRegion.rawValue) REGION").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.44))
             }
-            Spacer(); Text("\(points)").font(.title2.weight(.black)).foregroundStyle(.orange)
-        }.padding(12).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(.orange.opacity(0.18)))
+            Spacer(); Text("\(points)").font(.title2.weight(.black)).foregroundStyle(accent)
+        }.padding(12).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(accent.opacity(0.18)))
     }
 
     private func cutLine(_ title: String, color: Color) -> some View {
@@ -1865,11 +2039,13 @@ private struct FieldhouseStandingsPage: View {
 }
 
 private struct FieldhouseBracketPreview: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     private let conferenceTrophies = ["ACC", "BIG 12", "BIG TEN", "SEC"]
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("CHAMPIONSHIP WEEK · FOUR TROPHIES").font(.caption2.weight(.black)).tracking(1.6).foregroundStyle(.orange)
+            Text("CHAMPIONSHIP WEEK · FOUR TROPHIES").font(.caption2.weight(.black)).tracking(1.6).foregroundStyle(accent)
             Text("CUT DOWN FOUR NETS").font(.title2.weight(.black)).fontWidth(.condensed)
             Text("The four featured conference championships close the regular season before Selection Sunday opens the national bracket.")
                 .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
@@ -1890,14 +2066,16 @@ private struct FieldhouseBracketPreview: View {
                 Image(systemName: "arrow.right")
                 Text("76-TEAM BRACKET")
             }
-            .font(.system(size: 8, weight: .black)).foregroundStyle(.orange)
+            .font(.system(size: 8, weight: .black)).foregroundStyle(accent)
         }
         .padding(16).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.orange.opacity(0.42)))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.42)))
     }
 }
 
 private struct FieldhouseBracketsPage: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
     @State private var confirmingBracketHellfire = false
@@ -1930,9 +2108,9 @@ private struct FieldhouseBracketsPage: View {
     private func bracketModeButton(_ title: String, history: Bool) -> some View {
         Button { showingHistory = history } label: {
             Text(title).font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 11)
-                .foregroundStyle(showingHistory == history ? .black : .orange)
-                .background(showingHistory == history ? Color.orange : .black.opacity(0.7), in: RoundedRectangle(cornerRadius: 11))
-                .overlay(RoundedRectangle(cornerRadius: 11).stroke(.orange.opacity(0.55)))
+                .foregroundStyle(showingHistory == history ? .black : accent)
+                .background(showingHistory == history ? accent : .black.opacity(0.7), in: RoundedRectangle(cornerRadius: 11))
+                .overlay(RoundedRectangle(cornerRadius: 11).stroke(accent.opacity(0.55)))
         }.buttonStyle(.plain)
     }
 
@@ -1945,6 +2123,8 @@ private struct FieldhouseBracketsPage: View {
 }
 
 private struct FieldhouseNationalBracketMap: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     private let rounds = [("ROUND OF 64", 8), ("ROUND OF 32", 4), ("SWEET 16", 2), ("ELITE 8", 1)]
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
@@ -1965,18 +2145,18 @@ private struct FieldhouseNationalBracketMap: View {
 
             ForEach(FieldhouseRegion.allCases) { region in
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack { Text("\(region.rawValue) REGION").font(.caption.weight(.black)); Spacer(); Text("16 → 8 → 4 → 2 → 1").font(.system(size: 8, weight: .black)).foregroundStyle(.orange) }
+                    HStack { Text("\(region.rawValue) REGION").font(.caption.weight(.black)); Spacer(); Text("16 → 8 → 4 → 2 → 1").font(.system(size: 8, weight: .black)).foregroundStyle(accent) }
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .center, spacing: 9) {
                             ForEach(Array(rounds.enumerated()), id: \.offset) { index, round in
                                 bracketRound(round.0, games: round.1, emphasized: index == rounds.count - 1)
-                                if index < rounds.count - 1 { Image(systemName: "chevron.right.2").foregroundStyle(.orange.opacity(0.65)) }
+                                if index < rounds.count - 1 { Image(systemName: "chevron.right.2").foregroundStyle(accent.opacity(0.65)) }
                             }
                         }
                     }
                 }
                 .padding(13).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(.orange.opacity(0.28)))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(accent.opacity(0.28)))
             }
 
             HStack(spacing: 9) {
@@ -1985,7 +2165,7 @@ private struct FieldhouseNationalBracketMap: View {
                 bracketRound("TITLE GAME", games: 1, emphasized: true)
                 Image(systemName: "trophy.fill").font(.title2).foregroundStyle(.yellow)
             }
-            .padding(13).background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
+            .padding(13).background(accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(.yellow.opacity(0.45)))
             Text("Selection Sunday will replace every seed placeholder with the official field. The completed bracket remains in History as a permanent receipt.")
                 .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
@@ -1994,7 +2174,7 @@ private struct FieldhouseNationalBracketMap: View {
 
     private func bracketRound(_ title: String, games: Int, emphasized: Bool) -> some View {
         VStack(spacing: 6) {
-            Text(title).font(.system(size: 8, weight: .black)).foregroundStyle(emphasized ? .yellow : .orange)
+            Text(title).font(.system(size: 8, weight: .black)).foregroundStyle(emphasized ? .yellow : accent)
             ForEach(0..<games, id: \.self) { game in
                 VStack(spacing: 2) {
                     Text("SEED · TEAM").lineLimit(1)
@@ -2012,6 +2192,8 @@ private struct FieldhouseNationalBracketMap: View {
 
 private struct FieldhouseDispatchPage: View { var body: some View { VStack(spacing: 13) { FieldhouseHero(kicker: "THE FIELDHOUSE DISPATCH", title: "FINAL SCORES.\nFULL RECEIPTS.", detail: "Regional movement, busted chalk, buzzer beaters, and the weekly floor report.", icon: "newspaper.fill"); FieldhouseAction(kicker: "FRONT PAGE", title: "THE PAINT BELONGED TO NOBODY", detail: "Three favorites fell. One Best Bet survived. The Midwest is already hostile.", icon: "doc.text.image.fill") } } }
 private struct FieldhouseLockerPage: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     private static let bottomAnchor = "fieldhouse-locker-bottom"
     @State private var draft = ""
     @State private var messages = [
@@ -2027,16 +2209,16 @@ private struct FieldhouseLockerPage: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Label("FIELDHOUSE LIVE WIRE", systemImage: "bolt.fill").font(.caption2.weight(.black)).tracking(2).foregroundStyle(.orange)
+                            Label("FIELDHOUSE LIVE WIRE", systemImage: "bolt.fill").font(.caption2.weight(.black)).tracking(2).foregroundStyle(accent)
                             Text("THE LOCKER\nROOM").font(.system(size: 36, weight: .black)).fontWidth(.condensed).lineSpacing(-4)
                             Text("NO PRESS. NO PR TEAM. NO ALIBIS.").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(.red)
-                        }.frame(maxWidth: .infinity, alignment: .leading).padding(18).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 18)).overlay(alignment: .leading) { Rectangle().fill(.orange).frame(width: 4).padding(.vertical, 12) }
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(18).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 18)).overlay(alignment: .leading) { Rectangle().fill(accent).frame(width: 4).padding(.vertical, 12) }
                         ForEach(Array(messages.enumerated()), id: \.offset) { _, message in
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(message.0.uppercased()).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.orange)
+                                Text(message.0.uppercased()).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(accent)
                                 Text(message.1).font(.subheadline.weight(.semibold))
                                 HStack(spacing: 12) { Text("🔥 2"); Text("😂 1"); Text("🏀") }.font(.caption).foregroundStyle(.white.opacity(0.55))
-                            }.frame(maxWidth: .infinity, alignment: .leading).padding(13).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.20)))
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(13).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.20)))
                         }
                         Color.clear.frame(height: 1).id(Self.bottomAnchor)
                     }.padding(.top, 8)
@@ -2052,28 +2234,31 @@ private struct FieldhouseLockerPage: View {
                     guard !clean.isEmpty else { return }
                     messages.append(("YOU", clean)); draft = ""
                 } label: {
-                    Image(systemName: "paperplane.fill").font(.headline).foregroundStyle(.black).frame(width: 46, height: 46).background(.orange, in: Circle())
+                    Image(systemName: "paperplane.fill").font(.headline).foregroundStyle(.black).frame(width: 46, height: 46).background(accent, in: Circle())
                 }.buttonStyle(.plain)
             }.padding(.vertical, 8)
         }
     }
 }
 private struct FieldhouseProfilePage: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @State private var editingFavorite = false
     @State private var earnedExpanded = false
     @State private var searchText = ""
+    private var catalog: [String] { FieldhouseTeamCatalog.teams(for: state.league) }
     private var teams: [String] {
-        searchText.isEmpty ? FieldhouseTeamCatalog.all : FieldhouseTeamCatalog.all.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        return searchText.isEmpty ? catalog : catalog.filter { $0.localizedCaseInsensitiveContains(searchText) }
     }
     var body: some View {
         VStack(spacing: 13) {
             profileHero
             VStack(alignment: .leading, spacing: 12) {
-                Text("FAVORITE TEAM").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.orange)
+                Text("FAVORITE TEAM").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(accent)
                 Button { editingFavorite.toggle() } label: {
                     HStack {
-                        Image(systemName: "heart.fill").foregroundStyle(.orange)
+                        Image(systemName: "heart.fill").foregroundStyle(accent)
                         Text(state.favoriteTeam ?? "Choose a favorite team").font(.headline.weight(.black))
                         Spacer(); Image(systemName: editingFavorite ? "chevron.up" : "pencil")
                     }
@@ -2088,7 +2273,7 @@ private struct FieldhouseProfilePage: View {
                                 Button { state.favoriteTeam = team; editingFavorite = false; searchText = "" } label: {
                                     HStack {
                                         Text(team).font(.subheadline.weight(.bold)); Spacer()
-                                        if state.favoriteTeam == team { Image(systemName: "checkmark.circle.fill").foregroundStyle(.orange) }
+                                        if state.favoriteTeam == team { Image(systemName: "checkmark.circle.fill").foregroundStyle(accent) }
                                     }.padding(11).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
                                 }.buttonStyle(.plain)
                             }
@@ -2096,10 +2281,10 @@ private struct FieldhouseProfilePage: View {
                     }
                     .frame(maxHeight: 280)
                 }
-            }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.3)))
+            }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.3)))
             dossierRow("Arsenal", "Hellfire inventory and permanent receipts", "scope", .red)
-            dossierRow("Campaign Dog Tags", "Your identity across every War Room sport", "tag.fill", .orange)
-            dossierRow("Profile Passport", "League history, seasons and permanent record", "book.closed.fill", .orange)
+            dossierRow("Campaign Dog Tags", "Your identity across every War Room sport", "tag.fill", accent)
+            dossierRow("Profile Passport", "League history, seasons and permanent record", "book.closed.fill", accent)
             currentCampaign
 
             dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
@@ -2122,18 +2307,18 @@ private struct FieldhouseProfilePage: View {
                         }
                         Spacer(); Image(systemName: earnedExpanded ? "chevron.up" : "chevron.down")
                     }
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(accent)
                 }.buttonStyle(.plain)
                 if earnedExpanded {
                     ForEach(["FIRST TIP · MADE YOUR FIRST PICK", "HARDWOOD HOMER · PICKED YOUR FAVORITE", "HEAT CHECK · HIT A BEST BET"], id: \.self) { item in
-                        HStack { Image(systemName: "basketball.fill").foregroundStyle(.orange); Text(item).font(.caption.weight(.black)); Spacer() }
+                        HStack { Image(systemName: "basketball.fill").foregroundStyle(accent); Text(item).font(.caption.weight(.black)); Spacer() }
                             .padding(11).background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 11))
                     }
                 }
-            }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.3)))
+            }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.3)))
 
             dossierLabel("CHEEVO VAULT", detail: "FOUR ROOMS. ONE CONCERNING PERSONALITY.")
-            dossierRow("Open Cheevo Vault", "Inspect every earned artifact", "shippingbox.fill", .orange)
+            dossierRow("Open Cheevo Vault", "Inspect every earned artifact", "shippingbox.fill", accent)
 
             dossierLabel("TROPHY CASE", detail: "THE ROOM CANNOT DELETE HISTORY")
             dossierRow("No permanent hardware yet", "The engraver checked twice", "trophy.fill", .yellow)
@@ -2155,21 +2340,21 @@ private struct FieldhouseProfilePage: View {
 
     private var profileHero: some View {
         VStack(spacing: 10) {
-            Text("PLAYER DOSSIER").font(.caption2.weight(.black)).tracking(2.4).foregroundStyle(.orange)
-            Circle().fill(.orange.opacity(0.18)).frame(width: 104, height: 104)
-                .overlay(Text("RV").font(.system(size: 34, weight: .black)).foregroundStyle(.orange))
-                .overlay(Circle().stroke(.orange, lineWidth: 3))
-            Text("FLOOR GENERAL · RANK 5").font(.caption.weight(.black)).tracking(1.4).foregroundStyle(.orange)
+            Text("PLAYER DOSSIER").font(.caption2.weight(.black)).tracking(2.4).foregroundStyle(accent)
+            Circle().fill(accent.opacity(0.18)).frame(width: 104, height: 104)
+                .overlay(Text("RV").font(.system(size: 34, weight: .black)).foregroundStyle(accent))
+                .overlay(Circle().stroke(accent, lineWidth: 3))
+            Text("FLOOR GENERAL · RANK 5").font(.caption.weight(.black)).tracking(1.4).foregroundStyle(accent)
             Text("Riley V.").font(.system(size: 32, weight: .black)).fontWidth(.condensed)
             HStack(spacing: 7) {
                 profileTag("COMMISSIONER", color: .green)
-                profileTag("MIDWEST REGION", color: .orange)
+                profileTag("MIDWEST REGION", color: accent)
             }
-            Text("THE FIELDHOUSE NCAAM").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(.white.opacity(0.48))
+            Text("THE FIELDHOUSE \(state.league.rawValue)").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(.white.opacity(0.48))
         }
         .frame(maxWidth: .infinity).padding(.vertical, 22)
         .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(.orange.opacity(0.42)))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(accent.opacity(0.42)))
     }
 
     private var currentCampaign: some View {
@@ -2199,7 +2384,7 @@ private struct FieldhouseProfilePage: View {
 
     private func dossierLabel(_ title: String, detail: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(.orange)
+            Text(title).font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(accent)
             Text(detail).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.38))
         }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
     }
@@ -2219,6 +2404,51 @@ private struct FieldhouseProfilePage: View {
     }
 }
 
-private struct FieldhouseHero: View { let kicker: String; let title: String; let detail: String; let icon: String; var body: some View { VStack(alignment: .leading, spacing: 10) { Label(kicker, systemImage: icon).font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(.orange); Text(title).font(.system(size: 29, weight: .black)).fontWidth(.condensed); Text(detail).font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62)) }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(LinearGradient(colors: [.orange.opacity(0.24), .black.opacity(0.86)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 19)).overlay(RoundedRectangle(cornerRadius: 19).stroke(.orange.opacity(0.52))) } }
-private struct FieldhouseAction: View { let kicker: String; let title: String; let detail: String; let icon: String; var body: some View { HStack(spacing: 13) { Image(systemName: icon).font(.title2.weight(.black)).foregroundStyle(.orange).frame(width: 45, height: 45).background(.orange.opacity(0.12), in: Circle()); VStack(alignment: .leading, spacing: 4) { Text(kicker).font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(.orange); Text(title).font(.headline.weight(.black)); Text(detail).font(.caption).foregroundStyle(.white.opacity(0.55)) }; Spacer(); Image(systemName: "chevron.right").foregroundStyle(.orange) }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.3))) } }
-private struct FieldhouseMetric: View { let value: String; let label: String; var body: some View { VStack(spacing: 4) { Text(value).font(.title.weight(.black)).foregroundStyle(.orange); Text(label).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.5)) }.frame(maxWidth: .infinity).padding(15).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.24))) } }
+private struct FieldhouseHero: View {
+    @Environment(\.fieldhouseLeague) private var league
+    let kicker: String; let title: String; let detail: String; let icon: String
+    private var accent: Color { FieldhouseTheme.accent(for: league) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(kicker, systemImage: icon).font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(accent)
+            Text(title).font(.system(size: 29, weight: .black)).fontWidth(.condensed)
+            Text(detail).font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
+        }
+        .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+        .background(LinearGradient(colors: [accent.opacity(0.24), .black.opacity(0.86)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 19))
+        .overlay(RoundedRectangle(cornerRadius: 19).stroke(accent.opacity(0.52)))
+    }
+}
+
+private struct FieldhouseAction: View {
+    @Environment(\.fieldhouseLeague) private var league
+    let kicker: String; let title: String; let detail: String; let icon: String
+    private var accent: Color { FieldhouseTheme.accent(for: league) }
+    var body: some View {
+        HStack(spacing: 13) {
+            Image(systemName: icon).font(.title2.weight(.black)).foregroundStyle(accent).frame(width: 45, height: 45).background(accent.opacity(0.12), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(kicker).font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(accent)
+                Text(title).font(.headline.weight(.black))
+                Text(detail).font(.caption).foregroundStyle(.white.opacity(0.55))
+            }
+            Spacer(); Image(systemName: "chevron.right").foregroundStyle(accent)
+        }
+        .padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.3)))
+    }
+}
+
+private struct FieldhouseMetric: View {
+    @Environment(\.fieldhouseLeague) private var league
+    let value: String; let label: String
+    private var accent: Color { FieldhouseTheme.accent(for: league) }
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(value).font(.title.weight(.black)).foregroundStyle(accent)
+            Text(label).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.5))
+        }
+        .frame(maxWidth: .infinity).padding(15).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
+        .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.24)))
+    }
+}
