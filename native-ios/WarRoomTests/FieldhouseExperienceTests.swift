@@ -141,6 +141,30 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertTrue(state.picksLocked)
     }
 
+    func testDeadlineAutomaticallySealsCompleteCardButRejectsIncompleteCard() {
+        var complete = FieldhouseSeasonState()
+        let games = Array(FieldhouseGameCatalog.windowOne.prefix(10))
+        XCTAssertTrue(complete.publishCard(games: games, prop: .teamScores90))
+        for index in 0..<10 {
+            complete.sideSelections[index] = games[index].home
+            complete.confidenceSelections[index] = index + 1
+        }
+        complete.bestBetGame = 0
+        complete.propAnswer = "YES"
+        let completeDeadline = complete.pickLockDate
+        complete.enforcePickDeadline(at: completeDeadline)
+        XCTAssertTrue(complete.picksLocked)
+
+        var incomplete = FieldhouseSeasonState()
+        XCTAssertTrue(incomplete.publishCard(games: games, prop: .teamScores90))
+        incomplete.sideSelections[0] = games[0].home
+        let incompleteDeadline = incomplete.pickLockDate
+        incomplete.enforcePickDeadline(at: incompleteDeadline)
+        XCTAssertFalse(incomplete.picksLocked)
+        XCTAssertTrue(incomplete.pickWindowIsClosed(at: incompleteDeadline))
+        XCTAssertFalse(incomplete.canEditPicks(at: incompleteDeadline))
+    }
+
     func testEveryCommissionerPropIsStructuredForAutomaticScoring() {
         XCTAssertEqual(FieldhousePropKind.allCases.count, 4)
         XCTAssertEqual(Set(FieldhousePropKind.allCases.map(\.question)).count, FieldhousePropKind.allCases.count)
@@ -153,6 +177,36 @@ final class FieldhouseExperienceTests: XCTestCase {
         })
         XCTAssertEqual(Set(confidences.values), Set(1...10))
         XCTAssertEqual(confidences.count, 10)
+    }
+
+    func testHellfireUsesEveryPublishedFavoriteAndCannotFireAfterTip() {
+        let games = Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize))
+        var state = FieldhouseSeasonState()
+        XCTAssertTrue(state.publishCard(games: games, prop: .teamScores90))
+        XCTAssertTrue(state.deployRegularSeasonHellfire(at: state.pickLockDate.addingTimeInterval(-1)))
+        XCTAssertEqual(state.sideSelections.count, 10)
+        XCTAssertTrue(games.indices.allSatisfy { state.sideSelections[$0] == games[$0].favoriteTeam })
+        XCTAssertEqual(Set(state.confidenceSelections.values), Set(1...10))
+        XCTAssertEqual(state.bestBetGame, 0)
+        XCTAssertEqual(state.propAnswer, "YES")
+        XCTAssertEqual(state.regularHellfiresRemaining, 1)
+
+        var lateState = FieldhouseSeasonState()
+        XCTAssertTrue(lateState.publishCard(games: games, prop: .teamScores90))
+        XCTAssertFalse(lateState.deployRegularSeasonHellfire(at: lateState.pickLockDate))
+        XCTAssertTrue(lateState.sideSelections.isEmpty)
+        XCTAssertEqual(lateState.regularHellfiresRemaining, 2)
+    }
+
+    func testUnrelatedResultsCannotFalselyCompleteTheScoringCard() {
+        var state = FieldhouseSeasonState()
+        state.scoringGames = Array(FieldhouseGameCatalog.windowOne.prefix(2))
+        state.scoringResults = [
+            state.scoringGames[0].id: FieldhouseGameResult(gameID: state.scoringGames[0].id, awayScore: 80, homeScore: 70, phase: .final),
+            "unrelated-game": FieldhouseGameResult(gameID: "unrelated-game", awayScore: 90, homeScore: 60, phase: .final)
+        ]
+        XCTAssertEqual(state.scoringFinalGames, 1)
+        XCTAssertFalse(state.scoringIsComplete)
     }
 
     func testStructuredPropsWaitForEveryFinalThenScoreAutomatically() {

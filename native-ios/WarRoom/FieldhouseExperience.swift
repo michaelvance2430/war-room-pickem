@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 enum FieldhouseSeasonCalendar {
     static let eastern = TimeZone(identifier: "America/New_York")!
@@ -372,10 +373,13 @@ struct FieldhouseSeasonState {
     var picksLocked = false
 
     var regularHellfiresRemaining: Int { max(0, 2 - regularHellfiresUsed) }
-    var scoringFinalGames: Int { scoringResults.values.filter(\.isFinal).count }
+    var scoringFinalGames: Int {
+        scoringGames.filter { scoringResults[$0.id]?.isFinal == true }.count
+    }
     var scoringLiveGames: Int {
-        scoringResults.values.filter {
-            if case .live = $0.phase { return true }
+        scoringGames.filter {
+            guard let result = scoringResults[$0.id] else { return false }
+            if case .live = result.phase { return true }
             return false
         }.count
     }
@@ -394,7 +398,7 @@ struct FieldhouseSeasonState {
         FieldhousePropEvaluator.answer(for: scoringProp, games: scoringGames, results: scoringResults)
     }
     var scoringIsComplete: Bool {
-        !scoringGames.isEmpty && scoringResults.values.filter(\.isFinal).count == scoringGames.count && scoringPropResult != nil
+        !scoringGames.isEmpty && scoringFinalGames == scoringGames.count && scoringPropResult != nil
     }
     func scoringGamePoints(at index: Int) -> Int? {
         guard scoringGames.indices.contains(index),
@@ -429,6 +433,14 @@ struct FieldhouseSeasonState {
         cardIsPublished && date < pickLockDate
     }
 
+    func pickWindowIsClosed(at date: Date) -> Bool {
+        cardIsPublished && date >= pickLockDate
+    }
+
+    mutating func enforcePickDeadline(at date: Date) {
+        if pickWindowIsClosed(at: date), cardIsComplete { picksLocked = true }
+    }
+
     @discardableResult
     mutating func lockPicks(at date: Date) -> Bool {
         guard cardIsComplete, canEditPicks(at: date) else { return false }
@@ -440,6 +452,24 @@ struct FieldhouseSeasonState {
     mutating func reopenPicks(at date: Date) -> Bool {
         guard picksLocked, canEditPicks(at: date) else { return false }
         picksLocked = false
+        return true
+    }
+
+    @discardableResult
+    mutating func deployRegularSeasonHellfire(at date: Date) -> Bool {
+        guard regularHellfiresRemaining > 0, !picksLocked, canEditPicks(at: date),
+              publishedGames.count == FieldhouseGameCatalog.weeklyCardSize,
+              publishedGames.allSatisfy({ $0.favoriteTeam != nil }) else { return false }
+
+        sideSelections = Dictionary(uniqueKeysWithValues: publishedGames.enumerated().map {
+            ($0.offset, $0.element.favoriteTeam!)
+        })
+        confidenceSelections = Dictionary(uniqueKeysWithValues: publishedGames.indices.map {
+            ($0, FieldhouseGameCatalog.weeklyCardSize - $0)
+        })
+        bestBetGame = 0
+        propAnswer = "YES"
+        regularHellfiresUsed += 1
         return true
     }
 
@@ -555,10 +585,15 @@ struct FieldhouseNativePreviewView: View {
         .fullScreenCover(isPresented: $showingSetup) {
             FieldhouseSeasonSetupView(state: $state) { showingSetup = false }
         }
-        .onAppear { _ = state.advanceToNextWindow(at: Date()) }
+        .onAppear { refreshLifecycle(at: Date()) }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { _ = state.advanceToNextWindow(at: Date()) }
+            if phase == .active { refreshLifecycle(at: Date()) }
         }
+    }
+
+    private func refreshLifecycle(at date: Date) {
+        state.enforcePickDeadline(at: date)
+        _ = state.advanceToNextWindow(at: date)
     }
 }
 
@@ -1016,6 +1051,7 @@ private struct FieldhousePicksPage: View {
     @Binding var strikePresentation: StrikePresentation?
     @State private var confirmingLock = false
     @State private var lane: FieldhousePicksLane = .liveBoard
+    @State private var now = Date()
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
@@ -1024,6 +1060,8 @@ private struct FieldhousePicksPage: View {
                         liveBoard
                     } else if state.picksLocked {
                         lockedUpcomingBoard
+                    } else if state.pickWindowIsClosed(at: now) {
+                        expiredUpcomingBoard
                     } else if !state.cardIsPublished || state.publishedGames.count != FieldhouseGameCatalog.weeklyCardSize {
                         FieldhouseHero(kicker: "WEEK \(state.window) · ON DECK", title: "CARD NOT POSTED YET", detail: "Week \(state.scoringWindow) remains on the floor while the commissioner builds the next ten-game card.", icon: "hourglass")
                     } else {
@@ -1032,7 +1070,7 @@ private struct FieldhousePicksPage: View {
                 } header: {
                     VStack(spacing: 7) {
                         laneSelector
-                        if lane == .makePicks && state.cardIsPublished && !state.picksLocked {
+                        if lane == .makePicks && state.cardIsPublished && !state.picksLocked && !state.pickWindowIsClosed(at: now) {
                             pickProgressHeader
                         }
                     }
@@ -1048,6 +1086,11 @@ private struct FieldhousePicksPage: View {
         } message: {
             Text("Your card is complete. You can reopen and change it only before the first tip.")
         }
+        .onReceive(Timer.publish(every: 15, on: .main, in: .common).autoconnect()) { date in
+            now = date
+            state.enforcePickDeadline(at: date)
+            _ = state.advanceToNextWindow(at: date)
+        }
     }
 
     private var makePicksContent: some View {
@@ -1055,7 +1098,7 @@ private struct FieldhousePicksPage: View {
             FieldhouseHero(kicker: "ON DECK · WEEK \(state.window)", title: "TEN GAMES.\nNO EMPTY POSSESSIONS.", detail: "Pick the spread, assign confidence 1–10, mark one Best Bet, and answer the floor prop.", icon: "list.number")
                 Button { deployHellfire() } label: {
                     FieldhouseAction(kicker: "HELLFIRE · \(state.regularHellfiresRemaining)/2 AVAILABLE", title: state.regularHellfiresRemaining == 0 ? "Hellfires Expended" : "Deploy Hellfire", detail: "Always visible before the first game. Uses one authorization and fills the card.", icon: "scope")
-                }.buttonStyle(.plain).disabled(state.regularHellfiresRemaining == 0 || state.picksLocked).opacity(state.regularHellfiresRemaining == 0 || state.picksLocked ? 0.45 : 1)
+                }.buttonStyle(.plain).disabled(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now)).opacity(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now) ? 0.45 : 1)
                 ForEach(Array(state.publishedGames.enumerated()), id: \.element.id) { index, game in
                     gameCard(index: index, game: game)
                 }
@@ -1115,7 +1158,7 @@ private struct FieldhousePicksPage: View {
     private var laneSelector: some View {
         HStack(spacing: 8) {
             laneButton(.liveBoard, week: state.scoringWindow, title: "LIVE BOARD", icon: "dot.radiowaves.left.and.right")
-            laneButton(.makePicks, week: state.window, title: state.picksLocked ? "LOCKED BOARD" : "MAKE PICKS", icon: state.picksLocked ? "lock.fill" : "checkmark.seal.fill")
+            laneButton(.makePicks, week: state.window, title: state.picksLocked ? "LOCKED BOARD" : (state.pickWindowIsClosed(at: now) ? "WINDOW CLOSED" : "MAKE PICKS"), icon: state.picksLocked || state.pickWindowIsClosed(at: now) ? "lock.fill" : "checkmark.seal.fill")
         }
         .padding(6)
         .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 17))
@@ -1251,6 +1294,19 @@ private struct FieldhousePicksPage: View {
         }
     }
 
+    private var expiredUpcomingBoard: some View {
+        VStack(spacing: 12) {
+            FieldhouseHero(
+                kicker: "WEEK \(state.window) · WINDOW CLOSED",
+                title: "CARD NOT SUBMITTED",
+                detail: "The first selected game has tipped. This card is sealed and incomplete picks cannot be changed or scored.",
+                icon: "exclamationmark.lock.fill"
+            )
+            Text("The next card opens with Week \(state.window + 1).")
+                .font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.55))
+        }
+    }
+
     private func gameCard(index: Int, game matchup: FieldhouseGame) -> some View {
         let selected = state.sideSelections[index]
         return VStack(alignment: .leading, spacing: 11) {
@@ -1262,7 +1318,7 @@ private struct FieldhousePicksPage: View {
                 } label: {
                     Label("BEST BET", systemImage: state.bestBetGame == index ? "star.fill" : "star")
                         .font(.system(size: 8, weight: .black)).foregroundStyle(state.bestBetGame == index ? .yellow : .white.opacity(0.52))
-                }.buttonStyle(.plain).disabled(state.picksLocked)
+                }.buttonStyle(.plain).disabled(state.picksLocked || !state.canEditPicks(at: now))
             }
             HStack(spacing: 8) {
                 sideButton(matchup.away, game: index, selected: selected)
@@ -1281,7 +1337,7 @@ private struct FieldhousePicksPage: View {
                         Text("\(value)").font(.caption.weight(.black)).frame(width: 32, height: 32)
                             .foregroundStyle(chosen ? .black : (available ? .white : .white.opacity(0.22)))
                             .background(chosen ? Color.orange : Color.white.opacity(0.07), in: Circle())
-                    }.buttonStyle(.plain).disabled(!available || state.picksLocked)
+                    }.buttonStyle(.plain).disabled(!available || state.picksLocked || !state.canEditPicks(at: now))
                 }
             }
         }.padding(14).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(selected == nil ? .white.opacity(0.12) : .orange.opacity(0.42)))
@@ -1293,7 +1349,7 @@ private struct FieldhousePicksPage: View {
                 .frame(maxWidth: .infinity).padding(.vertical, 12)
                 .foregroundStyle(selected == team ? .black : .white)
                 .background(selected == team ? Color.orange : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
-        }.buttonStyle(.plain).disabled(state.picksLocked)
+        }.buttonStyle(.plain).disabled(state.picksLocked || !state.canEditPicks(at: now))
     }
 
     private func propButton(_ answer: String) -> some View {
@@ -1301,18 +1357,11 @@ private struct FieldhousePicksPage: View {
             Text(answer).font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(13)
                 .foregroundStyle(state.propAnswer == answer ? .black : .white)
                 .background(state.propAnswer == answer ? Color.orange : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
-        }.buttonStyle(.plain).disabled(state.picksLocked)
+        }.buttonStyle(.plain).disabled(state.picksLocked || !state.canEditPicks(at: now))
     }
 
     private func deployHellfire() {
-        guard state.regularHellfiresRemaining > 0, state.publishedGames.count == FieldhouseGameCatalog.weeklyCardSize else { return }
-        for (index, game) in state.publishedGames.enumerated() {
-            state.sideSelections[index] = game.spread.hasPrefix(game.away.components(separatedBy: " ").first ?? "") ? game.away : game.home
-            state.confidenceSelections[index] = FieldhouseGameCatalog.weeklyCardSize - index
-        }
-        state.bestBetGame = 0
-        state.propAnswer = "YES"
-        state.regularHellfiresUsed += 1
+        guard state.deployRegularSeasonHellfire(at: now) else { return }
         strikePresentation = WeaponStrikeCatalog.presentation(for: "cbb")
     }
 }
