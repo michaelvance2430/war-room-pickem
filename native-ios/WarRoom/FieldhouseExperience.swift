@@ -232,12 +232,14 @@ struct FieldhouseNativePreviewView: View {
                 }
                 if desk == .locker {
                     FieldhouseLockerPage().padding(.horizontal, 14)
+                } else if desk == .picks {
+                    FieldhousePicksPage(state: $state, strikePresentation: $strikePresentation)
                 } else {
                     ScrollView {
                         Group {
                             switch desk {
                             case .home: FieldhouseHomePage(state: $state, desk: $desk)
-                            case .picks: FieldhousePicksPage(state: $state, strikePresentation: $strikePresentation)
+                            case .picks: EmptyView()
                             case .standings: FieldhouseStandingsPage(state: $state)
                             case .locker: EmptyView()
                             case .profile: FieldhouseProfilePage(state: $state)
@@ -673,16 +675,42 @@ private struct FieldhousePicksPage: View {
     @State private var confirmingLock = false
     @State private var lane: FieldhousePicksLane = .liveBoard
     var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
+                Section {
+                    if lane == .liveBoard {
+                        liveBoard
+                    } else if state.picksLocked {
+                        lockedUpcomingBoard
+                    } else if !state.cardIsPublished || state.publishedGames.count != FieldhouseGameCatalog.weeklyCardSize {
+                        FieldhouseHero(kicker: "WEEK \(state.window) · ON DECK", title: "CARD NOT POSTED YET", detail: "Week \(state.scoringWindow) remains on the floor while the commissioner builds the next ten-game card.", icon: "hourglass")
+                    } else {
+                        makePicksContent
+                    }
+                } header: {
+                    VStack(spacing: 7) {
+                        laneSelector
+                        if lane == .makePicks && state.cardIsPublished && !state.picksLocked {
+                            pickProgressHeader
+                        }
+                    }
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.96))
+                }
+            }
+            .padding(.horizontal, 14).padding(.bottom, 30)
+        }
+        .alert("Lock these picks?", isPresented: $confirmingLock) {
+            Button("NOT YET", role: .cancel) {}
+            Button("LOCK PICKS") { state.picksLocked = true }
+        } message: {
+            Text("Your card is complete. You can reopen and change it only before the first tip.")
+        }
+    }
+
+    private var makePicksContent: some View {
         VStack(spacing: 12) {
-            laneSelector
-            if lane == .liveBoard {
-                liveBoard
-            } else if state.picksLocked {
-                lockedUpcomingBoard
-            } else if !state.cardIsPublished || state.publishedGames.count != FieldhouseGameCatalog.weeklyCardSize {
-                FieldhouseHero(kicker: "WEEK \(state.window) · ON DECK", title: "CARD NOT POSTED YET", detail: "Week \(state.scoringWindow) remains on the floor while the commissioner builds the next ten-game card.", icon: "hourglass")
-            } else {
-                FieldhouseHero(kicker: "ON DECK · WEEK \(state.window)", title: "TEN GAMES.\nNO EMPTY POSSESSIONS.", detail: "Pick the spread, assign confidence 1–10, mark one Best Bet, and answer the floor prop.", icon: "list.number")
+            FieldhouseHero(kicker: "ON DECK · WEEK \(state.window)", title: "TEN GAMES.\nNO EMPTY POSSESSIONS.", detail: "Pick the spread, assign confidence 1–10, mark one Best Bet, and answer the floor prop.", icon: "list.number")
                 Button { deployHellfire() } label: {
                     FieldhouseAction(kicker: "HELLFIRE · \(state.regularHellfiresRemaining)/2 AVAILABLE", title: state.regularHellfiresRemaining == 0 ? "Hellfires Expended" : "Deploy Hellfire", detail: "Always visible before the first game. Uses one authorization and fills the card.", icon: "scope")
                 }.buttonStyle(.plain).disabled(state.regularHellfiresRemaining == 0 || state.picksLocked).opacity(state.regularHellfiresRemaining == 0 || state.picksLocked ? 0.45 : 1)
@@ -710,14 +738,36 @@ private struct FieldhousePicksPage: View {
                             .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.52)).multilineTextAlignment(.center)
                     }
                 }
+        }
+    }
+
+    private var pickProgressHeader: some View {
+        let made = state.sideSelections.count
+        let remaining = max(0, FieldhouseGameCatalog.weeklyCardSize - made)
+        let confidenceReady = state.confidenceSelections.count == FieldhouseGameCatalog.weeklyCardSize
+        return VStack(spacing: 7) {
+            HStack {
+                Text("\(made)/\(FieldhouseGameCatalog.weeklyCardSize) PICKS MADE").font(.caption.weight(.black))
+                Spacer()
+                Text("\(remaining) REMAINING").font(.caption.weight(.black)).foregroundStyle(remaining == 0 ? .green : .orange)
+            }
+            HStack(spacing: 8) {
+                requirementChip("CONFIDENCE", ready: confidenceReady)
+                requirementChip("BEST BET", ready: state.bestBetGame != nil)
+                requirementChip("PROP", ready: state.propAnswer != nil)
             }
         }
-        .alert("Lock these picks?", isPresented: $confirmingLock) {
-            Button("NOT YET", role: .cancel) {}
-            Button("LOCK PICKS") { state.picksLocked = true }
-        } message: {
-            Text("Your card is complete. You can reopen and change it only before the first tip.")
-        }
+        .padding(11)
+        .background(.black, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(.orange.opacity(0.55)))
+        .shadow(color: .black.opacity(0.7), radius: 8, y: 4)
+    }
+
+    private func requirementChip(_ title: String, ready: Bool) -> some View {
+        Label(title, systemImage: ready ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 7, weight: .black)).foregroundStyle(ready ? .green : .white.opacity(0.48))
+            .frame(maxWidth: .infinity).padding(.vertical, 5)
+            .background(.white.opacity(0.05), in: Capsule())
     }
 
     private var laneSelector: some View {
