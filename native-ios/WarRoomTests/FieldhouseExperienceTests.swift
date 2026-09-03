@@ -2,6 +2,32 @@ import XCTest
 @testable import WarRoom
 
 final class FieldhouseExperienceTests: XCTestCase {
+    func testFieldhouseStateRoundTripsWithoutCrossingAccountOrLeagueBoundaries() throws {
+        let suiteName = "FieldhouseStateStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = FieldhouseStateStore(defaults: defaults)
+        let userA = UUID()
+        let userB = UUID()
+        let leagueA = UUID()
+        let leagueB = UUID()
+        let scope = FieldhouseStateScope(userID: userA, leagueID: leagueA)
+
+        var state = FieldhouseSeasonState()
+        state.favoriteTeam = "Duke Blue Devils"
+        state.crystalBallChampion = "UConn Huskies"
+        state.sideSelections[0] = "Gonzaga Bulldogs"
+        state.confidenceSelections[0] = 10
+        store.save(state, scope: scope)
+
+        XCTAssertEqual(store.load(scope: scope), state)
+        XCTAssertNil(store.load(scope: FieldhouseStateScope(userID: userB, leagueID: leagueA)))
+        XCTAssertNil(store.load(scope: FieldhouseStateScope(userID: userA, leagueID: leagueB)))
+
+        store.remove(scope: scope)
+        XCTAssertNil(store.load(scope: scope))
+    }
+
     func testMensAndWomensFieldhouseHaveDistinctSixTrophyCollections() {
         XCTAssertEqual(FieldhouseTrophyCatalog.ncaam.count, 6)
         XCTAssertEqual(FieldhouseTrophyCatalog.ncaaw.count, 6)

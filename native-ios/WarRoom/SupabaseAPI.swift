@@ -187,6 +187,7 @@ struct LeagueSummary: Decodable, Sendable {
     let mode: String?
     let regularSeasonWeeks: Int
     let maxHumanMembers: Int
+    let sportSettings: LeagueSportSettings?
     enum CodingKeys: String, CodingKey {
         case name, code
         case sportId = "sport_id"
@@ -197,6 +198,15 @@ struct LeagueSummary: Decodable, Sendable {
         case mode
         case regularSeasonWeeks = "regular_season_weeks"
         case maxHumanMembers = "max_human_members"
+        case sportSettings = "sport_settings"
+    }
+}
+
+struct LeagueSportSettings: Decodable, Sendable {
+    let fieldhouseLeague: String?
+
+    enum CodingKeys: String, CodingKey {
+        case fieldhouseLeague = "fieldhouse_league"
     }
 }
 
@@ -965,7 +975,7 @@ enum SupabaseAPI {
     static func leagueMemberships(token: String, userId: UUID, includeFoundry: Bool = false) async throws -> [LeagueMembership] {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/memberships"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "league_id,role,is_moderator,is_deputy,total_points,weekly_points,weeks_played,division,joined_at,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,leagues(name,code,sport_id,current_week,regular_season_weeks,commissioner_id,crystal_ball_enabled,championship_trophy_id,mode,max_human_members)"),
+            URLQueryItem(name: "select", value: "league_id,role,is_moderator,is_deputy,total_points,weekly_points,weeks_played,division,joined_at,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,leagues(name,code,sport_id,sport_settings,current_week,regular_season_weeks,commissioner_id,crystal_ball_enabled,championship_trophy_id,mode,max_human_members)"),
             URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())"),
         ]
         var request = URLRequest(url: components.url!)

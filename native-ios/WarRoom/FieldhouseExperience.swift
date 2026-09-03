@@ -148,19 +148,92 @@ enum WarRoomPostseasonRule {
     }
 }
 
-enum FieldhouseSeasonPhase: String {
+enum FieldhouseSeasonPhase: String, Codable {
     case preseason = "PRESEASON"
     case regularSeason = "REGULAR SEASON"
     case conferenceChampionships = "CONFERENCE CHAMPIONSHIPS"
     case postseason = "POSTSEASON"
 }
 
-enum FieldhouseLeague: String, CaseIterable, Identifiable {
+enum FieldhouseLeague: String, CaseIterable, Identifiable, Codable {
     case ncaam = "NCAAM"
     case ncaaw = "NCAAW"
     var id: String { rawValue }
     var displayName: String { "THE FIELDHOUSE · \(rawValue)" }
     static let activeBuild: FieldhouseLeague = .ncaam
+
+    init(summary: LeagueSummary) {
+        let configured = summary.sportSettings?.fieldhouseLeague?.lowercased()
+        self = configured == "ncaaw" || summary.sportId.lowercased() == "ncaaw" ? .ncaaw : .ncaam
+    }
+
+    var favoriteSportID: String { rawValue.lowercased() }
+}
+
+struct FieldhouseAuthenticatedSnapshot {
+    let membership: LeagueMembership
+    let card: WeekCard?
+    let pick: PlayerPick?
+    let favoriteTeam: FavoriteTeam?
+    let crystalBall: CrystalBallPick?
+}
+
+private struct FieldhouseRepositoryError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
+enum FieldhouseAuthenticatedRepository {
+    static func load(
+        token: String,
+        userID: UUID,
+        preferredLeagueID: UUID? = nil
+    ) async throws -> FieldhouseAuthenticatedSnapshot {
+        let memberships = try await SupabaseAPI.leagueMemberships(token: token, userId: userID)
+        let fieldhouse = memberships.filter { membership in
+            ["cbb", "ncaam", "ncaaw"].contains(membership.leagues.sportId.lowercased())
+        }
+        let membership: LeagueMembership?
+        if let preferredLeagueID {
+            membership = fieldhouse.first { $0.leagueId == preferredLeagueID }
+        } else {
+            membership = fieldhouse.first
+        }
+        guard let membership else {
+            throw FieldhouseRepositoryError(message: "This account does not belong to a Fieldhouse league.")
+        }
+
+        let fieldhouseLeague = FieldhouseLeague(summary: membership.leagues)
+        async let card = SupabaseAPI.weekCard(
+            token: token,
+            leagueId: membership.leagueId,
+            weekNumber: membership.leagues.currentWeek
+        )
+        async let pick = SupabaseAPI.playerPick(
+            token: token,
+            leagueId: membership.leagueId,
+            userId: userID,
+            weekNumber: membership.leagues.currentWeek
+        )
+        async let favorite = SupabaseAPI.favoriteTeam(
+            token: token,
+            userId: userID,
+            sportId: fieldhouseLeague.favoriteSportID
+        )
+        async let crystal = SupabaseAPI.crystalBallPick(
+            token: token,
+            leagueId: membership.leagueId,
+            userId: userID
+        )
+
+        return try await FieldhouseAuthenticatedSnapshot(
+            membership: membership,
+            card: card,
+            pick: pick,
+            favoriteTeam: favorite,
+            crystalBall: crystal
+        )
+    }
 }
 
 struct FieldhouseTrophyOption: Identifiable, Equatable {
@@ -201,7 +274,7 @@ enum FieldhouseLateEntryRule {
     static func acceptsEntries(during phase: FieldhouseSeasonPhase) -> Bool { phase != .postseason }
 }
 
-enum FieldhouseRegion: String, CaseIterable, Identifiable {
+enum FieldhouseRegion: String, CaseIterable, Identifiable, Codable {
     case east = "EAST"
     case west = "WEST"
     case south = "SOUTH"
@@ -233,7 +306,7 @@ enum FieldhouseDesk: String, CaseIterable, Identifiable {
     }
 }
 
-struct FieldhouseGame: Identifiable, Equatable {
+struct FieldhouseGame: Identifiable, Equatable, Codable {
     let id: String
     let away: String
     let home: String
@@ -284,13 +357,13 @@ enum FieldhousePickVisibility {
     static func canSeeRoomPicks(at now: Date, gameTip: Date) -> Bool { now >= gameTip }
 }
 
-enum FieldhouseGamePhase: Equatable {
+enum FieldhouseGamePhase: Equatable, Codable {
     case scheduled
     case live(period: String)
     case final
 }
 
-struct FieldhouseGameResult: Equatable {
+struct FieldhouseGameResult: Equatable, Codable {
     let gameID: String
     let awayScore: Int
     let homeScore: Int
@@ -406,7 +479,7 @@ enum FieldhouseGameCatalog {
     ]
 }
 
-enum FieldhousePropKind: String, CaseIterable, Identifiable {
+enum FieldhousePropKind: String, CaseIterable, Identifiable, Codable {
     case teamScores90
     case gameWithinThree
     case underdogWins
@@ -435,7 +508,7 @@ enum FieldhousePropKind: String, CaseIterable, Identifiable {
     }
 }
 
-struct FieldhouseSeasonState {
+struct FieldhouseSeasonState: Codable, Equatable {
     var league: FieldhouseLeague = .activeBuild
     var championshipTrophyID = FieldhouseTrophyCatalog.ncaam[0].id
     // Basketball is double-buffered: one week scores while the next accepts picks.
@@ -679,6 +752,45 @@ struct FieldhouseSeasonState {
     }
 }
 
+struct FieldhouseStateScope: Equatable {
+    let userID: UUID
+    let leagueID: UUID
+
+    var storageKey: String {
+        "fieldhouse.state.v1.\(userID.uuidString.lowercased()).\(leagueID.uuidString.lowercased())"
+    }
+}
+
+protocol FieldhouseStatePersisting {
+    func load(scope: FieldhouseStateScope) -> FieldhouseSeasonState?
+    func save(_ state: FieldhouseSeasonState, scope: FieldhouseStateScope)
+    func remove(scope: FieldhouseStateScope)
+}
+
+struct FieldhouseStateStore: FieldhouseStatePersisting {
+    private let defaults: UserDefaults
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    func load(scope: FieldhouseStateScope) -> FieldhouseSeasonState? {
+        guard let data = defaults.data(forKey: scope.storageKey) else { return nil }
+        return try? decoder.decode(FieldhouseSeasonState.self, from: data)
+    }
+
+    func save(_ state: FieldhouseSeasonState, scope: FieldhouseStateScope) {
+        guard let data = try? encoder.encode(state) else { return }
+        defaults.set(data, forKey: scope.storageKey)
+    }
+
+    func remove(scope: FieldhouseStateScope) {
+        defaults.removeObject(forKey: scope.storageKey)
+    }
+}
+
 struct FieldhouseNativePreviewView: View {
     @State private var desk: FieldhouseDesk = .home
     @State private var state = FieldhouseSeasonState()
@@ -686,6 +798,11 @@ struct FieldhouseNativePreviewView: View {
     @State private var showingEntrance = true
     @State private var showingSetup = false
     @Environment(\.scenePhase) private var scenePhase
+    private let stateStore = FieldhouseStateStore()
+    private let stateScope = FieldhouseStateScope(
+        userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,
+        leagueID: FieldhousePreviewIdentity.leagueID
+    )
 
     var body: some View {
         ZStack {
@@ -732,7 +849,13 @@ struct FieldhouseNativePreviewView: View {
         .fullScreenCover(isPresented: $showingSetup) {
             FieldhouseSeasonSetupView(state: $state) { showingSetup = false }
         }
-        .onAppear { refreshLifecycle(at: Date()) }
+        .onAppear {
+            if let saved = stateStore.load(scope: stateScope) { state = saved }
+            refreshLifecycle(at: Date())
+        }
+        .onChange(of: state) { _, newState in
+            stateStore.save(newState, scope: stateScope)
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { refreshLifecycle(at: Date()) }
         }
