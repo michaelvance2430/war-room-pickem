@@ -332,6 +332,18 @@ enum FieldhousePropEvaluator {
             return completed.contains { item in item.1.straightUpWinner(in: item.0) == item.0.underdogTeam }
         case .combinedScore150:
             return completed.contains { $0.1.awayScore + $0.1.homeScore >= 150 }
+        case .teamScores100:
+            return completed.contains { $0.1.awayScore >= 100 || $0.1.homeScore >= 100 }
+        case .bothTeamsScore75:
+            return completed.contains { $0.1.awayScore >= 75 && $0.1.homeScore >= 75 }
+        case .winningMargin20:
+            return completed.contains { abs($0.1.awayScore - $0.1.homeScore) >= 20 }
+        case .threeUnderdogsWin:
+            return completed.filter { item in item.1.straightUpWinner(in: item.0) == item.0.underdogTeam }.count >= 3
+        case .sixFavoritesCover:
+            return completed.filter { item in item.1.coverWinner(in: item.0) == item.0.favoriteTeam }.count >= 6
+        case .everyGameReaches130:
+            return completed.allSatisfy { $0.1.awayScore + $0.1.homeScore >= 130 }
         }
     }
 }
@@ -384,6 +396,12 @@ enum FieldhousePropKind: String, CaseIterable, Identifiable {
     case gameWithinThree
     case underdogWins
     case combinedScore150
+    case teamScores100
+    case bothTeamsScore75
+    case winningMargin20
+    case threeUnderdogsWin
+    case sixFavoritesCover
+    case everyGameReaches130
 
     var id: String { rawValue }
     var question: String {
@@ -392,6 +410,12 @@ enum FieldhousePropKind: String, CaseIterable, Identifiable {
         case .gameWithinThree: "Will any game finish within 3 points?"
         case .underdogWins: "Will any underdog win outright?"
         case .combinedScore150: "Will any game reach 150 combined points?"
+        case .teamScores100: "Will any team score 100 or more points?"
+        case .bothTeamsScore75: "Will both teams score 75 or more in any game?"
+        case .winningMargin20: "Will any game finish with a 20-point margin?"
+        case .threeUnderdogsWin: "Will at least three underdogs win outright?"
+        case .sixFavoritesCover: "Will at least six favorites cover the spread?"
+        case .everyGameReaches130: "Will every game reach 130 combined points?"
         }
     }
 }
@@ -1117,7 +1141,6 @@ private struct FieldhouseCardBuilder: View {
                         .disabled(oddsLoaded)
 
                         if oddsLoaded {
-                            Text("\(selectedGames.count)/\(cardSize) GAMES SELECTED").font(.caption.weight(.black)).foregroundStyle(selectedGames.count == cardSize ? .green : .orange)
                             ForEach(FieldhouseGameCatalog.windowOne) { game in
                                 let selected = selectedIDs.contains(game.id)
                                 Button {
@@ -1138,17 +1161,24 @@ private struct FieldhouseCardBuilder: View {
                             }
                             VStack(alignment: .leading, spacing: 7) {
                                 Text("WEEKLY PROP · 3 POINTS · AUTO-SCORED").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.orange)
-                                ForEach(FieldhousePropKind.allCases) { prop in
-                                    Button { selectedProp = selectedProp == prop ? nil : prop } label: {
-                                        HStack(spacing: 10) {
-                                            Image(systemName: selectedProp == prop ? "checkmark.circle.fill" : "circle")
-                                                .foregroundStyle(selectedProp == prop ? .orange : .white.opacity(0.38))
-                                            Text(prop.question).font(.subheadline.weight(.bold)).multilineTextAlignment(.leading)
-                                            Spacer()
-                                        }
-                                        .padding(12).background(.white.opacity(selectedProp == prop ? 0.10 : 0.05), in: RoundedRectangle(cornerRadius: 11))
-                                    }.buttonStyle(.plain)
+                                Menu {
+                                    ForEach(FieldhousePropKind.allCases) { prop in
+                                        Button(prop.question) { selectedProp = prop }
+                                    }
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: selectedProp == nil ? "chevron.down.circle" : "checkmark.circle.fill")
+                                            .foregroundStyle(selectedProp == nil ? .orange : .green)
+                                        Text(selectedProp?.question ?? "CHOOSE AN AUTO-SCORED PROP")
+                                            .font(.subheadline.weight(.bold)).multilineTextAlignment(.leading)
+                                        Spacer()
+                                        Image(systemName: "chevron.up.chevron.down").foregroundStyle(.orange)
+                                    }
+                                    .padding(14).background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
                                 }
+                                .buttonStyle(.plain)
+                                Text("\(FieldhousePropKind.allCases.count) verified score-and-spread rules available. No manual grading.")
+                                    .font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.45))
                             }
                             Button { if let selectedProp { publish(selectedGames, selectedProp) } } label: {
                                 Text("PUBLISH WINDOW \(window)").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
@@ -1157,9 +1187,26 @@ private struct FieldhouseCardBuilder: View {
                         }
                     }.padding().padding(.bottom, 24)
                 }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if oddsLoaded { cardSelectionProgress }
+                }
             }.navigationTitle("Commissioner Command").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("CANCEL") { dismiss() }.font(.caption.weight(.black)) } }
         }.preferredColorScheme(.dark)
+    }
+
+    private var cardSelectionProgress: some View {
+        HStack {
+            Label("\(selectedGames.count)/\(cardSize) GAMES SELECTED", systemImage: "list.bullet.clipboard.fill")
+                .font(.caption.weight(.black))
+            Spacer()
+            Text("\(max(0, cardSize - selectedGames.count)) REMAINING")
+                .font(.caption.weight(.black))
+                .foregroundStyle(selectedGames.count == cardSize ? .green : .orange)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+        .background(.black.opacity(0.97))
+        .overlay(alignment: .bottom) { Rectangle().fill(.orange.opacity(0.55)).frame(height: 1) }
     }
 }
 

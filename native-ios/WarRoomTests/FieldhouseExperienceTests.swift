@@ -226,7 +226,7 @@ final class FieldhouseExperienceTests: XCTestCase {
     }
 
     func testEveryCommissionerPropIsStructuredForAutomaticScoring() {
-        XCTAssertEqual(FieldhousePropKind.allCases.count, 4)
+        XCTAssertEqual(FieldhousePropKind.allCases.count, 10)
         XCTAssertEqual(Set(FieldhousePropKind.allCases.map(\.question)).count, FieldhousePropKind.allCases.count)
         XCTAssertTrue(FieldhousePropKind.allCases.allSatisfy { $0.question.hasSuffix("?") })
     }
@@ -293,6 +293,9 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(FieldhousePropEvaluator.answer(for: .teamScores90, games: games, results: results), true)
         XCTAssertEqual(FieldhousePropEvaluator.answer(for: .gameWithinThree, games: games, results: results), true)
         XCTAssertEqual(FieldhousePropEvaluator.answer(for: .combinedScore150, games: games, results: results), true)
+        XCTAssertTrue(FieldhousePropKind.allCases.allSatisfy {
+            FieldhousePropEvaluator.answer(for: $0, games: games, results: results) != nil
+        })
     }
 
     func testUnderdogPropUsesThePublishedSpreadFavorite() {
