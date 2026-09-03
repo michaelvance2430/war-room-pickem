@@ -912,8 +912,11 @@ struct FieldhouseNativePreviewView: View {
         let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
         let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
         let reviewLocker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-locker")
+        let reviewProfile = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-profile")
+        let reviewHellfire = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-hellfire")
         _state = State(initialValue: initialState)
-        _desk = State(initialValue: reviewLocker ? .locker : (reviewPicks ? .picks : .home))
+        _desk = State(initialValue: reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home)))
+        _strikePresentation = State(initialValue: reviewHellfire ? StrikePresentation(resourceName: initialLeague == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1") : nil)
         _showingEntrance = State(initialValue: !reviewMode)
     }
 
@@ -1987,7 +1990,11 @@ private struct FieldhousePicksPage: View {
 
     private func deployHellfire() {
         guard state.deployRegularSeasonHellfire(at: now) else { return }
-        strikePresentation = WeaponStrikeCatalog.presentation(for: "cbb")
+        strikePresentation = fieldhouseHellfirePresentation
+    }
+
+    private var fieldhouseHellfirePresentation: StrikePresentation {
+        StrikePresentation(resourceName: state.league == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1")
     }
 }
 
@@ -2145,7 +2152,7 @@ private struct FieldhouseBracketsPage: View {
         guard !state.bracketHellfireUsed else { return }
         state.bracketHellfireUsed = true
         state.bracketLocked = true
-        strikePresentation = WeaponStrikeCatalog.presentation(for: "cbb")
+        strikePresentation = StrikePresentation(resourceName: state.league == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1")
     }
 }
 
@@ -2392,6 +2399,7 @@ private struct FieldhouseProfilePage: View {
     @State private var editingFavorite = false
     @State private var earnedExpanded = false
     @State private var searchText = ""
+    @State private var activeDestination: FieldhouseProfileDestination?
     private var catalog: [String] { FieldhouseTeamCatalog.teams(for: state.league) }
     private var teams: [String] {
         return searchText.isEmpty ? catalog : catalog.filter { $0.localizedCaseInsensitiveContains(searchText) }
@@ -2427,13 +2435,13 @@ private struct FieldhouseProfilePage: View {
                     .frame(maxHeight: 280)
                 }
             }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.3)))
-            dossierRow("Arsenal", "Hellfire inventory and permanent receipts", "scope", .red)
-            dossierRow("Campaign Dog Tags", "Your identity across every War Room sport", "tag.fill", accent)
-            dossierRow("Profile Passport", "League history, seasons and permanent record", "book.closed.fill", accent)
+            dossierButton(.arsenal, "Arsenal", "Hellfire inventory and permanent receipts", "scope", .red)
+            dossierButton(.dogTags, "Campaign Dog Tags", "Your identity across every War Room sport", "tag.fill", accent)
+            dossierButton(.passport, "Profile Passport", "League history, seasons and permanent record", "book.closed.fill", accent)
             currentCampaign
 
             dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
-            dossierRow("Week 1 · \(state.scoringPoints) points", "SEASON TOTAL · \(state.scoringPoints)", "checklist.checked", .green)
+            dossierButton(.scorecard, "Week 1 · \(state.scoringPoints) points", "SEASON TOTAL · \(state.scoringPoints)", "checklist.checked", .green)
 
             dossierLabel("CAREER INTEL", detail: "THE NUMBERS HAVE TESTIFIED UNDER OATH")
             HStack(spacing: 8) {
@@ -2441,7 +2449,7 @@ private struct FieldhouseProfilePage: View {
                 FieldhouseMetric(value: "1", label: "STREAK")
                 FieldhouseMetric(value: "\(state.scoringPoints)", label: "BEST WEEK")
             }
-            dossierRow("Rivalry Report", "Riley V. vs. the regional field", "person.2.fill", .red)
+            dossierButton(.rivalry, "Rivalry Report", "Riley V. vs. the regional field", "person.2.fill", .red)
 
             VStack(alignment: .leading, spacing: 12) {
                 Button { withAnimation(.snappy) { earnedExpanded.toggle() } } label: {
@@ -2463,23 +2471,28 @@ private struct FieldhouseProfilePage: View {
             }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.3)))
 
             dossierLabel("CHEEVO VAULT", detail: "FOUR ROOMS. ONE CONCERNING PERSONALITY.")
-            dossierRow("Open Cheevo Vault", "Inspect every earned artifact", "shippingbox.fill", accent)
+            dossierButton(.cheevoVault, "Open Cheevo Vault", "Inspect every earned artifact", "shippingbox.fill", accent)
 
             dossierLabel("TROPHY CASE", detail: "THE ROOM CANNOT DELETE HISTORY")
-            dossierRow("No permanent hardware yet", "The engraver checked twice", "trophy.fill", .yellow)
-            FieldhouseAction(kicker: "CRYSTAL BALL · SEALED", title: state.crystalBallChampion ?? "Champion not selected", detail: "The original championship prediction stays on your permanent profile.", icon: "sparkles")
+            dossierInfo("No permanent hardware yet", "The engraver checked twice", "trophy.fill", .yellow)
+            Button { activeDestination = .crystalBall } label: {
+                FieldhouseAction(kicker: "CRYSTAL BALL · SEALED", title: state.crystalBallChampion ?? "Champion not selected", detail: "The original championship prediction stays on your permanent profile.", icon: "sparkles")
+            }.buttonStyle(.plain)
 
             dossierLabel("IDENTITY CONTROL", detail: "CHANGE THE NAME. KEEP THE RECEIPTS.")
-            dossierRow("Edit Profile", "Name, photo, birthday, favorite team and loadout", "person.crop.rectangle.fill", .green)
+            dossierButton(.editProfile, "Edit Profile", "Name, photo, birthday, favorite team and loadout", "person.crop.rectangle.fill", .green)
 
             dossierLabel("ROOM ACCESS", detail: "TRANSMISSIONS & RULES OF ENGAGEMENT")
-            dossierRow("Announcements", "Official yelling from command", "megaphone.fill", .red)
-            dossierRow("Rules of Engagement", "How this beautiful mess scores", "book.closed.fill", .yellow)
-            dossierRow("Privacy & Safety", "Policies, support and account controls", "hand.raised.fill", .green)
+            dossierButton(.announcements, "Announcements", "Official yelling from command", "megaphone.fill", .red)
+            dossierButton(.rules, "Rules of Engagement", "How this beautiful mess scores", "book.closed.fill", .yellow)
+            dossierButton(.privacy, "Privacy & Safety", "Policies, support and account controls", "hand.raised.fill", .green)
 
             dossierLabel("LEAGUE FREQUENCY", detail: "SEE EVERY TASK AND UNREAD TRANSMISSION BEFORE YOU SWITCH")
-            dossierRow("Open League Command", "1 room · prioritized by what needs you", "antenna.radiowaves.left.and.right", .green)
-            dossierRow("Leave the Building", "Sign out", "door.left.hand.open", .red)
+            dossierButton(.leagueCommand, "Open League Command", "1 room · prioritized by what needs you", "antenna.radiowaves.left.and.right", .green)
+            dossierButton(.signOut, "Leave the Building", "Sign out", "door.left.hand.open", .red)
+        }
+        .sheet(item: $activeDestination) { destination in
+            FieldhouseProfileDestinationView(state: $state, destination: destination)
         }
     }
 
@@ -2534,18 +2547,179 @@ private struct FieldhouseProfilePage: View {
         }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
     }
 
-    private func dossierRow(_ title: String, _ detail: String, _ icon: String, _ color: Color) -> some View {
+    private func dossierButton(_ destination: FieldhouseProfileDestination, _ title: String, _ detail: String, _ icon: String, _ color: Color) -> some View {
+        Button { activeDestination = destination } label: {
+            dossierRow(title, detail, icon, color, showsChevron: true)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title). \(detail)")
+    }
+
+    private func dossierInfo(_ title: String, _ detail: String, _ icon: String, _ color: Color) -> some View {
+        dossierRow(title, detail, icon, color, showsChevron: false)
+    }
+
+    private func dossierRow(_ title: String, _ detail: String, _ icon: String, _ color: Color, showsChevron: Bool) -> some View {
         HStack(spacing: 13) {
             Image(systemName: icon).font(.headline.weight(.black)).foregroundStyle(color).frame(width: 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline.weight(.black))
                 Text(detail).font(.caption).foregroundStyle(.secondary)
             }
-            Spacer(); Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(color.opacity(0.7))
+            Spacer()
+            if showsChevron {
+                Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(color.opacity(0.7))
+            }
         }
         .padding(15).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 17))
         .overlay(alignment: .leading) { Rectangle().fill(color).frame(width: 3).padding(.vertical, 9) }
         .overlay(RoundedRectangle(cornerRadius: 17).stroke(color.opacity(0.25)))
+    }
+}
+
+private enum FieldhouseProfileDestination: String, Identifiable {
+    case arsenal, dogTags, passport, scorecard, rivalry, cheevoVault, crystalBall
+    case editProfile, announcements, rules, privacy, leagueCommand, signOut
+    var id: String { rawValue }
+}
+
+private struct FieldhouseProfileDestinationView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.fieldhouseLeague) private var league
+    @Binding var state: FieldhouseSeasonState
+    let destination: FieldhouseProfileDestination
+    private var accent: Color { FieldhouseTheme.accent(for: league) }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Label(kicker, systemImage: icon)
+                        .font(.caption.weight(.black)).tracking(1.6).foregroundStyle(accent)
+                    Text(title).font(.system(size: 34, weight: .black)).fontWidth(.condensed)
+                    Text(detail).font(.body.weight(.semibold)).foregroundStyle(.white.opacity(0.68))
+                    content
+                }
+                .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(FieldhouseBackdrop(leagueOverride: state.league).ignoresSafeArea())
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: { Label("Back", systemImage: "chevron.left") }
+                        .font(.subheadline.weight(.black))
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder private var content: some View {
+        switch destination {
+        case .arsenal:
+            detailCard("REGULAR SEASON HELLFIRE", "\(state.regularHellfiresRemaining)/2 remaining · Locks all ten picks permanently · Correct picks score 2×")
+            detailCard("POSTSEASON HELLFIRE", state.bracketHellfireUsed ? "Deployed · Permanent receipt saved" : "1 available · 1.5× bracket scoring with the 60% threshold")
+        case .dogTags:
+            detailCard("RILEY V.", "Commissioner · Midwest Region · Identity follows you across every War Room sport")
+            detailCard("CURRENT PATCH", "The Fieldhouse \(state.league.rawValue)")
+        case .passport:
+            detailCard("ACTIVE CAMPAIGN", "The Fieldhouse \(state.league.rawValue) · Week \(state.window)")
+            detailCard("PERMANENT RECORD", "1 season · \(state.scoringPoints) career points · Rank \(state.rank)")
+        case .scorecard:
+            detailCard("WEEK \(state.scoringWindow)", "\(state.scoringPoints) points · \(state.scoringFinalGames) final · \(state.scoringLiveGames) live")
+            detailCard("PROP", state.scoringPropResult == nil ? "Pending final game data" : "Scored autonomously from the completed board")
+        case .rivalry:
+            detailCard("REGIONAL POSITION", "Rank \(state.rank) of \(state.regionPlayerCount) in the Midwest Region")
+            detailCard("HEAD-TO-HEAD", "Riley V. is 6–4 against the field this season")
+        case .cheevoVault:
+            detailCard("FIRST TIP", "Made your first Fieldhouse pick")
+            detailCard("HARDWOOD HOMER", "Locked your favorite team")
+            detailCard("HEAT CHECK", "Hit a Best Bet")
+        case .crystalBall:
+            detailCard("SEALED PREDICTION", state.crystalBallChampion ?? "No champion selected")
+            detailCard("PERMANENT RECEIPT", "The selection cannot be changed after confirmation and remains on your profile")
+        case .editProfile:
+            detailCard("PROFILE PHOTO", "Photo controls connect when Fieldhouse is wired to the live profile service")
+            detailCard("FAVORITE TEAM", state.favoriteTeam ?? "Not selected")
+            Text("Favorite team can be changed directly on the You page now.")
+                .font(.subheadline.weight(.bold)).foregroundStyle(accent)
+        case .announcements:
+            detailCard("NO NEW TRANSMISSIONS", "Official app and league notices will remain here after the banner is dismissed")
+        case .rules:
+            detailCard("WEEKLY CARD", "Pick 10 games against the spread. Use each confidence value from 1 through 10 once.")
+            detailCard("BEST BET", "Doubles the confidence points on one game. Incorrect picks score zero; football push language is never used.")
+            detailCard("HELLFIRE", "Regular season: 2× correct game points and permanent picks. Postseason: 1.5× with the 60% threshold.")
+        case .privacy:
+            detailCard("ENTERTAINMENT ONLY", "No real-money wagering, prizes, or payouts")
+            detailCard("ACCOUNT CONTROLS", "Profile, support, safety, and account deletion controls live here when connected to production")
+        case .leagueCommand:
+            detailCard("CURRENT ROOM", "The Fieldhouse \(state.league.rawValue) · \(state.playerCount) players")
+            detailCard("NEXT TASK", state.cardIsPublished ? (state.picksLocked ? "Week \(state.window) picks complete" : "Finish Week \(state.window) picks") : "Build the Week \(state.window) card")
+        case .signOut:
+            detailCard("PREVIEW PROTECTED", "This isolated Foundry build has no live account session to sign out. Production sign-out will require confirmation.")
+        }
+    }
+
+    private var kicker: String { destination == .signOut ? "ACCOUNT CONTROL" : "PLAYER DOSSIER" }
+    private var title: String {
+        switch destination {
+        case .arsenal: "Arsenal"
+        case .dogTags: "Campaign Dog Tags"
+        case .passport: "Profile Passport"
+        case .scorecard: "Season Scorecard"
+        case .rivalry: "Rivalry Report"
+        case .cheevoVault: "Cheevo Vault"
+        case .crystalBall: "Crystal Ball Receipt"
+        case .editProfile: "Edit Profile"
+        case .announcements: "Announcements"
+        case .rules: "Rules of Engagement"
+        case .privacy: "Privacy & Safety"
+        case .leagueCommand: "League Command"
+        case .signOut: "Leave the Building"
+        }
+    }
+    private var detail: String {
+        switch destination {
+        case .arsenal: "Inventory, deployment rules, and permanent receipts."
+        case .dogTags: "Your War Room identity, without sport-specific reinvention."
+        case .passport: "Every campaign and season follows one player record."
+        case .scorecard: "The points, status, and source of the current weekly total."
+        case .rivalry: "Your position against the people trying to catch you."
+        case .cheevoVault: "Every earned artifact in one cabinet."
+        case .crystalBall: "The championship prediction you sealed at entry."
+        case .editProfile: "Identity controls shared across every league and sport."
+        case .announcements: "App-wide and league transmissions."
+        case .rules: "The scoring rules without the scavenger hunt."
+        case .privacy: "Safety, policy, support, and account controls."
+        case .leagueCommand: "The room and its next required action."
+        case .signOut: "Account exit controls."
+        }
+    }
+    private var icon: String {
+        switch destination {
+        case .arsenal: "scope"
+        case .dogTags: "tag.fill"
+        case .passport: "book.closed.fill"
+        case .scorecard: "checklist.checked"
+        case .rivalry: "person.2.fill"
+        case .cheevoVault: "shippingbox.fill"
+        case .crystalBall: "sparkles"
+        case .editProfile: "person.crop.rectangle.fill"
+        case .announcements: "megaphone.fill"
+        case .rules: "book.closed.fill"
+        case .privacy: "hand.raised.fill"
+        case .leagueCommand: "antenna.radiowaves.left.and.right"
+        case .signOut: "door.left.hand.open"
+        }
+    }
+
+    private func detailCard(_ heading: String, _ body: String) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(heading).font(.caption.weight(.black)).tracking(1.3).foregroundStyle(accent)
+            Text(body).font(.headline.weight(.semibold)).foregroundStyle(.white.opacity(0.82))
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.3)))
     }
 }
 
