@@ -521,7 +521,15 @@ struct FieldhouseSeasonState {
     @discardableResult
     mutating func publishCard(games: [FieldhouseGame], prop: FieldhousePropKind) -> Bool {
         let count = FieldhouseGameCatalog.weeklyCardSize
-        guard games.count == count, Set(games.map(\.id)).count == count else { return false }
+        guard games.count == count,
+              Set(games.map(\.id)).count == count,
+              games.allSatisfy({
+                  (0...6).contains($0.dayOffset) &&
+                  (0...23).contains($0.tipHour) &&
+                  (0...59).contains($0.tipMinute) &&
+                  $0.favoriteTeam != nil &&
+                  ($0.favoriteSpread ?? 0) < 0
+              }) else { return false }
         publishedGames = games
         publishedProp = prop
         cardIsPublished = true

@@ -103,6 +103,23 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.publishedProp, .teamScores90)
     }
 
+    func testCommissionerCannotPublishAnUnscorableCard() {
+        var games = Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize))
+        games[0] = FieldhouseGame(
+            id: games[0].id,
+            away: games[0].away,
+            home: games[0].home,
+            spread: "Unknown Team -3.5",
+            tip: games[0].tip,
+            dayOffset: games[0].dayOffset,
+            tipHour: games[0].tipHour,
+            tipMinute: games[0].tipMinute
+        )
+        var state = FieldhouseSeasonState()
+        XCTAssertFalse(state.publishCard(games: games, prop: .teamScores90))
+        XCTAssertFalse(state.cardIsPublished)
+    }
+
     func testPlayerCannotLockUntilEveryRequiredDecisionIsComplete() {
         var state = FieldhouseSeasonState()
         XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: .teamScores90))
