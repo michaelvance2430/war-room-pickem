@@ -1225,6 +1225,7 @@ private struct FieldhouseHomePage: View {
     @State private var showingLeagueSwitcher = false
     @State private var showingCardBuilder = false
     @State private var showingCommissionerCommand = false
+    @State private var showingAnnouncements = false
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHomeMasthead(state: state)
@@ -1257,12 +1258,15 @@ private struct FieldhouseHomePage: View {
             if let certifiedWindow = state.lastCertifiedWindow, let certifiedPoints = state.lastCertifiedPoints {
                 FieldhouseAction(kicker: "LAST CERTIFIED SCORECARD", title: "Week \(certifiedWindow) · \(certifiedPoints) points", detail: "Permanent weekly receipt.", icon: "clipboard.fill")
             }
-            HStack(spacing: 10) {
-                FieldhouseMetric(value: "#\(state.rank)", label: "YOUR SEED LINE")
-                FieldhouseMetric(value: "\(state.regularHellfiresRemaining)/2", label: "HELLFIRES READY")
+            Button { showingAnnouncements = true } label: {
+                FieldhouseAction(
+                    kicker: "COMMAND TRANSMISSIONS",
+                    title: "Announcements",
+                    detail: "League updates, known issues, schedule changes, and everything shaping this War Room.",
+                    icon: "megaphone.fill"
+                )
             }
-            postseasonCard
-            Button { desk = .standings } label: { FieldhouseAction(kicker: "REGIONAL WAR MAP", title: "Battle Toward the Middle", detail: "East, West, South, and Midwest each send survivors inward.", icon: "square.grid.2x2.fill") }.buttonStyle(.plain)
+            .buttonStyle(.plain)
         }
         .sheet(isPresented: $showingLeagueSwitcher) {
             FieldhouseLeagueSwitcher(league: Binding(get: { state.league }, set: { state.selectLeague($0) }), dismiss: { showingLeagueSwitcher = false })
@@ -1278,6 +1282,10 @@ private struct FieldhouseHomePage: View {
         }
         .sheet(isPresented: $showingCommissionerCommand) {
             FieldhouseCommissionerCommand(state: $state)
+        }
+        .sheet(isPresented: $showingAnnouncements) {
+            NavigationStack { AnnouncementsView() }
+                .preferredColorScheme(.dark)
         }
         .onAppear {
             if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-trophies") {
@@ -1325,15 +1333,6 @@ private struct FieldhouseHomePage: View {
         .opacity(!state.cardIsPublished && !state.canBuildCard ? 0.72 : 1)
     }
 
-    private var postseasonCard: some View {
-        let counts = WarRoomPostseasonRule.counts(playerCount: state.playerCount)
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("THE REGIONAL CUT · 4 REGIONS OF 25").font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(accent)
-            HStack { cut("TOP", counts.championship, "CHAMPIONSHIP", .yellow); cut("MIDDLE", counts.activeNoBrass, "PICKS · NO BRASS", .white); cut("BOTTOM", counts.toilet, "TOILET BOWL", .purple) }
-            Text("Each region sends its top 4 to the Championship and bottom 4 to the Toilet Bowl. Everyone else keeps picking without brass eligibility.").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
-        }.padding(16).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.38)))
-    }
-    private func cut(_ label: String, _ value: Int, _ note: String, _ color: Color) -> some View { VStack(spacing: 3) { Text("\(value)").font(.title2.weight(.black)).foregroundStyle(color); Text(label).font(.system(size: 7, weight: .black)); Text(note).font(.system(size: 6, weight: .black)).foregroundStyle(.white.opacity(0.42)) }.frame(maxWidth: .infinity) }
 }
 
 private struct FieldhouseCommissionerCommand: View {
@@ -2019,9 +2018,19 @@ private struct FieldhouseStandingsPage: View {
         return name.isEmpty ? "Riley V." : name
     }
     private var players: [String] { [playerName, "Full Court Mess", "Bracket Buster", "The Sixth Man", "Baseline Bandit", "March Sadness", "Bank Shot", "Coach's Favorite", "Paint Patrol", "Buzzer Beater", "Zone Defense", "Heat Check", "One Shining Mistake", "Fast Break", "The Transfer Portal", "Double Bonus", "Shot Clock", "Backboard Damage", "Cinderella Story", "Technical Foul", "Bubble Trouble", "Air Ball", "Traveling", "Bench Mob", "Wooden Spoon"] }
+    private var regionalCounts: (championship: Int, activeNoBrass: Int, toilet: Int) {
+        WarRoomPostseasonRule.regionalCounts(playerCount: state.regionPlayerCount)
+    }
+    private var championshipCutIndex: Int? {
+        regionalCounts.championship > 0 ? regionalCounts.championship - 1 : nil
+    }
+    private var toiletCutIndex: Int? {
+        regionalCounts.toilet > 0 ? state.regionPlayerCount - regionalCounts.toilet - 1 : nil
+    }
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHero(kicker: "FIELDHOUSE STANDINGS", title: "REGIONAL SEED LINES", detail: "Live points, regional position, and both postseason cuts in the same format used across War Room.", icon: "list.number")
+            regionalCutSummary
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     standingsChip("OVERALL", selected: showingOverall) { showingOverall = true }
@@ -2035,8 +2044,8 @@ private struct FieldhouseStandingsPage: View {
             VStack(spacing: 8) {
                 ForEach(Array(players.enumerated()), id: \.offset) { index, player in
                     standingRow(rank: index + 1, player: player, points: index == 0 ? 87 + state.scoringPoints : 87 - (index * 2))
-                    if !showingOverall && index == 3 { cutLine("CHAMPIONSHIP CUT", color: .yellow) }
-                    if !showingOverall && index == 20 { cutLine("TOILET BOWL CUT", color: .purple) }
+                    if !showingOverall && index == championshipCutIndex { cutLine("CHAMPIONSHIP CUT", color: .yellow) }
+                    if !showingOverall && index == toiletCutIndex { cutLine("TOILET BOWL CUT", color: .purple) }
                 }
             }
             Text("EAST + WEST + SOUTH + MIDWEST  →  CENTER COURT").font(.caption.weight(.black)).tracking(1).foregroundStyle(accent).padding(14).frame(maxWidth: .infinity).background(accent.opacity(0.1), in: Capsule())
@@ -2062,6 +2071,38 @@ private struct FieldhouseStandingsPage: View {
             guard let token = auth.token else { profile = nil; return }
             profile = try? await SupabaseAPI.profile(token: token, userId: profileUserID)
         }
+    }
+
+    private var regionalCutSummary: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("REGIONAL CUT").font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(accent)
+                    Text("\(state.regionPlayerCount) PLAYERS · \(state.selectedRegion.rawValue) REGION")
+                        .font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.52))
+                }
+                Spacer()
+                Text("#\(state.rank)").font(.title2.weight(.black)).foregroundStyle(accent)
+            }
+            HStack(spacing: 8) {
+                cutMetric("TOP", regionalCounts.championship, "CHAMPIONSHIP", .yellow)
+                cutMetric("MIDDLE", regionalCounts.activeNoBrass, "NO BRASS", .white)
+                cutMetric("BOTTOM", regionalCounts.toilet, "TOILET BOWL", .purple)
+            }
+            Text("The cut recalculates from the number of players assigned to this region.")
+                .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+        }
+        .padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.36)))
+    }
+
+    private func cutMetric(_ label: String, _ value: Int, _ detail: String, _ color: Color) -> some View {
+        VStack(spacing: 3) {
+            Text("\(value)").font(.title2.weight(.black)).foregroundStyle(color)
+            Text(label).font(.system(size: 7, weight: .black))
+            Text(detail).font(.system(size: 6, weight: .black)).foregroundStyle(.white.opacity(0.42))
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func standingsChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {

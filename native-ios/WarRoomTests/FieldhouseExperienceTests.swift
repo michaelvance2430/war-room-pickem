@@ -201,6 +201,18 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(WarRoomPostseasonRule.status(rank: 22, playerCount: 25), .toilet(seed: 1))
     }
 
+    func testRegionalCutsRecalculateForDifferentLeagueSizes() {
+        let elevenPlayerRegion = WarRoomPostseasonRule.regionalCounts(playerCount: 11)
+        XCTAssertEqual(elevenPlayerRegion.championship, 4)
+        XCTAssertEqual(elevenPlayerRegion.activeNoBrass, 3)
+        XCTAssertEqual(elevenPlayerRegion.toilet, 4)
+
+        let sixPlayerRegion = WarRoomPostseasonRule.regionalCounts(playerCount: 6)
+        XCTAssertEqual(sixPlayerRegion.championship, 3)
+        XCTAssertEqual(sixPlayerRegion.activeNoBrass, 0)
+        XCTAssertEqual(sixPlayerRegion.toilet, 3)
+    }
+
     func testFieldhouseStartsWithTwoRegularSeasonHellfires() {
         var state = FieldhouseSeasonState()
         XCTAssertEqual(state.regularHellfiresRemaining, 2)
