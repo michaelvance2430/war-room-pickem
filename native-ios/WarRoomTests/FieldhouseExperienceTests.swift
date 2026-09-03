@@ -27,6 +27,19 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertFalse(FieldhouseTrophyCatalog.ncaam.map(\.id).contains(state.championshipTrophyID))
     }
 
+    func testChampionshipTrophyLocksAtSeasonTip() {
+        var state = FieldhouseSeasonState()
+        state.seasonHasStarted = false
+        let alternate = FieldhouseTrophyCatalog.ncaam[1].id
+        XCTAssertTrue(state.selectChampionshipTrophy(alternate))
+        XCTAssertEqual(state.championshipTrophyID, alternate)
+
+        state.seasonHasStarted = true
+        let lockedValue = state.championshipTrophyID
+        XCTAssertFalse(state.selectChampionshipTrophy(FieldhouseTrophyCatalog.ncaam[2].id))
+        XCTAssertEqual(state.championshipTrophyID, lockedValue)
+    }
+
     func testCurrentFieldhouseBuildExposesNCAAMFirst() {
         XCTAssertEqual(FieldhouseLeague.activeBuild, .ncaam)
     }

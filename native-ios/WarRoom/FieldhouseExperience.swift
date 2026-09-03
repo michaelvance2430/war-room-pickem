@@ -416,6 +416,7 @@ struct FieldhouseSeasonState {
         }
     }
     var canRebalanceRegions: Bool { !seasonHasStarted }
+    var canSelectChampionshipTrophy: Bool { !seasonHasStarted }
     var postseasonStatus: WarRoomPostseasonStatus {
         WarRoomPostseasonRule.status(rank: rank, playerCount: regionPlayerCount)
     }
@@ -516,6 +517,14 @@ struct FieldhouseSeasonState {
     mutating func selectLeague(_ newLeague: FieldhouseLeague) {
         league = newLeague
         championshipTrophyID = FieldhouseTrophyCatalog.options(for: newLeague)[0].id
+    }
+
+    @discardableResult
+    mutating func selectChampionshipTrophy(_ trophyID: String) -> Bool {
+        guard canSelectChampionshipTrophy,
+              FieldhouseTrophyCatalog.options(for: league).contains(where: { $0.id == trophyID }) else { return false }
+        championshipTrophyID = trophyID
+        return true
     }
 
     @discardableResult
@@ -851,6 +860,7 @@ private struct FieldhouseHomePage: View {
 private struct FieldhouseCommissionerCommand: View {
     @Binding var state: FieldhouseSeasonState
     @Environment(\.dismiss) private var dismiss
+    @State private var showingCardBuilder = false
     private let demoScores = [87, 82, 79, 76, 74, 72, 69, 66, 63, 61, 58, 55, 53, 49, 45, 42, 39, 35, 31, 28, 24, 19, 16, 12, 8]
     var body: some View {
         NavigationStack {
@@ -859,11 +869,22 @@ private struct FieldhouseCommissionerCommand: View {
                 ScrollView {
                     VStack(spacing: 12) {
                         FieldhouseHero(kicker: "COMMISSIONER CONTROL", title: "LEAGUE OPERATIONS", detail: "Players, regions, card state, and season rules from one place.", icon: "person.3.fill")
+                        Button {
+                            if !state.cardIsPublished { showingCardBuilder = true }
+                        } label: {
+                            commandRow(
+                                "WEEK \(state.window) · ON DECK",
+                                detail: state.cardIsPublished ? "Ten games and prop published" : "Choose ten games and an automatic floor prop",
+                                icon: "list.bullet.clipboard.fill",
+                                status: state.cardIsPublished ? "PICKS OPEN" : "BUILD CARD",
+                                color: state.cardIsPublished ? .green : .yellow
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(state.cardIsPublished)
                         commandRow("PLAYERS", detail: "25 active · late entry seed \(FieldhouseLateEntryRule.entryScore(existingScores: demoScores)) points", icon: "person.2.fill", status: FieldhouseLateEntryRule.acceptsEntries(during: state.phase) ? "OPEN" : "CLOSED", color: .green)
-                        commandRow("REGION ASSIGNMENTS", detail: "East · West · South · Midwest", icon: "square.grid.2x2.fill", status: state.canRebalanceRegions ? "EDIT" : "LOCKED", color: state.canRebalanceRegions ? .orange : .red)
-                        trophySelector
                         commandRow("WEEK \(state.scoringWindow) · ON THE FLOOR", detail: "\(state.scoringFinalGames) final · \(state.scoringLiveGames) live", icon: "basketball.fill", status: "SCORING", color: .green)
-                        commandRow("WEEK \(state.window) · ON DECK", detail: state.cardIsPublished ? "Ten games and prop published" : "Commissioner must build the next card", icon: "list.bullet.clipboard.fill", status: state.cardIsPublished ? "PICKS OPEN" : "BUILD", color: state.cardIsPublished ? .orange : .yellow)
+                        commandRow("REGION ASSIGNMENTS", detail: "East · West · South · Midwest", icon: "square.grid.2x2.fill", status: state.canRebalanceRegions ? "EDIT" : "LOCKED", color: state.canRebalanceRegions ? .orange : .red)
                         commandRow("SEASON PHASE", detail: "Transitions control entry eligibility and regional seeding", icon: "calendar.badge.clock", status: state.phase.rawValue, color: .orange)
                         VStack(alignment: .leading, spacing: 7) {
                             Text("HARD RULES").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
@@ -871,10 +892,16 @@ private struct FieldhouseCommissionerCommand: View {
                             Label("Late entries receive the rounded average of the bottom 15%.", systemImage: "person.badge.plus")
                             Label("New entries close when postseason begins.", systemImage: "calendar.badge.exclamationmark")
                         }.font(.caption.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading).padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.28)))
+                        trophySelector
                     }.padding(14).padding(.bottom, 28)
                 }
             }.navigationTitle("Commissioner Command").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarLeading) { Button("DONE") { dismiss() }.font(.caption.weight(.black)) } }
+                .sheet(isPresented: $showingCardBuilder) {
+                    FieldhouseCardBuilder(window: state.window) { games, prop in
+                        if state.publishCard(games: games, prop: prop) { showingCardBuilder = false }
+                    }
+                }
         }.preferredColorScheme(.dark)
     }
 
@@ -888,12 +915,18 @@ private struct FieldhouseCommissionerCommand: View {
 
     private var trophySelector: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("\(state.league.rawValue) · CHAMPIONSHIP TROPHY").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
-            Text("This collection is exclusive to \(state.league.displayName).").font(.caption).foregroundStyle(.white.opacity(0.52))
+            HStack {
+                Text("\(state.league.rawValue) · CHAMPIONSHIP TROPHY").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
+                Spacer()
+                Label(state.canSelectChampionshipTrophy ? "SELECT" : "LOCKED", systemImage: state.canSelectChampionshipTrophy ? "hand.tap.fill" : "lock.fill")
+                    .font(.system(size: 8, weight: .black)).foregroundStyle(state.canSelectChampionshipTrophy ? .orange : .red)
+            }
+            Text(state.canSelectChampionshipTrophy ? "Choose the league hardware before the season's first tip." : "The season has tipped. Championship hardware is permanently locked.")
+                .font(.caption).foregroundStyle(.white.opacity(0.52))
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(FieldhouseTrophyCatalog.options(for: state.league)) { trophy in
                     let selected = state.championshipTrophyID == trophy.id
-                    Button { state.championshipTrophyID = trophy.id } label: {
+                    Button { _ = state.selectChampionshipTrophy(trophy.id) } label: {
                         VStack(spacing: 7) {
                             Image(trophy.asset).resizable().scaledToFit().frame(height: 112)
                             Text(trophy.name.uppercased()).font(.system(size: 9, weight: .black)).multilineTextAlignment(.center)
@@ -902,7 +935,7 @@ private struct FieldhouseCommissionerCommand: View {
                         .frame(maxWidth: .infinity).padding(10)
                         .background(selected ? .orange.opacity(0.16) : .black.opacity(0.74), in: RoundedRectangle(cornerRadius: 14))
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(selected ? .orange : .white.opacity(0.10), lineWidth: selected ? 2 : 1))
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(.plain).disabled(!state.canSelectChampionshipTrophy)
                 }
             }
         }
