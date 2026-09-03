@@ -1252,9 +1252,21 @@ private struct FieldhousePicksPage: View {
     @State private var lane: FieldhousePicksLane = .liveBoard
     @State private var now = Date()
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
-                Section {
+        VStack(spacing: 0) {
+            VStack(spacing: 7) {
+                laneSelector
+                if lane == .makePicks && state.cardIsPublished && !state.picksLocked && !state.pickWindowIsClosed(at: now) {
+                    pickProgressHeader
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(.black.opacity(0.97))
+            .overlay(alignment: .bottom) { Rectangle().fill(.orange.opacity(0.28)).frame(height: 1) }
+            .zIndex(2)
+
+            ScrollView {
+                VStack(spacing: 12) {
                     if lane == .liveBoard {
                         liveBoard
                     } else if state.picksLocked {
@@ -1266,18 +1278,9 @@ private struct FieldhousePicksPage: View {
                     } else {
                         makePicksContent
                     }
-                } header: {
-                    VStack(spacing: 7) {
-                        laneSelector
-                        if lane == .makePicks && state.cardIsPublished && !state.picksLocked && !state.pickWindowIsClosed(at: now) {
-                            pickProgressHeader
-                        }
-                    }
-                    .padding(.vertical, 6)
-                    .background(.black.opacity(0.96))
                 }
+                .padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 30)
             }
-            .padding(.horizontal, 14).padding(.bottom, 30)
         }
         .alert("Lock these picks?", isPresented: $confirmingLock) {
             Button("NOT YET", role: .cancel) {}
