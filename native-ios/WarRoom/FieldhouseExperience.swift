@@ -948,6 +948,7 @@ private struct FieldhouseCardBuilder: View {
     let window: Int
     let publish: ([FieldhouseGame], FieldhousePropKind) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var oddsLoaded = false
     @State private var selectedIDs: Set<String> = []
     @State private var selectedProp: FieldhousePropKind?
     private var selectedGames: [FieldhouseGame] { FieldhouseGameCatalog.windowOne.filter { selectedIDs.contains($0.id) } }
@@ -961,43 +962,69 @@ private struct FieldhouseCardBuilder: View {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("WINDOW \(window) · COMMISSIONER").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
                         Text("BUILD THE CARD").font(.system(size: 36, weight: .black)).fontWidth(.condensed)
-                        Text("Select exactly ten Division I games from the Monday–Sunday window, confirm the spreads, then choose an automatically scored three-point floor prop.")
+                        Text("Pull the Division I board for this Monday–Sunday window, select exactly ten games, confirm the spreads, then choose an automatically scored three-point floor prop.")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
-                        Text("\(selectedGames.count)/\(cardSize) GAMES SELECTED").font(.caption.weight(.black)).foregroundStyle(selectedGames.count == cardSize ? .green : .orange)
-                        ForEach(FieldhouseGameCatalog.windowOne) { game in
-                            let selected = selectedIDs.contains(game.id)
-                            Button {
-                                if selected { selectedIDs.remove(game.id) }
-                                else if selectedIDs.count < cardSize { selectedIDs.insert(game.id) }
-                            } label: {
-                                HStack(spacing: 11) {
-                                    Image(systemName: selected ? "checkmark.circle.fill" : "circle").font(.title3).foregroundStyle(selected ? .orange : .white.opacity(0.38))
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("\(game.away) at \(game.home)").font(.subheadline.weight(.black)).multilineTextAlignment(.leading)
-                                        Text("\(game.spread) · \(game.tip)").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.48))
-                                    }
-                                    Spacer()
-                                }.padding(13).background(selected ? .orange.opacity(0.14) : .black.opacity(0.70), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? .orange : .white.opacity(0.10)))
-                            }.buttonStyle(.plain).disabled(!selected && selectedIDs.count == cardSize)
+                        Button {
+                            oddsLoaded = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: oddsLoaded ? "checkmark.circle.fill" : "arrow.down.circle.fill")
+                                    .font(.title2.weight(.black))
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(oddsLoaded ? "ODDS LOADED" : "PULL NCAAM ODDS").font(.headline.weight(.black))
+                                    Text(oddsLoaded ? "\(FieldhouseGameCatalog.windowOne.count) eligible games · Monday–Sunday" : "Load eligible Division I games and current spreads")
+                                        .font(.caption.weight(.bold)).opacity(0.72)
+                                }
+                                Spacer()
+                                if oddsLoaded { Text("READY").font(.caption2.weight(.black)) }
+                            }
+                            .frame(maxWidth: .infinity).padding(16)
+                            .foregroundStyle(oddsLoaded ? Color.green : Color.black)
+                            .background(oddsLoaded ? Color.green.opacity(0.12) : Color.orange, in: RoundedRectangle(cornerRadius: 15))
+                            .overlay(RoundedRectangle(cornerRadius: 15).stroke(oddsLoaded ? Color.green.opacity(0.55) : Color.orange))
                         }
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text("WEEKLY PROP · 3 POINTS · AUTO-SCORED").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.orange)
-                            ForEach(FieldhousePropKind.allCases) { prop in
-                                Button { selectedProp = selectedProp == prop ? nil : prop } label: {
-                                    HStack(spacing: 10) {
-                                        Image(systemName: selectedProp == prop ? "checkmark.circle.fill" : "circle")
-                                            .foregroundStyle(selectedProp == prop ? .orange : .white.opacity(0.38))
-                                        Text(prop.question).font(.subheadline.weight(.bold)).multilineTextAlignment(.leading)
+                        .buttonStyle(.plain)
+                        .disabled(oddsLoaded)
+
+                        if oddsLoaded {
+                            Text("\(selectedGames.count)/\(cardSize) GAMES SELECTED").font(.caption.weight(.black)).foregroundStyle(selectedGames.count == cardSize ? .green : .orange)
+                            ForEach(FieldhouseGameCatalog.windowOne) { game in
+                                let selected = selectedIDs.contains(game.id)
+                                Button {
+                                    if selected { selectedIDs.remove(game.id) }
+                                    else if selectedIDs.count < cardSize { selectedIDs.insert(game.id) }
+                                } label: {
+                                    HStack(spacing: 11) {
+                                        Image(systemName: selected ? "checkmark.circle.fill" : "circle").font(.title3).foregroundStyle(selected ? .orange : .white.opacity(0.38))
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("\(game.away) at \(game.home)").font(.subheadline.weight(.black)).multilineTextAlignment(.leading)
+                                            Text("\(game.spread) · \(game.tip)").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.48))
+                                        }
                                         Spacer()
                                     }
-                                    .padding(12).background(.white.opacity(selectedProp == prop ? 0.10 : 0.05), in: RoundedRectangle(cornerRadius: 11))
                                 }.buttonStyle(.plain)
+                                .disabled(!selected && selectedIDs.count == cardSize)
+                                .padding(13).background(selected ? .orange.opacity(0.14) : .black.opacity(0.70), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? .orange : .white.opacity(0.10)))
                             }
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text("WEEKLY PROP · 3 POINTS · AUTO-SCORED").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.orange)
+                                ForEach(FieldhousePropKind.allCases) { prop in
+                                    Button { selectedProp = selectedProp == prop ? nil : prop } label: {
+                                        HStack(spacing: 10) {
+                                            Image(systemName: selectedProp == prop ? "checkmark.circle.fill" : "circle")
+                                                .foregroundStyle(selectedProp == prop ? .orange : .white.opacity(0.38))
+                                            Text(prop.question).font(.subheadline.weight(.bold)).multilineTextAlignment(.leading)
+                                            Spacer()
+                                        }
+                                        .padding(12).background(.white.opacity(selectedProp == prop ? 0.10 : 0.05), in: RoundedRectangle(cornerRadius: 11))
+                                    }.buttonStyle(.plain)
+                                }
+                            }
+                            Button { if let selectedProp { publish(selectedGames, selectedProp) } } label: {
+                                Text("PUBLISH WINDOW \(window)").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
+                                    .foregroundStyle(.black).background(ready ? Color.orange : Color.gray, in: RoundedRectangle(cornerRadius: 15))
+                            }.buttonStyle(.plain).disabled(!ready)
                         }
-                        Button { if let selectedProp { publish(selectedGames, selectedProp) } } label: {
-                            Text("PUBLISH WINDOW \(window)").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
-                                .foregroundStyle(.black).background(ready ? Color.orange : Color.gray, in: RoundedRectangle(cornerRadius: 15))
-                        }.buttonStyle(.plain).disabled(!ready)
                     }.padding().padding(.bottom, 24)
                 }
             }.navigationTitle("Commissioner Command").navigationBarTitleDisplayMode(.inline)
