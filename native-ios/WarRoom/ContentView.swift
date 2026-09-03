@@ -7703,8 +7703,15 @@ struct NativeProfileView: View {
     @State private var savingBirthday = false
     @State private var confirmingBirthday = false
     @State private var favoriteTeamId: String?
+    private var isFieldhousePreview: Bool {
+        ProcessInfo.processInfo.arguments.contains("--fieldhouse-preview")
+    }
+    private let fieldhousePreviewUserID = UUID(uuidString: "09544d2b-6eca-4131-a321-c000586c9029")!
     private var identity: SportIdentity {
-        SportIdentity((memberships.first { $0.leagueId == auth.selectedLeagueId } ?? memberships.first)?.leagues.sportId)
+        if isFieldhousePreview {
+            return SportIdentity(ProcessInfo.processInfo.arguments.contains("--fieldhouse-ncaaw") ? "ncaaw" : "ncaam")
+        }
+        return SportIdentity((memberships.first { $0.leagueId == auth.selectedLeagueId } ?? memberships.first)?.leagues.sportId)
     }
 
     private var cleanName: String {
@@ -7808,7 +7815,8 @@ struct NativeProfileView: View {
                         ProfileTitlePickerView(
                             name: cleanName, options: availableTitles,
                             selectedTitleId: $equippedTitleId, selectedBorderId: $equippedBorderId,
-                            sportId: identity.sportId
+                            sportId: identity.sportId,
+                            allowsLocalPreview: isFieldhousePreview
                         )
                     } label: {
                         profileLoadoutRow("EQUIPPED TITLE", value: titleName)
@@ -7851,7 +7859,21 @@ struct NativeProfileView: View {
     }
 
     private func load() async {
-        guard let token = auth.token, let user = auth.user else { return }
+        guard let token = auth.token, let user = auth.user else {
+            if isFieldhousePreview {
+                displayName = "Riley V."
+                originalName = "Riley V."
+                equippedTitleId = UserDefaults.standard.string(forKey: "fieldhouse.preview.equippedTitleId")
+                equippedBorderId = "plain"
+                achievements = [
+                    ProfileAchievement(leagueId: fieldhousePreviewUserID, code: "hot_hand", title: "Hot Hand", flavor: "Caught fire on the weekly card.", earnedAt: "2026-11-09T04:00:00Z"),
+                    ProfileAchievement(leagueId: fieldhousePreviewUserID, code: "best_bet_assassin", title: "Best Bet Assassin", flavor: "Put the extra weight on the right game.", earnedAt: "2026-11-09T04:00:00Z"),
+                    ProfileAchievement(leagueId: fieldhousePreviewUserID, code: "locker_lurker", title: "Locker Lurker", flavor: "Stayed close enough to the room to become evidence.", earnedAt: "2026-11-09T04:00:00Z")
+                ]
+                loading = false
+            }
+            return
+        }
         do {
             async let loadedProfile = SupabaseAPI.profile(token: token, userId: user.id)
             async let loadedAchievements = SupabaseAPI.profileAchievements(token: token, userId: user.id)
@@ -7933,7 +7955,8 @@ struct NativeProfileView: View {
     }
 
     private var availableBorders: [ProfileCosmeticOption] {
-        auth.user.map { ProfileCosmetics.borders(userId: $0.id, earned: achievements) } ?? []
+        let userID = auth.user?.id ?? (isFieldhousePreview ? fieldhousePreviewUserID : nil)
+        return userID.map { ProfileCosmetics.borders(userId: $0, earned: achievements) } ?? []
     }
 
     private var titleName: String { availableTitles.first { $0.id == equippedTitleId }?.name ?? "Name only" }
@@ -7973,6 +7996,7 @@ private struct ProfileTitlePickerView: View {
     @Binding var selectedTitleId: String?
     @Binding var selectedBorderId: String?
     let sportId: String
+    var allowsLocalPreview = false
     @State private var saving = false
     @State private var error: String?
 
@@ -8000,7 +8024,14 @@ private struct ProfileTitlePickerView: View {
     }
 
     private func save(_ id: String?) async {
-        guard let token = auth.token, let user = auth.user else { return }
+        guard let token = auth.token, let user = auth.user else {
+            guard allowsLocalPreview else { return }
+            if let id { UserDefaults.standard.set(id, forKey: "fieldhouse.preview.equippedTitleId") }
+            else { UserDefaults.standard.removeObject(forKey: "fieldhouse.preview.equippedTitleId") }
+            selectedTitleId = id
+            dismiss()
+            return
+        }
         saving = true
         do {
             try await SupabaseAPI.updateProfileCosmetics(token: token, userId: user.id, titleId: id, borderId: selectedBorderId)

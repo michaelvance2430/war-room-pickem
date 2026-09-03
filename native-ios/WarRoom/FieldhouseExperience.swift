@@ -1309,7 +1309,8 @@ private struct FieldhouseHomePage: View {
     }
 
     private var playerCommand: some View {
-        Button {
+        let commandColor: Color = state.playerPicksAreComplete ? .green : (state.cardIsPublished ? .red : accent)
+        return Button {
             if state.cardIsPublished { desk = .picks }
             else if state.canBuildCard { showingCardBuilder = true }
         } label: {
@@ -1325,7 +1326,8 @@ private struct FieldhouseHomePage: View {
                     : (state.cardIsPublished
                     ? "Ten shared games. One card. Locks at the first selected tip."
                     : (state.isCommissioner ? "Pull the odds and publish the next board." : "The commissioner is building the next ten-game board.")),
-                icon: state.playerPicksAreComplete ? "checkmark.seal.fill" : (state.cardIsPublished ? "list.bullet.clipboard.fill" : (state.isCommissioner ? "hammer.fill" : "hourglass"))
+                icon: state.playerPicksAreComplete ? "checkmark.seal.fill" : (state.cardIsPublished ? "list.bullet.clipboard.fill" : (state.isCommissioner ? "hammer.fill" : "hourglass")),
+                signalColor: commandColor
             )
         }
         .buttonStyle(.plain)
@@ -1420,7 +1422,7 @@ private struct FieldhouseCommissionerCommand: View {
     }
 
     private func commandRow(_ title: String, detail: String, icon: String, status: String, color: Color) -> some View {
-        HStack(spacing: 12) {
+        return HStack(spacing: 12) {
             Image(systemName: icon).font(.title3.weight(.black)).foregroundStyle(accent).frame(width: 42, height: 42).background(accent.opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 4) { Text(title).font(.headline.weight(.black)); Text(detail).font(.caption).foregroundStyle(.white.opacity(0.52)) }
             Spacer(); Text(status).font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(color).padding(.horizontal, 9).padding(.vertical, 6).background(color.opacity(0.12), in: Capsule())
@@ -2009,8 +2011,10 @@ private struct FieldhouseStandingsPage: View {
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
+    private var sportID: String { state.league == .ncaaw ? "ncaaw" : "ncaam" }
     @State private var showingOverall = false
     @State private var profile: Profile?
+    @AppStorage("fieldhouse.preview.equippedTitleId") private var previewEquippedTitleId: String?
     private let previewFallbackUserID = UUID(uuidString: "09544d2b-6eca-4131-a321-c000586c9029")!
     private var profileUserID: UUID { auth.user?.id ?? previewFallbackUserID }
     private var playerName: String {
@@ -2043,7 +2047,7 @@ private struct FieldhouseStandingsPage: View {
             }
             VStack(spacing: 8) {
                 ForEach(Array(players.enumerated()), id: \.offset) { index, player in
-                    standingRow(rank: index + 1, player: player, points: index == 0 ? 87 + state.scoringPoints : 87 - (index * 2))
+                    standingRow(rank: index + 1, player: player, points: index == 0 ? 87 + state.scoringPoints : 87 - (index * 2), isCurrentUser: index == 0)
                     if !showingOverall && index == championshipCutIndex { cutLine("CHAMPIONSHIP CUT", color: .yellow) }
                     if !showingOverall && index == toiletCutIndex { cutLine("TOILET BOWL CUT", color: .purple) }
                 }
@@ -2115,12 +2119,16 @@ private struct FieldhouseStandingsPage: View {
         }.buttonStyle(.plain)
     }
 
-    private func standingRow(rank: Int, player: String, points: Int) -> some View {
-        HStack(spacing: 12) {
+    private func standingRow(rank: Int, player: String, points: Int, isCurrentUser: Bool) -> some View {
+        let rowProfile = isCurrentUser ? profile : nil
+        let equippedTitleId = rowProfile?.equippedTitleId ?? (isCurrentUser ? previewEquippedTitleId : nil)
+        let earnedTitle = ProfileCosmetics.titleName(for: equippedTitleId)
+        let displayName = earnedTitle.map { "\(SportIdentity(sportID).cheevoTitle(code: equippedTitleId ?? "", fallback: $0)) \(player)" } ?? player
+        return HStack(spacing: 12) {
             Text("\(rank)").font(.title3.weight(.black)).foregroundStyle(rank <= 4 ? .yellow : .white.opacity(0.58)).frame(width: 30)
-            Circle().fill(accent.opacity(0.18)).frame(width: 42, height: 42).overlay(Text(String(player.prefix(1))).font(.headline.weight(.black)).foregroundStyle(accent))
+            ProfileAvatar(urlString: rowProfile?.avatarURL, name: player, size: 42, borderId: rowProfile?.equippedBorderId, accent: accent)
             VStack(alignment: .leading, spacing: 3) {
-                Text(player).font(.headline.weight(.black))
+                Text(displayName).font(.headline.weight(.black))
                 Text(showingOverall ? "FIELDHOUSE OVERALL" : "\(state.selectedRegion.rawValue) REGION").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.44))
             }
             Spacer(); Text("\(points)").font(.title2.weight(.black)).foregroundStyle(accent)
@@ -2864,19 +2872,21 @@ private struct FieldhouseHero: View {
 private struct FieldhouseAction: View {
     @Environment(\.fieldhouseLeague) private var league
     let kicker: String; let title: String; let detail: String; let icon: String
+    var signalColor: Color? = nil
     private var accent: Color { FieldhouseTheme.accent(for: league) }
+    private var actionColor: Color { signalColor ?? accent }
     var body: some View {
         HStack(spacing: 13) {
-            Image(systemName: icon).font(.title2.weight(.black)).foregroundStyle(accent).frame(width: 45, height: 45).background(accent.opacity(0.12), in: Circle())
+            Image(systemName: icon).font(.title2.weight(.black)).foregroundStyle(actionColor).frame(width: 45, height: 45).background(actionColor.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 4) {
-                Text(kicker).font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(accent)
-                Text(title).font(.headline.weight(.black))
+                Text(kicker).font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(actionColor)
+                Text(title).font(.headline.weight(.black)).foregroundStyle(signalColor == nil ? .white : actionColor)
                 Text(detail).font(.caption).foregroundStyle(.white.opacity(0.55))
             }
-            Spacer(); Image(systemName: "chevron.right").foregroundStyle(accent)
+            Spacer(); Image(systemName: "chevron.right").foregroundStyle(actionColor)
         }
         .padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.3)))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(actionColor.opacity(signalColor == nil ? 0.3 : 0.72), lineWidth: signalColor == nil ? 1 : 2))
     }
 }
 
