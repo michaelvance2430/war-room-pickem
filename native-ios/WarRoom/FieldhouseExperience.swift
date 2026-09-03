@@ -2332,7 +2332,7 @@ private struct FieldhouseLockerPage: View {
                                     .buttonStyle(.plain)
                                     .accessibilityHint("Opens this player's profile")
                                     Text(message.body).font(.subheadline.weight(.semibold)).multilineTextAlignment(message.isMine ? .trailing : .leading)
-                                    HStack(spacing: 12) { Text("🔥 2"); Text("😂 1"); Text("🏀") }.font(.caption).foregroundStyle(.white.opacity(0.55))
+                                    HStack(spacing: 12) { Text("🔥 2"); Text("😂 1"); Text("💀"); Text("🏀") }.font(.caption).foregroundStyle(.white.opacity(0.55))
                                 }
                                 .frame(maxWidth: .infinity, alignment: message.isMine ? .trailing : .leading)
                                 .padding(13)
