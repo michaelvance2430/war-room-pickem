@@ -1,5 +1,79 @@
 import SwiftUI
 import Combine
+import UserNotifications
+
+struct FieldhouseCardReminder: Equatable {
+    let identifier: String
+    let fireAt: Date
+}
+
+enum FieldhouseCardReminderSchedule {
+    static func oneHour(lockAt: Date, now: Date, leagueID: UUID, week: Int) -> FieldhouseCardReminder? {
+        let fireAt = lockAt.addingTimeInterval(-60 * 60)
+        guard fireAt > now else { return nil }
+        return FieldhouseCardReminder(
+            identifier: "fieldhouse.card-lock.1h.\(leagueID.uuidString).\(week)",
+            fireAt: fireAt
+        )
+    }
+}
+
+enum FieldhouseNotificationScheduler {
+    private static let center = UNUserNotificationCenter.current()
+
+    static func cardPublished(leagueID: UUID, leagueName: String, week: Int, lockAt: Date, now: Date = Date()) async {
+        let authorization = await center.notificationSettings().authorizationStatus
+        guard authorization == .authorized || authorization == .provisional else { return }
+
+        let builtID = "fieldhouse.card-built.\(leagueID.uuidString).\(week)"
+        if !UserDefaults.standard.bool(forKey: builtID) {
+            let content = notificationContent(
+                title: "Week \(week) card built",
+                body: "\(leagueName) is open. Make and lock your 10 picks before the first tip.",
+                leagueID: leagueID,
+                week: week,
+                kind: "fieldhouse_card_built"
+            )
+            do {
+                try await center.add(UNNotificationRequest(identifier: builtID, content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)))
+                UserDefaults.standard.set(true, forKey: builtID)
+            } catch { }
+        }
+
+        if let reminder = FieldhouseCardReminderSchedule.oneHour(lockAt: lockAt, now: now, leagueID: leagueID, week: week) {
+            center.removePendingNotificationRequests(withIdentifiers: [reminder.identifier])
+            let content = notificationContent(
+                title: "1 HOUR · WEEK \(week) LOCKS",
+                body: "\(leagueName) closes at first tip. Finish and lock your card.",
+                leagueID: leagueID,
+                week: week,
+                kind: "fieldhouse_card_lock_1h"
+            )
+            let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: reminder.fireAt)
+            try? await center.add(UNNotificationRequest(identifier: reminder.identifier, content: content, trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)))
+        }
+    }
+
+    private static func notificationContent(title: String, body: String, leagueID: UUID, week: Int, kind: String) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        content.categoryIdentifier = "WAR_ROOM_SYSTEM"
+        content.threadIdentifier = "league.\(leagueID.uuidString)"
+        content.userInfo = [
+            "kind": kind,
+            "league_id": leagueID.uuidString.lowercased(),
+            "destination": "picks",
+            "week": week
+        ]
+        return content
+    }
+}
+
+private enum FieldhousePreviewIdentity {
+    static let leagueID = UUID(uuidString: "F13D0000-0000-4000-8000-000000000001")!
+}
 
 enum FieldhouseSeasonCalendar {
     static let eastern = TimeZone(identifier: "America/New_York")!
@@ -417,6 +491,9 @@ struct FieldhouseSeasonState {
     }
     var canRebalanceRegions: Bool { !seasonHasStarted }
     var canSelectChampionshipTrophy: Bool { !seasonHasStarted }
+    func hasOutstandingPickTask(at date: Date) -> Bool {
+        cardIsPublished && !picksLocked && canEditPicks(at: date)
+    }
     var postseasonStatus: WarRoomPostseasonStatus {
         WarRoomPostseasonRule.status(rank: rank, playerCount: regionPlayerCount)
     }
@@ -587,7 +664,9 @@ struct FieldhouseNativePreviewView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            FieldhouseBottomNavigation(selection: $desk)
+            TimelineView(.periodic(from: .now, by: 15)) { context in
+                FieldhouseBottomNavigation(selection: $desk, hasOutstandingPickTask: state.hasOutstandingPickTask(at: context.date))
+            }
         }
         .preferredColorScheme(.dark)
         .fullScreenCover(item: $strikePresentation) { presentation in
@@ -730,12 +809,25 @@ private struct FieldhouseHeader: View {
 
 private struct FieldhouseBottomNavigation: View {
     @Binding var selection: FieldhouseDesk
+    let hasOutstandingPickTask: Bool
     var body: some View {
         HStack(spacing: 0) {
             ForEach(FieldhouseDesk.allCases) { desk in
                 Button { selection = desk } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: desk.icon).font(.system(size: 21, weight: .bold))
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: desk.icon).font(.system(size: 21, weight: .bold))
+                            if desk == .picks && hasOutstandingPickTask {
+                                Text("1")
+                                    .font(.system(size: 8, weight: .black))
+                                    .foregroundStyle(.black)
+                                    .frame(width: 16, height: 16)
+                                    .background(Color.orange, in: Circle())
+                                    .overlay(Circle().stroke(.black, lineWidth: 2))
+                                    .offset(x: 10, y: -7)
+                                    .accessibilityLabel("One pick task remaining")
+                            }
+                        }
                         Text(desk.rawValue).font(.system(size: 10, weight: .bold))
                     }
                     .foregroundStyle(selection == desk ? Color.orange : Color.white.opacity(0.78))
@@ -838,11 +930,28 @@ private struct FieldhouseHomePage: View {
         }
         .sheet(isPresented: $showingCardBuilder) {
             FieldhouseCardBuilder(window: state.window) { games, prop in
-                if state.publishCard(games: games, prop: prop) { showingCardBuilder = false }
+                if state.publishCard(games: games, prop: prop) {
+                    showingCardBuilder = false
+                    scheduleCardNotifications()
+                }
             }
         }
         .sheet(isPresented: $showingCommissionerCommand) {
             FieldhouseCommissionerCommand(state: $state)
+        }
+    }
+
+    private func scheduleCardNotifications() {
+        let week = state.window
+        let lockAt = state.pickLockDate
+        let leagueName = state.league.displayName
+        Task {
+            await FieldhouseNotificationScheduler.cardPublished(
+                leagueID: FieldhousePreviewIdentity.leagueID,
+                leagueName: leagueName,
+                week: week,
+                lockAt: lockAt
+            )
         }
     }
 
@@ -899,10 +1008,27 @@ private struct FieldhouseCommissionerCommand: View {
                 .toolbar { ToolbarItem(placement: .topBarLeading) { Button("DONE") { dismiss() }.font(.caption.weight(.black)) } }
                 .sheet(isPresented: $showingCardBuilder) {
                     FieldhouseCardBuilder(window: state.window) { games, prop in
-                        if state.publishCard(games: games, prop: prop) { showingCardBuilder = false }
+                        if state.publishCard(games: games, prop: prop) {
+                            showingCardBuilder = false
+                            scheduleCardNotifications()
+                        }
                     }
                 }
         }.preferredColorScheme(.dark)
+    }
+
+    private func scheduleCardNotifications() {
+        let week = state.window
+        let lockAt = state.pickLockDate
+        let leagueName = state.league.displayName
+        Task {
+            await FieldhouseNotificationScheduler.cardPublished(
+                leagueID: FieldhousePreviewIdentity.leagueID,
+                leagueName: leagueName,
+                week: week,
+                lockAt: lockAt
+            )
+        }
     }
 
     private func commandRow(_ title: String, detail: String, icon: String, status: String, color: Color) -> some View {

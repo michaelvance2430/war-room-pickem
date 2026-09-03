@@ -57,6 +57,36 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertTrue(FieldhousePickVisibility.canSeeRoomPicks(at: tip, gameTip: tip))
     }
 
+    func testPickTaskBadgeOnlyShowsWhileAnOpenCardNeedsSubmission() {
+        var state = FieldhouseSeasonState()
+        let games = Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize))
+        XCTAssertTrue(state.publishCard(games: games, prop: .teamScores90))
+        let beforeTip = state.pickLockDate.addingTimeInterval(-1)
+        XCTAssertTrue(state.hasOutstandingPickTask(at: beforeTip))
+
+        for index in games.indices {
+            state.sideSelections[index] = games[index].home
+            state.confidenceSelections[index] = index + 1
+        }
+        state.bestBetGame = 0
+        state.propAnswer = "YES"
+        XCTAssertTrue(state.lockPicks(at: beforeTip))
+        XCTAssertFalse(state.hasOutstandingPickTask(at: beforeTip))
+
+        state.picksLocked = false
+        XCTAssertFalse(state.hasOutstandingPickTask(at: state.pickLockDate))
+    }
+
+    func testFieldhouseOneHourReminderUsesExactWeekLock() {
+        let leagueID = UUID(uuidString: "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE")!
+        let now = Date(timeIntervalSince1970: 1_000)
+        let lockAt = now.addingTimeInterval(7_200)
+        let reminder = FieldhouseCardReminderSchedule.oneHour(lockAt: lockAt, now: now, leagueID: leagueID, week: 8)
+        XCTAssertEqual(reminder?.fireAt, now.addingTimeInterval(3_600))
+        XCTAssertEqual(reminder?.identifier, "fieldhouse.card-lock.1h.\(leagueID.uuidString).8")
+        XCTAssertNil(FieldhouseCardReminderSchedule.oneHour(lockAt: now.addingTimeInterval(3_600), now: now, leagueID: leagueID, week: 8))
+    }
+
     func testFavoriteAndCrystalBallCatalogContainsFullDivisionOneDirectory() {
         XCTAssertEqual(FieldhouseTeamCatalog.all.count, 362)
         XCTAssertTrue(FieldhouseTeamCatalog.all.contains("Abilene Christian Wildcats"))
