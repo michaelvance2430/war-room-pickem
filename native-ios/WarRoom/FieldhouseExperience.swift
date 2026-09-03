@@ -349,6 +349,8 @@ struct FieldhouseSeasonState {
     var scoringBestBetGame: Int? = 0
     var scoringProp: FieldhousePropKind = .teamScores90
     var scoringPropAnswer = "YES"
+    var lastCertifiedWindow: Int?
+    var lastCertifiedPoints: Int?
     var phase: FieldhouseSeasonPhase = .regularSeason
     var seasonHasStarted = true
     var cardIsPublished = false
@@ -388,6 +390,12 @@ struct FieldhouseSeasonState {
             propAnswer: scoringPropAnswer
         )
     }
+    var scoringPropResult: Bool? {
+        FieldhousePropEvaluator.answer(for: scoringProp, games: scoringGames, results: scoringResults)
+    }
+    var scoringIsComplete: Bool {
+        !scoringGames.isEmpty && scoringResults.values.filter(\.isFinal).count == scoringGames.count && scoringPropResult != nil
+    }
     var canRebalanceRegions: Bool { !seasonHasStarted }
     var postseasonStatus: WarRoomPostseasonStatus {
         WarRoomPostseasonRule.status(rank: rank, playerCount: regionPlayerCount)
@@ -416,6 +424,37 @@ struct FieldhouseSeasonState {
     @discardableResult
     mutating func reopenPicks(at date: Date) -> Bool {
         guard picksLocked, canEditPicks(at: date) else { return false }
+        picksLocked = false
+        return true
+    }
+
+    @discardableResult
+    mutating func advanceToNextWindow(at date: Date) -> Bool {
+        guard scoringIsComplete, picksLocked, date >= pickLockDate,
+              publishedGames.count == FieldhouseGameCatalog.weeklyCardSize,
+              let publishedProp, let propAnswer else { return false }
+
+        lastCertifiedWindow = scoringWindow
+        lastCertifiedPoints = scoringPoints
+        scoringWindow = window
+        scoringGames = publishedGames
+        scoringResults = Dictionary(uniqueKeysWithValues: publishedGames.map {
+            ($0.id, FieldhouseGameResult(gameID: $0.id, awayScore: 0, homeScore: 0, phase: .scheduled))
+        })
+        scoringSelections = sideSelections
+        scoringConfidences = confidenceSelections
+        scoringBestBetGame = bestBetGame
+        scoringProp = publishedProp
+        scoringPropAnswer = propAnswer
+
+        window += 1
+        cardIsPublished = false
+        publishedGames = []
+        self.publishedProp = nil
+        sideSelections = [:]
+        confidenceSelections = [:]
+        bestBetGame = nil
+        self.propAnswer = nil
         picksLocked = false
         return true
     }

@@ -205,6 +205,37 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.scoringPoints, 34)
     }
 
+    func testCompletedFloorPromotesLockedOnDeckCardAtItsFirstTip() {
+        var state = FieldhouseSeasonState()
+        state.scoringResults = Dictionary(uniqueKeysWithValues: state.scoringGames.enumerated().map { index, game in
+            (game.id, FieldhouseGameResult(gameID: game.id, awayScore: index == 0 ? 91 : 75, homeScore: 70, phase: .final))
+        })
+        XCTAssertTrue(state.scoringIsComplete)
+
+        let nextGames = Array(FieldhouseGameCatalog.windowOne.prefix(10))
+        XCTAssertTrue(state.publishCard(games: nextGames, prop: .gameWithinThree))
+        for index in 0..<10 {
+            state.sideSelections[index] = nextGames[index].home
+            state.confidenceSelections[index] = index + 1
+        }
+        state.bestBetGame = 0
+        state.propAnswer = "NO"
+        XCTAssertTrue(state.lockPicks(at: state.pickLockDate.addingTimeInterval(-1)))
+
+        let priorWindow = state.scoringWindow
+        let promotedWindow = state.window
+        let promotionTip = state.pickLockDate
+        XCTAssertFalse(state.advanceToNextWindow(at: promotionTip.addingTimeInterval(-1)))
+        XCTAssertTrue(state.advanceToNextWindow(at: promotionTip))
+        XCTAssertEqual(state.lastCertifiedWindow, priorWindow)
+        XCTAssertEqual(state.scoringWindow, promotedWindow)
+        XCTAssertEqual(state.window, promotedWindow + 1)
+        XCTAssertFalse(state.cardIsPublished)
+        XCTAssertEqual(state.scoringResults.values.filter(\.isFinal).count, 0)
+        XCTAssertEqual(state.scoringProp, .gameWithinThree)
+        XCTAssertEqual(state.scoringPropAnswer, "NO")
+    }
+
     func testSeasonStartLocksRegionRebalancing() {
         var state = FieldhouseSeasonState()
         XCTAssertFalse(state.canRebalanceRegions)
