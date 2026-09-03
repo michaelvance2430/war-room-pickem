@@ -12,6 +12,7 @@ These integrations are intentionally deferred. GitHub, Supabase, and Xcode are s
 ## Saved review notes
 
 - Championship cold open: announce Kahmann as last season's champion and visibly put a target on his back for the new season.
+- Fieldhouse review-session rule: collect corrections only until Mike explicitly says **build**. Do not change code, rebuild, relaunch, reinstall, reset preview state, or otherwise force him to repeat favorite-team selection, Crystal Ball locking, or construction of the ten-game card while notes are still being gathered. When he says **build**, apply the collected batch once, validate it, and preserve review state wherever technically possible.
 
 ## Build 21
 
