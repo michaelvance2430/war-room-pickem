@@ -1453,22 +1453,30 @@ private struct FieldhousePicksPage: View {
     private var laneSelector: some View {
         HStack(spacing: 8) {
             laneButton(.liveBoard, week: state.scoringWindow, title: "LIVE BOARD", icon: "dot.radiowaves.left.and.right")
-            laneButton(.makePicks, week: state.window, title: state.picksLocked ? "LOCKED BOARD" : (state.pickWindowIsClosed(at: now) ? "WINDOW CLOSED" : "MAKE PICKS"), icon: state.picksLocked || state.pickWindowIsClosed(at: now) ? "lock.fill" : "checkmark.seal.fill")
+            laneButton(
+                .makePicks,
+                week: state.window,
+                title: state.picksLocked ? "LOCKED BOARD" : (state.pickWindowIsClosed(at: now) ? "WINDOW CLOSED" : "MAKE PICKS"),
+                icon: state.picksLocked || state.pickWindowIsClosed(at: now) ? "lock.fill" : "checkmark.seal.fill",
+                urgent: state.hasOutstandingPickTask(at: now)
+            )
         }
         .padding(6)
         .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 17))
         .overlay(RoundedRectangle(cornerRadius: 17).stroke(.orange.opacity(0.34)))
     }
 
-    private func laneButton(_ target: FieldhousePicksLane, week: Int, title: String, icon: String) -> some View {
+    private func laneButton(_ target: FieldhousePicksLane, week: Int, title: String, icon: String, urgent: Bool = false) -> some View {
         Button { lane = target } label: {
             VStack(spacing: 4) {
                 Text("WEEK \(week)").font(.system(size: 8, weight: .black)).tracking(1.2)
                 Label(title, systemImage: icon).font(.caption.weight(.black))
             }
-            .foregroundStyle(lane == target ? .black : .white.opacity(0.62))
+            .foregroundStyle(urgent ? .white : (lane == target ? .black : .white.opacity(0.62)))
             .frame(maxWidth: .infinity).padding(.vertical, 11)
-            .background(lane == target ? Color.orange : .clear, in: RoundedRectangle(cornerRadius: 12))
+            .background(urgent ? Color.red : (lane == target ? Color.orange : .clear), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(urgent ? Color.white.opacity(0.72) : .clear, lineWidth: urgent ? 2 : 0))
+            .shadow(color: urgent ? .red.opacity(0.75) : .clear, radius: urgent ? 10 : 0)
         }.buttonStyle(.plain)
     }
 
@@ -1735,26 +1743,31 @@ private struct FieldhouseStandingsPage: View {
 
 private struct FieldhouseBracketPreview: View {
     @Binding var state: FieldhouseSeasonState
-    private let rounds = ["ROUND OF 64", "ROUND OF 32", "SWEET 16", "ELITE 8", "FINAL FOUR", "TITLE GAME"]
+    private let conferenceTrophies = ["ACC", "BIG 12", "BIG TEN", "SEC"]
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("POSTSEASON TRANSITION · MARCH").font(.caption2.weight(.black)).tracking(1.6).foregroundStyle(.orange)
-            Text("THE ROAD TO CENTER COURT").font(.title2.weight(.black)).fontWidth(.condensed)
-            Text("Your regional finish seeds the standard national bracket. Championship and Toilet Bowl fields are pulled from each region—never overall league standings.")
+            Text("CHAMPIONSHIP WEEK · FOUR TROPHIES").font(.caption2.weight(.black)).tracking(1.6).foregroundStyle(.orange)
+            Text("CUT DOWN FOUR NETS").font(.title2.weight(.black)).fontWidth(.condensed)
+            Text("The four featured conference championships close the regular season before Selection Sunday opens the national bracket.")
                 .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
-            ForEach(Array(rounds.enumerated()), id: \.offset) { index, round in
-                HStack(spacing: 10) {
-                    Text("\(index + 1)").font(.caption.weight(.black)).foregroundStyle(.black)
-                        .frame(width: 25, height: 25).background(.orange, in: Circle())
-                    Text(round).font(.subheadline.weight(.black))
-                    Spacer()
-                    Image(systemName: index == rounds.count - 1 ? "trophy.fill" : "arrow.down")
-                        .foregroundStyle(index == rounds.count - 1 ? .yellow : .orange)
+            HStack(spacing: 7) {
+                ForEach(conferenceTrophies, id: \.self) { conference in
+                    VStack(spacing: 5) {
+                        Image(systemName: "trophy.fill").foregroundStyle(.yellow)
+                        Text(conference).font(.system(size: 7, weight: .black)).minimumScaleFactor(0.7)
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 10)
+                    .background(.yellow.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(.yellow.opacity(0.35)))
                 }
             }
-            HStack { Label("BRACKET HELLFIRE", systemImage: "scope"); Spacer(); Text(state.bracketHellfireUsed ? "0/1" : "1/1") }
-                .font(.caption.weight(.black)).foregroundStyle(.orange)
-                .padding(12).background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+            HStack {
+                Text("CONFERENCE CHAMPIONSHIPS")
+                Spacer()
+                Image(systemName: "arrow.right")
+                Text("76-TEAM BRACKET")
+            }
+            .font(.system(size: 8, weight: .black)).foregroundStyle(.orange)
         }
         .padding(16).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(.orange.opacity(0.42)))
@@ -1765,23 +1778,39 @@ private struct FieldhouseBracketsPage: View {
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
     @State private var confirmingBracketHellfire = false
+    @State private var showingHistory = false
     var body: some View {
         VStack(spacing: 13) {
-            FieldhouseHero(kicker: "MARCH COMMAND · 67 DECISIONS", title: "THE NATIONAL BRACKET", detail: "First Four through the title game. Lock the whole sheet before the first tip.", icon: "point.3.connected.trianglepath.dotted")
-            ForEach(FieldhouseRegion.allCases) { region in
-                HStack { Text(region.rawValue).font(.headline.weight(.black)); Spacer(); Text("ROUND OF 64 → SWEET 16 → ELITE 8").font(.system(size: 7, weight: .black)).foregroundStyle(.orange); Image(systemName: "chevron.right.2").foregroundStyle(.yellow) }.padding(15).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(.orange.opacity(0.25)))
-            }
             Button { confirmingBracketHellfire = true } label: {
-                FieldhouseAction(kicker: "BRACKET WEAPON · ONE SHOT", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch the AI Crazy Pick", detail: state.bracketHellfireUsed ? "All 67 picks are sealed. No reroll." : "AI fills an erratic but complete bracket and seals every pick. Hit 60% for 1.5×; miss it and your raw points are cut in half.", icon: "wand.and.stars")
+                FieldhouseAction(kicker: "BRACKET HELLFIRE · 1/1", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch the AI Crazy Pick", detail: state.bracketHellfireUsed ? "All 75 decisions are sealed. No reroll." : "One-way door. AI fills an erratic 76-team bracket and seals all 75 decisions. Hit 60% for 1.5×; miss it and raw points are cut in half.", icon: "wand.and.stars")
             }.buttonStyle(.plain).disabled(state.bracketHellfireUsed)
-            Text("REGULAR SEASON HELLFIRE: 2/2 · BRACKET AI HELLFIRE: 1 TOTAL · NO REROLLS").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.48))
+            FieldhouseHero(kicker: "MARCH COMMAND · 76 TEAMS · 75 DECISIONS", title: "ROAD TO CENTER COURT", detail: "Twelve Opening Round games feed the familiar field of 64. Every winner advances through the real bracket path.", icon: "point.3.connected.trianglepath.dotted")
+            HStack(spacing: 8) {
+                bracketModeButton("CURRENT BRACKET", history: false)
+                bracketModeButton("HISTORY", history: true)
+            }
+            if showingHistory {
+                FieldhouseAction(kicker: "BRACKET ARCHIVE", title: "No completed Fieldhouse bracket yet", detail: "Finished tournament brackets remain here permanently by season. The first archive appears after the 2027 title game.", icon: "archivebox.fill")
+            } else {
+                FieldhouseNationalBracketMap()
+            }
+            Text("REGULAR SEASON HELLFIRE: 2/2 · BRACKET HELLFIRE: 1 TOTAL · NO EDITS · NO REROLLS").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.48))
         }
         .alert("Launch Bracket Hellfire?", isPresented: $confirmingBracketHellfire) {
             Button("CANCEL", role: .cancel) {}
             Button("LAUNCH AND LOCK", role: .destructive) { deployBracketHellfire() }
         } message: {
-            Text("This cannot be undone. The machine makes all 67 decisions, locks the bracket permanently, and allows no edits or rerolls. At least 60% correct earns 1.5× raw bracket points. Below 60% cuts raw bracket points in half.")
+            Text("This cannot be undone. The machine makes all 75 decisions in the 76-team bracket, locks it permanently, and allows no edits or rerolls. At least 60% correct earns 1.5× raw bracket points. Below 60% cuts raw bracket points in half.")
         }
+    }
+
+    private func bracketModeButton(_ title: String, history: Bool) -> some View {
+        Button { showingHistory = history } label: {
+            Text(title).font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 11)
+                .foregroundStyle(showingHistory == history ? .black : .orange)
+                .background(showingHistory == history ? Color.orange : .black.opacity(0.7), in: RoundedRectangle(cornerRadius: 11))
+                .overlay(RoundedRectangle(cornerRadius: 11).stroke(.orange.opacity(0.55)))
+        }.buttonStyle(.plain)
     }
 
     private func deployBracketHellfire() {
@@ -1789,6 +1818,72 @@ private struct FieldhouseBracketsPage: View {
         state.bracketHellfireUsed = true
         state.bracketLocked = true
         strikePresentation = WeaponStrikeCatalog.presentation(for: "cbb")
+    }
+}
+
+private struct FieldhouseNationalBracketMap: View {
+    private let rounds = [("ROUND OF 64", 8), ("ROUND OF 32", 4), ("SWEET 16", 2), ("ELITE 8", 1)]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack { Label("OPENING ROUND", systemImage: "arrow.triangle.branch"); Spacer(); Text("12 GAMES · 24 TEAMS") }
+                    .font(.caption.weight(.black)).foregroundStyle(.yellow)
+                Text("The 12 winners feed directly into the standard 64-team bracket.")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+                HStack(spacing: 4) {
+                    ForEach(1...12, id: \.self) { game in
+                        Text("\(game)").font(.system(size: 7, weight: .black)).foregroundStyle(.black)
+                            .frame(maxWidth: .infinity).padding(.vertical, 5).background(.yellow, in: RoundedRectangle(cornerRadius: 4))
+                    }
+                }
+            }
+            .padding(13).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(.yellow.opacity(0.38)))
+
+            ForEach(FieldhouseRegion.allCases) { region in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack { Text("\(region.rawValue) REGION").font(.caption.weight(.black)); Spacer(); Text("16 → 8 → 4 → 2 → 1").font(.system(size: 8, weight: .black)).foregroundStyle(.orange) }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .center, spacing: 9) {
+                            ForEach(Array(rounds.enumerated()), id: \.offset) { index, round in
+                                bracketRound(round.0, games: round.1, emphasized: index == rounds.count - 1)
+                                if index < rounds.count - 1 { Image(systemName: "chevron.right.2").foregroundStyle(.orange.opacity(0.65)) }
+                            }
+                        }
+                    }
+                }
+                .padding(13).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(.orange.opacity(0.28)))
+            }
+
+            HStack(spacing: 9) {
+                bracketRound("FINAL FOUR", games: 2, emphasized: true)
+                Image(systemName: "chevron.right.2").foregroundStyle(.yellow)
+                bracketRound("TITLE GAME", games: 1, emphasized: true)
+                Image(systemName: "trophy.fill").font(.title2).foregroundStyle(.yellow)
+            }
+            .padding(13).background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(.yellow.opacity(0.45)))
+            Text("Selection Sunday will replace every seed placeholder with the official field. The completed bracket remains in History as a permanent receipt.")
+                .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+        }
+    }
+
+    private func bracketRound(_ title: String, games: Int, emphasized: Bool) -> some View {
+        VStack(spacing: 6) {
+            Text(title).font(.system(size: 8, weight: .black)).foregroundStyle(emphasized ? .yellow : .orange)
+            ForEach(0..<games, id: \.self) { game in
+                VStack(spacing: 2) {
+                    Text("SEED · TEAM").lineLimit(1)
+                    Rectangle().fill(.white.opacity(0.12)).frame(height: 1)
+                    Text("SEED · TEAM").lineLimit(1)
+                }
+                .font(.system(size: 7, weight: .bold)).foregroundStyle(.white.opacity(0.55))
+                .frame(width: 92).padding(6).background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 7))
+                .overlay(RoundedRectangle(cornerRadius: 7).stroke(emphasized ? .yellow.opacity(0.30) : .white.opacity(0.12)))
+                .accessibilityLabel("\(title) game \(game + 1), awaiting Selection Sunday teams")
+            }
+        }
     }
 }
 
