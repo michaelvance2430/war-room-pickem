@@ -1945,31 +1945,9 @@ private struct FieldhouseProfilePage: View {
     }
     var body: some View {
         VStack(spacing: 13) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("FIELDHOUSE PERSONNEL FILE").font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(.orange)
-                HStack(spacing: 14) {
-                    Circle().fill(.orange.opacity(0.18)).frame(width: 72, height: 72)
-                        .overlay(Text("RV").font(.title.weight(.black)).foregroundStyle(.orange))
-                        .overlay(Circle().stroke(.orange, lineWidth: 3))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Riley V.").font(.title2.weight(.black))
-                        Text("warroom@example.com").font(.caption).foregroundStyle(.white.opacity(0.48))
-                        Text("CHANGE PROFILE PHOTO").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.orange)
-                    }
-                }
-            }.frame(maxWidth: .infinity, alignment: .leading).padding(18).background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 18)).overlay(RoundedRectangle(cornerRadius: 18).stroke(.orange.opacity(0.32)))
-            HStack(spacing: 10) {
-                FieldhouseMetric(value: "\(state.regularHellfiresUsed)", label: "HELLFIRES")
-                FieldhouseMetric(value: "\(state.rank)", label: "REGIONAL SEED")
-            }
-            profileSection("WAR ROOM ACCOUNT NAME", icon: "person.fill") {
-                VStack(alignment: .leading, spacing: 5) { Text("Riley V.").font(.headline.weight(.black)); Text("Used across every sport and league.").font(.caption).foregroundStyle(.white.opacity(0.48)) }
-            }
-            profileSection("CLASSIFIED BIRTHDAY FILE", icon: "lock.shield.fill") {
-                VStack(alignment: .leading, spacing: 5) { Text("Birthday not sealed").font(.headline.weight(.black)); Text("Only month and day are stored.").font(.caption).foregroundStyle(.white.opacity(0.48)) }
-            }
+            profileHero
             VStack(alignment: .leading, spacing: 12) {
-                Text("FAVORITE TEAM · EDITABLE ANYTIME").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.orange)
+                Text("FAVORITE TEAM").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.orange)
                 Button { editingFavorite.toggle() } label: {
                     HStack {
                         Image(systemName: "heart.fill").foregroundStyle(.orange)
@@ -1996,21 +1974,32 @@ private struct FieldhouseProfilePage: View {
                     .frame(maxHeight: 280)
                 }
             }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.3)))
-            FieldhouseAction(kicker: "CRYSTAL BALL · SEALED", title: state.crystalBallChampion ?? "Champion not selected", detail: "The original championship prediction stays on your permanent profile.", icon: "sparkles")
-            profileSection("ACTIVE LOADOUT", icon: "slider.horizontal.3") {
-                VStack(spacing: 10) {
-                    profileRow("EQUIPPED TITLE", value: "Floor General")
-                    profileRow("STANDINGS INSIGNIA", value: "Regional Seed")
-                    profileRow("AVATAR BORDER", value: "Courtside Orange")
-                }
+            dossierRow("Arsenal", "Hellfire inventory and permanent receipts", "scope", .red)
+            dossierRow("Campaign Dog Tags", "Your identity across every War Room sport", "tag.fill", .orange)
+            dossierRow("Profile Passport", "League history, seasons and permanent record", "book.closed.fill", .orange)
+            currentCampaign
+
+            dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
+            dossierRow("Week 1 · \(state.scoringPoints) points", "SEASON TOTAL · \(state.scoringPoints)", "checklist.checked", .green)
+
+            dossierLabel("CAREER INTEL", detail: "THE NUMBERS HAVE TESTIFIED UNDER OATH")
+            HStack(spacing: 8) {
+                FieldhouseMetric(value: "6-4", label: "ATS")
+                FieldhouseMetric(value: "1", label: "STREAK")
+                FieldhouseMetric(value: "\(state.scoringPoints)", label: "BEST WEEK")
             }
-            FieldhouseAction(kicker: "PERMANENT HARDWARE", title: "Championship · Toilet Bowl · Bracket Crown", detail: "Only regional postseason qualifiers can add Championship or Toilet Bowl brass.", icon: "trophy.fill")
+            dossierRow("Rivalry Report", "Riley V. vs. the regional field", "person.2.fill", .red)
+
             VStack(alignment: .leading, spacing: 12) {
                 Button { withAnimation(.snappy) { earnedExpanded.toggle() } } label: {
                     HStack {
-                        Label("EARNED SCHWAG", systemImage: "medal.fill").font(.headline.weight(.black)).foregroundStyle(.orange)
-                        Spacer(); Text("3").font(.caption.weight(.black)); Image(systemName: earnedExpanded ? "chevron.up" : "chevron.down")
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("EARNED SWAG").font(.caption.weight(.black)).tracking(1.7)
+                            Text("3 RECEIPTS · \(earnedExpanded ? "CLOSE CABINET" : "OPEN CABINET")").font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(.white.opacity(0.5))
+                        }
+                        Spacer(); Image(systemName: earnedExpanded ? "chevron.up" : "chevron.down")
                     }
+                    .foregroundStyle(.orange)
                 }.buttonStyle(.plain)
                 if earnedExpanded {
                     ForEach(["FIRST TIP · MADE YOUR FIRST PICK", "HARDWOOD HOMER · PICKED YOUR FAVORITE", "HEAT CHECK · HIT A BEST BET"], id: \.self) { item in
@@ -2019,18 +2008,91 @@ private struct FieldhouseProfilePage: View {
                     }
                 }
             }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.3)))
+
+            dossierLabel("CHEEVO VAULT", detail: "FOUR ROOMS. ONE CONCERNING PERSONALITY.")
+            dossierRow("Open Cheevo Vault", "Inspect every earned artifact", "shippingbox.fill", .orange)
+
+            dossierLabel("TROPHY CASE", detail: "THE ROOM CANNOT DELETE HISTORY")
+            dossierRow("No permanent hardware yet", "The engraver checked twice", "trophy.fill", .yellow)
+            FieldhouseAction(kicker: "CRYSTAL BALL · SEALED", title: state.crystalBallChampion ?? "Champion not selected", detail: "The original championship prediction stays on your permanent profile.", icon: "sparkles")
+
+            dossierLabel("IDENTITY CONTROL", detail: "CHANGE THE NAME. KEEP THE RECEIPTS.")
+            dossierRow("Edit Profile", "Name, photo, birthday, favorite team and loadout", "person.crop.rectangle.fill", .green)
+
+            dossierLabel("ROOM ACCESS", detail: "TRANSMISSIONS & RULES OF ENGAGEMENT")
+            dossierRow("Announcements", "Official yelling from command", "megaphone.fill", .red)
+            dossierRow("Rules of Engagement", "How this beautiful mess scores", "book.closed.fill", .yellow)
+            dossierRow("Privacy & Safety", "Policies, support and account controls", "hand.raised.fill", .green)
+
+            dossierLabel("LEAGUE FREQUENCY", detail: "SEE EVERY TASK AND UNREAD TRANSMISSION BEFORE YOU SWITCH")
+            dossierRow("Open League Command", "1 room · prioritized by what needs you", "antenna.radiowaves.left.and.right", .green)
+            dossierRow("Leave the Building", "Sign out", "door.left.hand.open", .red)
         }
     }
 
-    private func profileSection<Content: View>(_ title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            Label(title, systemImage: icon).font(.caption2.weight(.black)).tracking(1.2).foregroundStyle(.orange)
-            content()
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.3)))
+    private var profileHero: some View {
+        VStack(spacing: 10) {
+            Text("PLAYER DOSSIER").font(.caption2.weight(.black)).tracking(2.4).foregroundStyle(.orange)
+            Circle().fill(.orange.opacity(0.18)).frame(width: 104, height: 104)
+                .overlay(Text("RV").font(.system(size: 34, weight: .black)).foregroundStyle(.orange))
+                .overlay(Circle().stroke(.orange, lineWidth: 3))
+            Text("FLOOR GENERAL · RANK 5").font(.caption.weight(.black)).tracking(1.4).foregroundStyle(.orange)
+            Text("Riley V.").font(.system(size: 32, weight: .black)).fontWidth(.condensed)
+            HStack(spacing: 7) {
+                profileTag("COMMISSIONER", color: .green)
+                profileTag("MIDWEST REGION", color: .orange)
+            }
+            Text("THE FIELDHOUSE NCAAM").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(.white.opacity(0.48))
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 22)
+        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(.orange.opacity(0.42)))
     }
 
-    private func profileRow(_ title: String, value: String) -> some View {
-        HStack { VStack(alignment: .leading) { Text(title).font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.45)); Text(value).font(.subheadline.weight(.black)) }; Spacer(); Image(systemName: "chevron.right").foregroundStyle(.orange) }
+    private var currentCampaign: some View {
+        VStack(spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("CURRENT CAMPAIGN").font(.caption2.weight(.black)).tracking(1.8).foregroundStyle(.green)
+                    Text("FORM: FUNCTIONAL · SUSPICIOUSLY COMPETENT").font(.system(size: 8, weight: .black)).tracking(0.6).foregroundStyle(.white.opacity(0.48))
+                }
+                Spacer(); Image(systemName: "scope").font(.title2.weight(.black)).foregroundStyle(.green)
+            }
+            HStack(spacing: 8) {
+                FieldhouseMetric(value: "\(state.scoringPoints)", label: "CAREER PTS")
+                FieldhouseMetric(value: "1", label: "WEEKS")
+                FieldhouseMetric(value: "\(state.scoringPoints)", label: "LAST WEEK")
+            }
+        }
+        .padding(14).background(LinearGradient(colors: [.black.opacity(0.92), .green.opacity(0.14)], startPoint: .leading, endPoint: .trailing), in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.green.opacity(0.35)))
+    }
+
+    private func profileTag(_ text: String, color: Color) -> some View {
+        Text(text).font(.system(size: 9, weight: .black)).tracking(1)
+            .foregroundStyle(color).padding(.horizontal, 9).padding(.vertical, 5)
+            .background(color.opacity(0.14), in: Capsule()).overlay(Capsule().stroke(color.opacity(0.55)))
+    }
+
+    private func dossierLabel(_ title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(.orange)
+            Text(detail).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.38))
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
+    }
+
+    private func dossierRow(_ title: String, _ detail: String, _ icon: String, _ color: Color) -> some View {
+        HStack(spacing: 13) {
+            Image(systemName: icon).font(.headline.weight(.black)).foregroundStyle(color).frame(width: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.headline.weight(.black))
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer(); Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(color.opacity(0.7))
+        }
+        .padding(15).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 17))
+        .overlay(alignment: .leading) { Rectangle().fill(color).frame(width: 3).padding(.vertical, 9) }
+        .overlay(RoundedRectangle(cornerRadius: 17).stroke(color.opacity(0.25)))
     }
 }
 
