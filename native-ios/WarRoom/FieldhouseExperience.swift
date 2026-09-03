@@ -2400,6 +2400,7 @@ private struct FieldhouseLockerProfileSheet: View {
     }
 }
 private struct FieldhouseProfilePage: View {
+    @EnvironmentObject private var auth: AuthStore
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
@@ -2408,7 +2409,13 @@ private struct FieldhouseProfilePage: View {
     @State private var searchText = ""
     @State private var activeDestination: FieldhouseProfileDestination?
     @State private var selectedAchievement: ProfileAchievement?
-    private let previewUserID = UUID(uuidString: "09544d2b-6eca-4131-a321-c000586c9029")!
+    @State private var profile: Profile?
+    private let previewFallbackUserID = UUID(uuidString: "09544d2b-6eca-4131-a321-c000586c9029")!
+    private var profileUserID: UUID { auth.user?.id ?? previewFallbackUserID }
+    private var playerName: String {
+        let name = profile?.displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? "Riley V." : name
+    }
     private var sportID: String { state.league == .ncaaw ? "ncaaw" : "ncaam" }
     private var demoAchievements: [ProfileAchievement] {
         [
@@ -2452,9 +2459,9 @@ private struct FieldhouseProfilePage: View {
                     .frame(maxHeight: 280)
                 }
             }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.3)))
-            ProfileArsenalView(userId: previewUserID, sportId: sportID)
-            CampaignDogTagsView(userId: previewUserID)
-            ProfilePassportView(userId: previewUserID, isOwner: true)
+            ProfileArsenalView(userId: profileUserID, sportId: sportID)
+            CampaignDogTagsView(userId: profileUserID)
+            ProfilePassportView(userId: profileUserID, isOwner: true)
             currentCampaign
 
             dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
@@ -2513,21 +2520,32 @@ private struct FieldhouseProfilePage: View {
             dossierButton(.leagueCommand, "Open League Command", "1 room · prioritized by what needs you", "antenna.radiowaves.left.and.right", .green)
             dossierButton(.signOut, "Leave the Building", "Sign out", "door.left.hand.open", .red)
         }
-        .sheet(item: $activeDestination) { destination in
+        .sheet(item: $activeDestination, onDismiss: {
+            Task { await reloadProfile() }
+        }) { destination in
             FieldhouseProfileDestinationView(state: $state, destination: destination)
         }
         .sheet(item: $selectedAchievement) { achievement in
             AchievementEvidenceView(achievement: achievement, visual: achievementVisual(for: achievement.code), sportId: sportID)
                 .presentationDetents([.large]).presentationDragIndicator(.hidden)
         }
+        .task(id: profileUserID) {
+            await reloadProfile()
+        }
+    }
+
+    @MainActor
+    private func reloadProfile() async {
+        guard let token = auth.token else { profile = nil; return }
+        profile = try? await SupabaseAPI.profile(token: token, userId: profileUserID)
     }
 
     private var profileHero: some View {
         VStack(spacing: 10) {
             Text("PLAYER DOSSIER").font(.caption2.weight(.black)).tracking(2.4).foregroundStyle(accent)
-            ProfileAvatar(urlString: nil, name: "Riley V.", size: 104, borderId: nil, accent: accent)
+            ProfileAvatar(urlString: profile?.avatarURL, name: playerName, size: 104, borderId: profile?.equippedBorderId, accent: accent)
             ProfileRankPlacard(progress: CareerRanks.resolve(points: 230, seasons: 1, sports: 3), isOwner: true, sportId: sportID)
-            Text("Riley V.").font(.system(size: 32, weight: .black)).fontWidth(.condensed)
+            Text(playerName).font(.system(size: 32, weight: .black)).fontWidth(.condensed)
             HStack(spacing: 7) {
                 profileTag("COMMISSIONER", color: .green)
                 profileTag("MIDWEST REGION", color: accent)
