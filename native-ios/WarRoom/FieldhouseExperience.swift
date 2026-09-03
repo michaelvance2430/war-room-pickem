@@ -1244,6 +1244,7 @@ private struct FieldhousePicksPage: View {
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
     @State private var confirmingLock = false
+    @State private var confirmingHellfire = false
     @State private var lane: FieldhousePicksLane = .liveBoard
     @State private var now = Date()
     var body: some View {
@@ -1280,6 +1281,12 @@ private struct FieldhousePicksPage: View {
         } message: {
             Text("Your card is complete. You can reopen and change it only before the first tip.")
         }
+        .alert("Deploy Hellfire?", isPresented: $confirmingHellfire) {
+            Button("CANCEL", role: .cancel) {}
+            Button("DEPLOY HELLFIRE", role: .destructive) { deployHellfire() }
+        } message: {
+            Text("This cannot be undone. One of your two regular-season Hellfires will be permanently spent. Hellfire fills all ten favorites, confidence points, Best Bet, and the prop. You may still adjust those picks before the first tip, but the Hellfire will not be returned.")
+        }
         .onReceive(Timer.publish(every: 15, on: .main, in: .common).autoconnect()) { date in
             now = date
             state.enforcePickDeadline(at: date)
@@ -1290,7 +1297,7 @@ private struct FieldhousePicksPage: View {
     private var makePicksContent: some View {
         VStack(spacing: 12) {
             FieldhouseHero(kicker: "ON DECK · WEEK \(state.window)", title: "TEN GAMES.\nNO EMPTY POSSESSIONS.", detail: "Pick the spread, assign confidence 1–10, mark one Best Bet, and answer the floor prop.", icon: "list.number")
-                Button { deployHellfire() } label: {
+                Button { confirmingHellfire = true } label: {
                     FieldhouseAction(kicker: "HELLFIRE · \(state.regularHellfiresRemaining)/2 AVAILABLE", title: state.regularHellfiresRemaining == 0 ? "Hellfires Expended" : "Deploy Hellfire", detail: "Always visible before the first game. Uses one authorization and fills the card.", icon: "scope")
                 }.buttonStyle(.plain).disabled(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now)).opacity(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now) ? 0.45 : 1)
                 ForEach(Array(state.publishedGames.enumerated()), id: \.element.id) { index, game in
