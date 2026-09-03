@@ -83,8 +83,10 @@ final class FieldhouseExperienceTests: XCTestCase {
         state.propAnswer = "YES"
         XCTAssertTrue(state.lockPicks(at: beforeTip))
         XCTAssertFalse(state.hasOutstandingPickTask(at: beforeTip))
+        XCTAssertTrue(state.playerPicksAreComplete)
 
         state.picksLocked = false
+        XCTAssertFalse(state.playerPicksAreComplete)
         XCTAssertFalse(state.hasOutstandingPickTask(at: state.pickLockDate))
     }
 

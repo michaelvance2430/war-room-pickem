@@ -518,6 +518,7 @@ struct FieldhouseSeasonState {
     var canRebalanceRegions: Bool { !seasonHasStarted }
     var canSelectChampionshipTrophy: Bool { !seasonHasStarted }
     var canBuildCard: Bool { isCommissioner && !cardIsPublished }
+    var playerPicksAreComplete: Bool { cardIsPublished && picksLocked }
     func hasOutstandingPickTask(at date: Date) -> Bool {
         cardIsPublished && !picksLocked && canEditPicks(at: date)
     }
@@ -983,12 +984,18 @@ private struct FieldhouseHomePage: View {
             else if state.canBuildCard { showingCardBuilder = true }
         } label: {
             FieldhouseAction(
-                kicker: state.cardIsPublished ? "PLAYER COMMAND · WEEK \(state.window) · PICKS OPEN" : "PLAYER COMMAND · WEEK \(state.window)",
-                title: state.cardIsPublished ? "Make Your 10 Picks" : (state.isCommissioner ? "Build Next Week's Card" : "Card Not Posted Yet"),
-                detail: state.cardIsPublished
+                kicker: state.playerPicksAreComplete
+                    ? "PLAYER COMMAND · WEEK \(state.window) · COMPLETE"
+                    : (state.cardIsPublished ? "PLAYER COMMAND · WEEK \(state.window) · PICKS OPEN" : "PLAYER COMMAND · WEEK \(state.window)"),
+                title: state.playerPicksAreComplete
+                    ? "Week \(state.window) Picks Complete"
+                    : (state.cardIsPublished ? "Make Your 10 Picks" : (state.isCommissioner ? "Build Next Week's Card" : "Card Not Posted Yet")),
+                detail: state.playerPicksAreComplete
+                    ? "Your ten picks are on the record. Tap to view your locked board."
+                    : (state.cardIsPublished
                     ? "Ten shared games. One card. Locks at the first selected tip."
-                    : (state.isCommissioner ? "Pull the odds and publish the next board." : "The commissioner is building the next ten-game board."),
-                icon: state.cardIsPublished ? "checkmark.seal.fill" : (state.isCommissioner ? "hammer.fill" : "hourglass")
+                    : (state.isCommissioner ? "Pull the odds and publish the next board." : "The commissioner is building the next ten-game board.")),
+                icon: state.playerPicksAreComplete ? "checkmark.seal.fill" : (state.cardIsPublished ? "list.bullet.clipboard.fill" : (state.isCommissioner ? "hammer.fill" : "hourglass"))
             )
         }
         .buttonStyle(.plain)
