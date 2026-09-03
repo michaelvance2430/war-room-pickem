@@ -2006,11 +2006,19 @@ private struct FieldhousePicksPage: View {
 }
 
 private struct FieldhouseStandingsPage: View {
+    @EnvironmentObject private var auth: AuthStore
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @State private var showingOverall = false
-    private let players = ["Riley V.", "Full Court Mess", "Bracket Buster", "The Sixth Man", "Baseline Bandit", "March Sadness", "Bank Shot", "Coach's Favorite", "Paint Patrol", "Buzzer Beater", "Zone Defense", "Heat Check", "One Shining Mistake", "Fast Break", "The Transfer Portal", "Double Bonus", "Shot Clock", "Backboard Damage", "Cinderella Story", "Technical Foul", "Bubble Trouble", "Air Ball", "Traveling", "Bench Mob", "Wooden Spoon"]
+    @State private var profile: Profile?
+    private let previewFallbackUserID = UUID(uuidString: "09544d2b-6eca-4131-a321-c000586c9029")!
+    private var profileUserID: UUID { auth.user?.id ?? previewFallbackUserID }
+    private var playerName: String {
+        let name = profile?.displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? "Riley V." : name
+    }
+    private var players: [String] { [playerName, "Full Court Mess", "Bracket Buster", "The Sixth Man", "Baseline Bandit", "March Sadness", "Bank Shot", "Coach's Favorite", "Paint Patrol", "Buzzer Beater", "Zone Defense", "Heat Check", "One Shining Mistake", "Fast Break", "The Transfer Portal", "Double Bonus", "Shot Clock", "Backboard Damage", "Cinderella Story", "Technical Foul", "Bubble Trouble", "Air Ball", "Traveling", "Bench Mob", "Wooden Spoon"] }
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHero(kicker: "FIELDHOUSE STANDINGS", title: "REGIONAL SEED LINES", detail: "Live points, regional position, and both postseason cuts in the same format used across War Room.", icon: "list.number")
@@ -2049,6 +2057,10 @@ private struct FieldhouseStandingsPage: View {
             .padding(16).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.32)))
             FieldhouseBracketPreview(state: $state)
+        }
+        .task(id: profileUserID) {
+            guard let token = auth.token else { profile = nil; return }
+            profile = try? await SupabaseAPI.profile(token: token, userId: profileUserID)
         }
     }
 
@@ -2276,11 +2288,19 @@ private struct FieldhouseChatAvatar: View {
 }
 
 private struct FieldhouseLockerPage: View {
+    @EnvironmentObject private var auth: AuthStore
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     private static let bottomAnchor = "fieldhouse-locker-bottom"
     @State private var draft = ""
     @State private var selectedProfile: FieldhouseLockerMessage?
+    @State private var profile: Profile?
+    private let previewFallbackUserID = UUID(uuidString: "09544d2b-6eca-4131-a321-c000586c9029")!
+    private var profileUserID: UUID { auth.user?.id ?? previewFallbackUserID }
+    private var playerName: String {
+        let name = profile?.displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? "Riley V." : name
+    }
     @State private var messages = [
         FieldhouseLockerMessage(id: "full-court-1", author: "Full Court Mess", body: "That bracket has six exits and you found all seven.", avatarURL: nil, isMine: false),
         FieldhouseLockerMessage(id: "midwest-1", author: "Midwest to the Middle", body: "Book it. This region belongs to us.", avatarURL: nil, isMine: false),
@@ -2299,14 +2319,15 @@ private struct FieldhouseLockerPage: View {
                             Text("NO PRESS. NO PR TEAM. NO ALIBIS.").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(.red)
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(18).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 18)).overlay(alignment: .leading) { Rectangle().fill(accent).frame(width: 4).padding(.vertical, 12) }
                         ForEach(messages) { message in
+                            let displayedMessage = resolved(message)
                             HStack(alignment: .top, spacing: 9) {
                                 if message.isMine { Spacer(minLength: 38) }
                                 if !message.isMine {
-                                    profileButton(for: message)
+                                    profileButton(for: displayedMessage)
                                 }
                                 VStack(alignment: message.isMine ? .trailing : .leading, spacing: 5) {
-                                    Button { selectedProfile = message } label: {
-                                        Text(message.isMine ? "YOU" : message.author.uppercased()).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(accent)
+                                    Button { selectedProfile = displayedMessage } label: {
+                                        Text(message.isMine ? "YOU" : displayedMessage.author.uppercased()).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(accent)
                                     }
                                     .buttonStyle(.plain)
                                     .accessibilityHint("Opens this player's profile")
@@ -2318,7 +2339,7 @@ private struct FieldhouseLockerPage: View {
                                 .background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15))
                                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.20)))
                                 if message.isMine {
-                                    profileButton(for: message)
+                                    profileButton(for: displayedMessage)
                                 } else { Spacer(minLength: 38) }
                             }
                         }
@@ -2334,7 +2355,7 @@ private struct FieldhouseLockerPage: View {
                 Button {
                     let clean = draft.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !clean.isEmpty else { return }
-                    messages.append(FieldhouseLockerMessage(id: UUID().uuidString, author: "Riley V.", body: clean, avatarURL: nil, isMine: true)); draft = ""
+                    messages.append(FieldhouseLockerMessage(id: UUID().uuidString, author: playerName, body: clean, avatarURL: profile?.avatarURL, isMine: true)); draft = ""
                 } label: {
                     Image(systemName: "paperplane.fill").font(.headline).foregroundStyle(.black).frame(width: 46, height: 46).background(accent, in: Circle())
                 }.buttonStyle(.plain)
@@ -2348,6 +2369,15 @@ private struct FieldhouseLockerPage: View {
                 selectedProfile = messages.first
             }
         }
+        .task(id: profileUserID) {
+            guard let token = auth.token else { profile = nil; return }
+            profile = try? await SupabaseAPI.profile(token: token, userId: profileUserID)
+        }
+    }
+
+    private func resolved(_ message: FieldhouseLockerMessage) -> FieldhouseLockerMessage {
+        guard message.isMine else { return message }
+        return FieldhouseLockerMessage(id: message.id, author: playerName, body: message.body, avatarURL: profile?.avatarURL, isMine: true)
     }
 
     private func profileButton(for message: FieldhouseLockerMessage) -> some View {
@@ -2473,7 +2503,7 @@ private struct FieldhouseProfilePage: View {
                 FieldhouseMetric(value: "1", label: "STREAK")
                 FieldhouseMetric(value: "\(state.scoringPoints)", label: "BEST WEEK")
             }
-            dossierButton(.rivalry, "Rivalry Report", "Riley V. vs. the regional field", "person.2.fill", .red)
+            dossierButton(.rivalry, "Rivalry Report", "\(playerName) vs. the regional field", "person.2.fill", .red)
 
             VStack(alignment: .leading, spacing: 12) {
                 Button { withAnimation(.snappy) { earnedExpanded.toggle() } } label: {
@@ -2523,7 +2553,7 @@ private struct FieldhouseProfilePage: View {
         .sheet(item: $activeDestination, onDismiss: {
             Task { await reloadProfile() }
         }) { destination in
-            FieldhouseProfileDestinationView(state: $state, destination: destination)
+            FieldhouseProfileDestinationView(state: $state, destination: destination, playerName: playerName)
         }
         .sheet(item: $selectedAchievement) { achievement in
             AchievementEvidenceView(achievement: achievement, visual: achievementVisual(for: achievement.code), sportId: sportID)
@@ -2630,6 +2660,7 @@ private struct FieldhouseProfileDestinationView: View {
     @Environment(\.fieldhouseLeague) private var league
     @Binding var state: FieldhouseSeasonState
     let destination: FieldhouseProfileDestination
+    let playerName: String
     private var accent: Color { FieldhouseTheme.accent(for: league) }
 
     var body: some View {
@@ -2688,7 +2719,7 @@ private struct FieldhouseProfileDestinationView: View {
             detailCard("PROP", state.scoringPropResult == nil ? "Pending final game data" : "Scored autonomously from the completed board")
         case .rivalry:
             detailCard("REGIONAL POSITION", "Rank \(state.rank) of \(state.regionPlayerCount) in the Midwest Region")
-            detailCard("HEAD-TO-HEAD", "Riley V. is 6–4 against the field this season")
+            detailCard("HEAD-TO-HEAD", "\(playerName) is 6–4 against the field this season")
         case .cheevoVault:
             detailCard("FIRST TIP", "Made your first Fieldhouse pick")
             detailCard("HARDWOOD HOMER", "Locked your favorite team")
