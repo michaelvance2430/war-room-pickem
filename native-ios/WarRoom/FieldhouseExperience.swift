@@ -374,6 +374,20 @@ enum FieldhouseScoreEngine {
     }
 }
 
+enum FieldhousePostseasonScoreEngine {
+    static func adjustedPoints(
+        rawPoints: Int,
+        correctPicks: Int,
+        totalPicks: Int,
+        usedHellfire: Bool
+    ) -> Int {
+        guard usedHellfire, totalPicks > 0 else { return rawPoints }
+        let clearedThreshold = Double(correctPicks) / Double(totalPicks) >= 0.60
+        let multiplier = clearedThreshold ? 1.5 : 0.5
+        return Int((Double(rawPoints) * multiplier).rounded())
+    }
+}
+
 enum FieldhouseGameCatalog {
     static let weeklyCardSize = 10
     static let windowOne = [
@@ -1750,17 +1764,31 @@ private struct FieldhouseBracketPreview: View {
 private struct FieldhouseBracketsPage: View {
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
+    @State private var confirmingBracketHellfire = false
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHero(kicker: "MARCH COMMAND · 67 DECISIONS", title: "THE NATIONAL BRACKET", detail: "First Four through the title game. Lock the whole sheet before the first tip.", icon: "point.3.connected.trianglepath.dotted")
             ForEach(FieldhouseRegion.allCases) { region in
                 HStack { Text(region.rawValue).font(.headline.weight(.black)); Spacer(); Text("ROUND OF 64 → SWEET 16 → ELITE 8").font(.system(size: 7, weight: .black)).foregroundStyle(.orange); Image(systemName: "chevron.right.2").foregroundStyle(.yellow) }.padding(15).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(.orange.opacity(0.25)))
             }
-            Button { guard !state.bracketHellfireUsed else { return }; state.bracketHellfireUsed = true; state.bracketLocked = true; strikePresentation = WeaponStrikeCatalog.presentation(for: "cbb") } label: {
-                FieldhouseAction(kicker: "BRACKET WEAPON · ONE SHOT", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch the AI Crazy Pick", detail: state.bracketHellfireUsed ? "All 67 picks are sealed. No reroll." : "AI fills a wild but complete bracket, plays the Fieldhouse strike video, then seals every pick.", icon: "wand.and.stars")
+            Button { confirmingBracketHellfire = true } label: {
+                FieldhouseAction(kicker: "BRACKET WEAPON · ONE SHOT", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch the AI Crazy Pick", detail: state.bracketHellfireUsed ? "All 67 picks are sealed. No reroll." : "AI fills an erratic but complete bracket and seals every pick. Hit 60% for 1.5×; miss it and your raw points are cut in half.", icon: "wand.and.stars")
             }.buttonStyle(.plain).disabled(state.bracketHellfireUsed)
             Text("REGULAR SEASON HELLFIRE: 2/2 · BRACKET AI HELLFIRE: 1 TOTAL · NO REROLLS").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.48))
         }
+        .alert("Launch Bracket Hellfire?", isPresented: $confirmingBracketHellfire) {
+            Button("CANCEL", role: .cancel) {}
+            Button("LAUNCH AND LOCK", role: .destructive) { deployBracketHellfire() }
+        } message: {
+            Text("This cannot be undone. The machine makes all 67 decisions, locks the bracket permanently, and allows no edits or rerolls. At least 60% correct earns 1.5× raw bracket points. Below 60% cuts raw bracket points in half.")
+        }
+    }
+
+    private func deployBracketHellfire() {
+        guard !state.bracketHellfireUsed else { return }
+        state.bracketHellfireUsed = true
+        state.bracketLocked = true
+        strikePresentation = WeaponStrikeCatalog.presentation(for: "cbb")
     }
 }
 

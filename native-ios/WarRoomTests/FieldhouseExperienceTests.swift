@@ -361,6 +361,27 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(points, 40)
     }
 
+    func testPostseasonHellfireUsesSixtyPercentRiskRewardRule() {
+        XCTAssertEqual(
+            FieldhousePostseasonScoreEngine.adjustedPoints(
+                rawPoints: 80, correctPicks: 41, totalPicks: 67, usedHellfire: true
+            ),
+            120
+        )
+        XCTAssertEqual(
+            FieldhousePostseasonScoreEngine.adjustedPoints(
+                rawPoints: 80, correctPicks: 40, totalPicks: 67, usedHellfire: true
+            ),
+            40
+        )
+        XCTAssertEqual(
+            FieldhousePostseasonScoreEngine.adjustedPoints(
+                rawPoints: 80, correctPicks: 40, totalPicks: 67, usedHellfire: false
+            ),
+            80
+        )
+    }
+
     func testPreviewLiveBoardPointsAreDerivedFromGameResults() {
         let state = FieldhouseSeasonState()
         XCTAssertEqual(state.scoringFinalGames, 6)
