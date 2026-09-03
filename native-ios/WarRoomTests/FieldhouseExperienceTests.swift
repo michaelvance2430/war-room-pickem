@@ -250,12 +250,24 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.bestBetGame, 0)
         XCTAssertEqual(state.propAnswer, "YES")
         XCTAssertEqual(state.regularHellfiresRemaining, 1)
+        XCTAssertTrue(state.hellfireDeployedOnCurrentCard)
+        XCTAssertTrue(state.lockPicks(at: state.pickLockDate.addingTimeInterval(-1)))
+        XCTAssertFalse(state.reopenPicks(at: state.pickLockDate.addingTimeInterval(-1)))
+        XCTAssertTrue(state.picksLocked)
 
         var lateState = FieldhouseSeasonState()
         XCTAssertTrue(lateState.publishCard(games: games, prop: .teamScores90))
         XCTAssertFalse(lateState.deployRegularSeasonHellfire(at: lateState.pickLockDate))
         XCTAssertTrue(lateState.sideSelections.isEmpty)
         XCTAssertEqual(lateState.regularHellfiresRemaining, 2)
+    }
+
+    func testPublishingANewCardClearsThePriorCardHellfireRestriction() {
+        let games = Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize))
+        var state = FieldhouseSeasonState()
+        state.hellfireDeployedOnCurrentCard = true
+        XCTAssertTrue(state.publishCard(games: games, prop: .teamScores90))
+        XCTAssertFalse(state.hellfireDeployedOnCurrentCard)
     }
 
     func testUnrelatedResultsCannotFalselyCompleteTheScoringCard() {

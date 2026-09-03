@@ -445,6 +445,7 @@ struct FieldhouseSeasonState {
     var bestBetGame: Int?
     var propAnswer: String?
     var picksLocked = false
+    var hellfireDeployedOnCurrentCard = false
 
     var regularHellfiresRemaining: Int { max(0, 2 - regularHellfiresUsed) }
     var scoringFinalGames: Int {
@@ -528,7 +529,7 @@ struct FieldhouseSeasonState {
 
     @discardableResult
     mutating func reopenPicks(at date: Date) -> Bool {
-        guard picksLocked, canEditPicks(at: date) else { return false }
+        guard picksLocked, !hellfireDeployedOnCurrentCard, canEditPicks(at: date) else { return false }
         picksLocked = false
         return true
     }
@@ -548,6 +549,7 @@ struct FieldhouseSeasonState {
         bestBetGame = 0
         propAnswer = "YES"
         regularHellfiresUsed += 1
+        hellfireDeployedOnCurrentCard = true
         return true
     }
 
@@ -579,6 +581,7 @@ struct FieldhouseSeasonState {
         bestBetGame = nil
         self.propAnswer = nil
         picksLocked = false
+        hellfireDeployedOnCurrentCard = false
         return true
     }
 
@@ -624,6 +627,7 @@ struct FieldhouseSeasonState {
         bestBetGame = nil
         propAnswer = nil
         picksLocked = false
+        hellfireDeployedOnCurrentCard = false
         return true
     }
 }
@@ -1485,13 +1489,13 @@ private struct FieldhousePicksPage: View {
                 .padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 13))
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(.orange.opacity(0.22)))
             }
-            Button("REOPEN PICKS BEFORE FIRST TIP") { _ = state.reopenPicks(at: Date()) }
+            Button(state.hellfireDeployedOnCurrentCard ? "HELLFIRE CARD CANNOT REOPEN" : "REOPEN PICKS BEFORE FIRST TIP") { _ = state.reopenPicks(at: Date()) }
                 .font(.caption.weight(.black)).foregroundStyle(.orange)
                 .frame(maxWidth: .infinity).padding(15)
                 .background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 15))
                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.35)))
-                .disabled(!state.canEditPicks(at: Date()))
-                .opacity(state.canEditPicks(at: Date()) ? 1 : 0.45)
+                .disabled(state.hellfireDeployedOnCurrentCard || !state.canEditPicks(at: Date()))
+                .opacity(!state.hellfireDeployedOnCurrentCard && state.canEditPicks(at: Date()) ? 1 : 0.45)
         }
     }
 
