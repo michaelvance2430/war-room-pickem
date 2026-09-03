@@ -185,10 +185,105 @@ struct FieldhouseGame: Identifiable, Equatable {
         let day = calendar.date(byAdding: .day, value: dayOffset, to: FieldhouseSeasonCalendar.start(of: window))!
         return calendar.date(bySettingHour: tipHour, minute: tipMinute, second: 0, of: day)!
     }
+
+    var favoriteTeam: String? {
+        let pieces = spread.split(separator: " ")
+        guard pieces.count > 1, Double(pieces.last ?? "") != nil else { return nil }
+        let favoriteLabel = pieces.dropLast().joined(separator: " ")
+        if away.localizedCaseInsensitiveCompare(favoriteLabel) == .orderedSame || away.localizedCaseInsensitiveContains(favoriteLabel) { return away }
+        if home.localizedCaseInsensitiveCompare(favoriteLabel) == .orderedSame || home.localizedCaseInsensitiveContains(favoriteLabel) { return home }
+        return nil
+    }
+
+    var underdogTeam: String? {
+        guard let favoriteTeam else { return nil }
+        if favoriteTeam == away { return home }
+        if favoriteTeam == home { return away }
+        return nil
+    }
+
+    var favoriteSpread: Double? { Double(spread.split(separator: " ").last ?? "") }
 }
 
 enum FieldhousePickVisibility {
     static func canSeeRoomPicks(at now: Date, gameTip: Date) -> Bool { now >= gameTip }
+}
+
+enum FieldhouseGamePhase: Equatable {
+    case scheduled
+    case live(period: String)
+    case final
+}
+
+struct FieldhouseGameResult: Equatable {
+    let gameID: String
+    let awayScore: Int
+    let homeScore: Int
+    let phase: FieldhouseGamePhase
+
+    var isFinal: Bool { phase == .final }
+
+    func straightUpWinner(in game: FieldhouseGame) -> String? {
+        guard isFinal, awayScore != homeScore else { return nil }
+        return awayScore > homeScore ? game.away : game.home
+    }
+
+
+    func coverWinner(in game: FieldhouseGame) -> String? {
+        guard isFinal, let favorite = game.favoriteTeam, let line = game.favoriteSpread,
+              let underdog = game.underdogTeam else { return nil }
+        let favoriteScore = favorite == game.away ? awayScore : homeScore
+        let underdogScore = underdog == game.away ? awayScore : homeScore
+        let adjustedFavoriteScore = Double(favoriteScore) + line
+        guard adjustedFavoriteScore != Double(underdogScore) else { return nil }
+        return adjustedFavoriteScore > Double(underdogScore) ? favorite : underdog
+    }
+}
+
+enum FieldhousePropEvaluator {
+    static func answer(for prop: FieldhousePropKind, games: [FieldhouseGame], results: [String: FieldhouseGameResult]) -> Bool? {
+        let completed = games.compactMap { game -> (FieldhouseGame, FieldhouseGameResult)? in
+            guard let result = results[game.id], result.isFinal else { return nil }
+            return (game, result)
+        }
+        guard completed.count == games.count, !games.isEmpty else { return nil }
+
+        switch prop {
+        case .teamScores90:
+            return completed.contains { $0.1.awayScore >= 90 || $0.1.homeScore >= 90 }
+        case .gameWithinThree:
+            return completed.contains { abs($0.1.awayScore - $0.1.homeScore) <= 3 }
+        case .underdogWins:
+            return completed.contains { item in item.1.straightUpWinner(in: item.0) == item.0.underdogTeam }
+        case .combinedScore150:
+            return completed.contains { $0.1.awayScore + $0.1.homeScore >= 150 }
+        }
+    }
+}
+
+enum FieldhouseScoreEngine {
+    static func points(
+        games: [FieldhouseGame],
+        results: [String: FieldhouseGameResult],
+        selections: [Int: String],
+        confidences: [Int: Int],
+        bestBetGame: Int?,
+        prop: FieldhousePropKind?,
+        propAnswer: String?
+    ) -> Int {
+        var total = 0
+        for (index, game) in games.enumerated() {
+            guard let result = results[game.id], let winner = result.coverWinner(in: game),
+                  selections[index] == winner, let confidence = confidences[index] else { continue }
+            total += confidence * (bestBetGame == index ? 2 : 1)
+        }
+        if let prop, let propAnswer,
+           let correctAnswer = FieldhousePropEvaluator.answer(for: prop, games: games, results: results),
+           propAnswer == (correctAnswer ? "YES" : "NO") {
+            total += 3
+        }
+        return total
+    }
 }
 
 enum FieldhouseGameCatalog {
@@ -209,20 +304,56 @@ enum FieldhouseGameCatalog {
     ]
 }
 
+enum FieldhousePropKind: String, CaseIterable, Identifiable {
+    case teamScores90
+    case gameWithinThree
+    case underdogWins
+    case combinedScore150
+
+    var id: String { rawValue }
+    var question: String {
+        switch self {
+        case .teamScores90: "Will any team score 90 or more points?"
+        case .gameWithinThree: "Will any game finish within 3 points?"
+        case .underdogWins: "Will any underdog win outright?"
+        case .combinedScore150: "Will any game reach 150 combined points?"
+        }
+    }
+}
+
 struct FieldhouseSeasonState {
     var league: FieldhouseLeague = .activeBuild
     var championshipTrophyID = FieldhouseTrophyCatalog.ncaam[0].id
     // Basketball is double-buffered: one week scores while the next accepts picks.
     var window = 2
     var scoringWindow = 1
-    var scoringFinalGames = 6
-    var scoringLiveGames = 4
-    var scoringPoints = 34
+    var scoringGames = Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize))
+    var scoringResults: [String: FieldhouseGameResult] = [
+        "gonzaga-duke": FieldhouseGameResult(gameID: "gonzaga-duke", awayScore: 78, homeScore: 76, phase: .final),
+        "auburn-houston": FieldhouseGameResult(gameID: "auburn-houston", awayScore: 71, homeScore: 74, phase: .final),
+        "uconn-kansas": FieldhouseGameResult(gameID: "uconn-kansas", awayScore: 69, homeScore: 75, phase: .final),
+        "iowa-state-tennessee": FieldhouseGameResult(gameID: "iowa-state-tennessee", awayScore: 80, homeScore: 78, phase: .final),
+        "baylor-alabama": FieldhouseGameResult(gameID: "baylor-alabama", awayScore: 72, homeScore: 84, phase: .final),
+        "purdue-michigan-state": FieldhouseGameResult(gameID: "purdue-michigan-state", awayScore: 77, homeScore: 74, phase: .final),
+        "kentucky-north-carolina": FieldhouseGameResult(gameID: "kentucky-north-carolina", awayScore: 52, homeScore: 49, phase: .live(period: "2H · 11:42")),
+        "arizona-illinois": FieldhouseGameResult(gameID: "arizona-illinois", awayScore: 41, homeScore: 44, phase: .live(period: "HALF")),
+        "marquette-creighton": FieldhouseGameResult(gameID: "marquette-creighton", awayScore: 22, homeScore: 18, phase: .live(period: "1H · 7:08")),
+        "ucla-oregon": FieldhouseGameResult(gameID: "ucla-oregon", awayScore: 8, homeScore: 12, phase: .live(period: "1H · 15:31"))
+    ]
+    var scoringSelections: [Int: String] = [
+        0: "Gonzaga Bulldogs", 1: "Auburn Tigers", 2: "Kansas Jayhawks", 3: "Tennessee Volunteers",
+        4: "Alabama Crimson Tide", 5: "Michigan State Spartans", 6: "Kentucky Wildcats",
+        7: "Arizona Wildcats", 8: "Marquette Golden Eagles", 9: "UCLA Bruins"
+    ]
+    var scoringConfidences: [Int: Int] = Dictionary(uniqueKeysWithValues: (0..<FieldhouseGameCatalog.weeklyCardSize).map { ($0, FieldhouseGameCatalog.weeklyCardSize - $0) })
+    var scoringBestBetGame: Int? = 0
+    var scoringProp: FieldhousePropKind = .teamScores90
+    var scoringPropAnswer = "YES"
     var phase: FieldhouseSeasonPhase = .regularSeason
     var seasonHasStarted = true
     var cardIsPublished = false
     var publishedGames: [FieldhouseGame] = []
-    var publishedProp = ""
+    var publishedProp: FieldhousePropKind?
     var playerCount = 100
     var regionPlayerCount = 25
     var rank = 5
@@ -239,6 +370,24 @@ struct FieldhouseSeasonState {
     var picksLocked = false
 
     var regularHellfiresRemaining: Int { max(0, 2 - regularHellfiresUsed) }
+    var scoringFinalGames: Int { scoringResults.values.filter(\.isFinal).count }
+    var scoringLiveGames: Int {
+        scoringResults.values.filter {
+            if case .live = $0.phase { return true }
+            return false
+        }.count
+    }
+    var scoringPoints: Int {
+        FieldhouseScoreEngine.points(
+            games: scoringGames,
+            results: scoringResults,
+            selections: scoringSelections,
+            confidences: scoringConfidences,
+            bestBetGame: scoringBestBetGame,
+            prop: scoringProp,
+            propAnswer: scoringPropAnswer
+        )
+    }
     var canRebalanceRegions: Bool { !seasonHasStarted }
     var postseasonStatus: WarRoomPostseasonStatus {
         WarRoomPostseasonRule.status(rank: rank, playerCount: regionPlayerCount)
@@ -286,12 +435,11 @@ struct FieldhouseSeasonState {
     }
 
     @discardableResult
-    mutating func publishCard(games: [FieldhouseGame], prop: String) -> Bool {
-        let cleanProp = prop.trimmingCharacters(in: .whitespacesAndNewlines)
+    mutating func publishCard(games: [FieldhouseGame], prop: FieldhousePropKind) -> Bool {
         let count = FieldhouseGameCatalog.weeklyCardSize
-        guard games.count == count, Set(games.map(\.id)).count == count, !cleanProp.isEmpty else { return false }
+        guard games.count == count, Set(games.map(\.id)).count == count else { return false }
         publishedGames = games
-        publishedProp = cleanProp
+        publishedProp = prop
         cardIsPublished = true
         sideSelections = [:]
         confidenceSelections = [:]
@@ -660,14 +808,13 @@ private struct FieldhouseCommissionerCommand: View {
 
 private struct FieldhouseCardBuilder: View {
     let window: Int
-    let publish: ([FieldhouseGame], String) -> Void
+    let publish: ([FieldhouseGame], FieldhousePropKind) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var selectedIDs: Set<String> = []
-    @State private var prop = ""
+    @State private var selectedProp: FieldhousePropKind?
     private var selectedGames: [FieldhouseGame] { FieldhouseGameCatalog.windowOne.filter { selectedIDs.contains($0.id) } }
-    private var cleanProp: String { prop.trimmingCharacters(in: .whitespacesAndNewlines) }
     private let cardSize = FieldhouseGameCatalog.weeklyCardSize
-    private var ready: Bool { selectedGames.count == cardSize && !cleanProp.isEmpty }
+    private var ready: Bool { selectedGames.count == cardSize && selectedProp != nil }
     var body: some View {
         NavigationStack {
             ZStack {
@@ -676,7 +823,7 @@ private struct FieldhouseCardBuilder: View {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("WINDOW \(window) · COMMISSIONER").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
                         Text("BUILD THE CARD").font(.system(size: 36, weight: .black)).fontWidth(.condensed)
-                        Text("Select exactly ten Division I games from the Monday–Sunday window, confirm the spreads, then write the three-point floor prop.")
+                        Text("Select exactly ten Division I games from the Monday–Sunday window, confirm the spreads, then choose an automatically scored three-point floor prop.")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
                         Text("\(selectedGames.count)/\(cardSize) GAMES SELECTED").font(.caption.weight(.black)).foregroundStyle(selectedGames.count == cardSize ? .green : .orange)
                         ForEach(FieldhouseGameCatalog.windowOne) { game in
@@ -696,11 +843,20 @@ private struct FieldhouseCardBuilder: View {
                             }.buttonStyle(.plain).disabled(!selected && selectedIDs.count == cardSize)
                         }
                         VStack(alignment: .leading, spacing: 7) {
-                            Text("WEEKLY PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.orange)
-                            TextField("Write a yes-or-no basketball question", text: $prop, axis: .vertical)
-                                .lineLimit(2...4).padding(12).background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                            Text("WEEKLY PROP · 3 POINTS · AUTO-SCORED").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.orange)
+                            ForEach(FieldhousePropKind.allCases) { prop in
+                                Button { selectedProp = selectedProp == prop ? nil : prop } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: selectedProp == prop ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(selectedProp == prop ? .orange : .white.opacity(0.38))
+                                        Text(prop.question).font(.subheadline.weight(.bold)).multilineTextAlignment(.leading)
+                                        Spacer()
+                                    }
+                                    .padding(12).background(.white.opacity(selectedProp == prop ? 0.10 : 0.05), in: RoundedRectangle(cornerRadius: 11))
+                                }.buttonStyle(.plain)
+                            }
                         }
-                        Button { publish(selectedGames, cleanProp) } label: {
+                        Button { if let selectedProp { publish(selectedGames, selectedProp) } } label: {
                             Text("PUBLISH WINDOW \(window)").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
                                 .foregroundStyle(.black).background(ready ? Color.orange : Color.gray, in: RoundedRectangle(cornerRadius: 15))
                         }.buttonStyle(.plain).disabled(!ready)
@@ -843,7 +999,7 @@ private struct FieldhousePicksPage: View {
                 }
                 VStack(alignment: .leading, spacing: 9) {
                     Text("FLOOR PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.orange)
-                    Text(state.publishedProp).font(.headline.weight(.black))
+                    Text(state.publishedProp?.question ?? "PROP NOT PUBLISHED").font(.headline.weight(.black))
                     HStack(spacing: 9) { propButton("YES"); propButton("NO") }
                 }.padding(15).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.28)))
                 if state.picksLocked {
@@ -924,23 +1080,48 @@ private struct FieldhousePicksPage: View {
                 detail: "\(state.scoringFinalGames) final · \(state.scoringLiveGames) live · your scorecard: \(state.scoringPoints) points",
                 icon: "basketball.fill"
             )
-            ForEach(Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize).enumerated()), id: \.element.id) { index, game in
+            ForEach(Array(state.scoringGames.enumerated()), id: \.element.id) { index, game in
+                let result = state.scoringResults[game.id]
+                let isFinal = result?.isFinal == true
+                let coverWinner = result?.coverWinner(in: game)
                 HStack(spacing: 10) {
-                    Image(systemName: index < state.scoringFinalGames ? "checkmark.circle.fill" : "dot.radiowaves.left.and.right")
-                        .foregroundStyle(index < state.scoringFinalGames ? .green : .orange)
+                    Image(systemName: isFinal ? "checkmark.circle.fill" : "dot.radiowaves.left.and.right")
+                        .foregroundStyle(isFinal ? .green : .orange)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("\(game.away) at \(game.home)").font(.caption.weight(.black))
-                        Text("\(game.spread) · \(index < state.scoringFinalGames ? "FINAL" : "LIVE")")
+                        Text("\(game.spread) · \(resultStatus(result))")
                             .font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.48))
+                        if let coverWinner {
+                            Text("COVERING · \(coverWinner.uppercased())")
+                                .font(.system(size: 8, weight: .black)).foregroundStyle(.green)
+                        }
                     }
                     Spacer()
-                    Text(index < state.scoringFinalGames ? "FINAL" : "2H")
-                        .font(.caption2.weight(.black)).foregroundStyle(index < state.scoringFinalGames ? .green : .orange)
+                    VStack(alignment: .trailing, spacing: 3) {
+                        if let result { Text("\(result.awayScore)–\(result.homeScore)").font(.headline.weight(.black)) }
+                        Text(isFinal ? "FINAL" : periodLabel(result))
+                            .font(.caption2.weight(.black)).foregroundStyle(isFinal ? .green : .orange)
+                    }
                 }
                 .padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 13))
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(.white.opacity(0.10)))
             }
         }
+    }
+
+    private func resultStatus(_ result: FieldhouseGameResult?) -> String {
+        guard let result else { return "SCHEDULED" }
+        switch result.phase {
+        case .scheduled: return "SCHEDULED"
+        case .live: return "LIVE"
+        case .final: return "FINAL"
+        }
+    }
+
+    private func periodLabel(_ result: FieldhouseGameResult?) -> String {
+        guard let result else { return "SOON" }
+        if case let .live(period) = result.phase { return period }
+        return result.isFinal ? "FINAL" : "SOON"
     }
 
     private var lockedUpcomingBoard: some View {
@@ -1032,7 +1213,7 @@ private struct FieldhousePicksPage: View {
         guard state.regularHellfiresRemaining > 0, state.publishedGames.count == FieldhouseGameCatalog.weeklyCardSize else { return }
         for (index, game) in state.publishedGames.enumerated() {
             state.sideSelections[index] = game.spread.hasPrefix(game.away.components(separatedBy: " ").first ?? "") ? game.away : game.home
-            state.confidenceSelections[index] = 5 - index
+            state.confidenceSelections[index] = FieldhouseGameCatalog.weeklyCardSize - index
         }
         state.bestBetGame = 0
         state.propAnswer = "YES"
@@ -1060,7 +1241,7 @@ private struct FieldhouseStandingsPage: View {
             }
             VStack(spacing: 8) {
                 ForEach(Array(players.enumerated()), id: \.offset) { index, player in
-                    standingRow(rank: index + 1, player: player, points: 87 - (index * 2))
+                    standingRow(rank: index + 1, player: player, points: index == 0 ? 87 + state.scoringPoints : 87 - (index * 2))
                     if !showingOverall && index == 3 { cutLine("CHAMPIONSHIP CUT", color: .yellow) }
                     if !showingOverall && index == 20 { cutLine("TOILET BOWL CUT", color: .purple) }
                 }

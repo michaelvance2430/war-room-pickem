@@ -94,20 +94,18 @@ final class FieldhouseExperienceTests: XCTestCase {
 
     func testCommissionerCannotPublishAnIncompleteCard() {
         var state = FieldhouseSeasonState()
-        XCTAssertFalse(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(9)), prop: "Will a ranked team trail at halftime?"))
-        XCTAssertFalse(state.cardIsPublished)
-        XCTAssertFalse(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: "   "))
+        XCTAssertFalse(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(9)), prop: .teamScores90))
         XCTAssertFalse(state.cardIsPublished)
 
-        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: "Will a ranked team trail at halftime?"))
+        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: .teamScores90))
         XCTAssertTrue(state.cardIsPublished)
         XCTAssertEqual(state.publishedGames.count, 10)
-        XCTAssertEqual(state.publishedProp, "Will a ranked team trail at halftime?")
+        XCTAssertEqual(state.publishedProp, .teamScores90)
     }
 
     func testPlayerCannotLockUntilEveryRequiredDecisionIsComplete() {
         var state = FieldhouseSeasonState()
-        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: "Will a ranked team trail at halftime?"))
+        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: .teamScores90))
         XCTAssertFalse(state.cardIsComplete)
         for index in 0..<10 {
             state.sideSelections[index] = state.publishedGames[index].home
@@ -128,7 +126,7 @@ final class FieldhouseExperienceTests: XCTestCase {
 
     func testPicksCannotLockOrReopenAfterFirstTip() {
         var state = FieldhouseSeasonState()
-        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: "Will a ranked team trail at halftime?"))
+        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: .teamScores90))
         for index in 0..<10 {
             state.sideSelections[index] = state.publishedGames[index].home
             state.confidenceSelections[index] = index + 1
@@ -141,6 +139,70 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertTrue(state.lockPicks(at: beforeTip))
         XCTAssertFalse(state.reopenPicks(at: atTip))
         XCTAssertTrue(state.picksLocked)
+    }
+
+    func testEveryCommissionerPropIsStructuredForAutomaticScoring() {
+        XCTAssertEqual(FieldhousePropKind.allCases.count, 4)
+        XCTAssertEqual(Set(FieldhousePropKind.allCases.map(\.question)).count, FieldhousePropKind.allCases.count)
+        XCTAssertTrue(FieldhousePropKind.allCases.allSatisfy { $0.question.hasSuffix("?") })
+    }
+
+    func testTenGameHellfireConfidencePatternIsValid() {
+        let confidences = Dictionary(uniqueKeysWithValues: (0..<FieldhouseGameCatalog.weeklyCardSize).map {
+            ($0, FieldhouseGameCatalog.weeklyCardSize - $0)
+        })
+        XCTAssertEqual(Set(confidences.values), Set(1...10))
+        XCTAssertEqual(confidences.count, 10)
+    }
+
+    func testStructuredPropsWaitForEveryFinalThenScoreAutomatically() {
+        let games = Array(FieldhouseGameCatalog.windowOne.prefix(2))
+        var results = [
+            games[0].id: FieldhouseGameResult(gameID: games[0].id, awayScore: 91, homeScore: 86, phase: .final),
+            games[1].id: FieldhouseGameResult(gameID: games[1].id, awayScore: 70, homeScore: 69, phase: .live(period: "2H"))
+        ]
+        XCTAssertNil(FieldhousePropEvaluator.answer(for: .teamScores90, games: games, results: results))
+
+        results[games[1].id] = FieldhouseGameResult(gameID: games[1].id, awayScore: 70, homeScore: 69, phase: .final)
+        XCTAssertEqual(FieldhousePropEvaluator.answer(for: .teamScores90, games: games, results: results), true)
+        XCTAssertEqual(FieldhousePropEvaluator.answer(for: .gameWithinThree, games: games, results: results), true)
+        XCTAssertEqual(FieldhousePropEvaluator.answer(for: .combinedScore150, games: games, results: results), true)
+    }
+
+    func testUnderdogPropUsesThePublishedSpreadFavorite() {
+        let game = FieldhouseGameCatalog.windowOne[0]
+        XCTAssertEqual(game.favoriteTeam, "Duke Blue Devils")
+        XCTAssertEqual(game.underdogTeam, "Gonzaga Bulldogs")
+        let result = FieldhouseGameResult(gameID: game.id, awayScore: 78, homeScore: 74, phase: .final)
+        XCTAssertEqual(FieldhousePropEvaluator.answer(for: .underdogWins, games: [game], results: [game.id: result]), true)
+    }
+
+    func testLiveScoreEngineUsesSpreadConfidenceBestBetAndFinalProp() {
+        let games = Array(FieldhouseGameCatalog.windowOne.prefix(2))
+        let results = [
+            games[0].id: FieldhouseGameResult(gameID: games[0].id, awayScore: 78, homeScore: 76, phase: .final),
+            games[1].id: FieldhouseGameResult(gameID: games[1].id, awayScore: 80, homeScore: 70, phase: .final)
+        ]
+        XCTAssertEqual(results[games[0].id]?.coverWinner(in: games[0]), games[0].away)
+        XCTAssertEqual(results[games[1].id]?.coverWinner(in: games[1]), games[1].away)
+
+        let points = FieldhouseScoreEngine.points(
+            games: games,
+            results: results,
+            selections: [0: games[0].away, 1: games[1].away],
+            confidences: [0: 10, 1: 9],
+            bestBetGame: 0,
+            prop: .combinedScore150,
+            propAnswer: "YES"
+        )
+        XCTAssertEqual(points, 32)
+    }
+
+    func testPreviewLiveBoardPointsAreDerivedFromGameResults() {
+        let state = FieldhouseSeasonState()
+        XCTAssertEqual(state.scoringFinalGames, 6)
+        XCTAssertEqual(state.scoringLiveGames, 4)
+        XCTAssertEqual(state.scoringPoints, 34)
     }
 
     func testSeasonStartLocksRegionRebalancing() {
