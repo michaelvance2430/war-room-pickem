@@ -2,6 +2,19 @@ import XCTest
 @testable import WarRoom
 
 final class FieldhouseExperienceTests: XCTestCase {
+    func testFieldhouseUsesMondaySundayWindowsAndNamesTheLockWeek() {
+        let calendar = Calendar(identifier: .gregorian)
+        XCTAssertEqual(calendar.component(.weekday, from: FieldhouseSeasonCalendar.openingTip), 2)
+        XCTAssertTrue(FieldhouseSeasonCalendar.windowLabel(1).contains("NOV 2–NOV 8"))
+        XCTAssertTrue(FieldhouseSeasonCalendar.lockClock(at: .distantPast, window: 2).hasPrefix("WEEK 2 PICKS LOCK IN"))
+    }
+
+    func testRoomPicksDeclassifyAtEachIndividualGameTip() {
+        let tip = Date(timeIntervalSince1970: 1_000)
+        XCTAssertFalse(FieldhousePickVisibility.canSeeRoomPicks(at: Date(timeIntervalSince1970: 999), gameTip: tip))
+        XCTAssertTrue(FieldhousePickVisibility.canSeeRoomPicks(at: tip, gameTip: tip))
+    }
+
     func testFavoriteAndCrystalBallCatalogContainsFullDivisionOneDirectory() {
         XCTAssertEqual(FieldhouseTeamCatalog.all.count, 362)
         XCTAssertTrue(FieldhouseTeamCatalog.all.contains("Abilene Christian Wildcats"))

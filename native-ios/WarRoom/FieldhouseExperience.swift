@@ -10,16 +10,28 @@ enum FieldhouseSeasonCalendar {
         return components.date!
     }
 
-    static func missionClock(at now: Date) -> String {
-        guard now < openingTip else { return "LIVE · FIRST TIP" }
+    static func start(of window: Int) -> Date {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = eastern
-        let parts = calendar.dateComponents([.day, .hour, .minute], from: now, to: openingTip)
-        return "\(max(0, parts.day ?? 0))D \(max(0, parts.hour ?? 0))H \(max(0, parts.minute ?? 0))M · OPENING TIP"
+        return calendar.date(byAdding: .day, value: max(0, window - 1) * 7, to: openingTip)!
+    }
+
+    static func lockDate(for window: Int) -> Date {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = eastern
+        // Preview deadline. Production uses the earliest tip on the published card.
+        return calendar.date(byAdding: .hour, value: 19 + (3 * 24), to: start(of: window))!
+    }
+
+    static func lockClock(at now: Date, window: Int) -> String {
+        let deadline = lockDate(for: window)
+        guard now < deadline else { return "WEEK \(window) PICKS LOCKED" }
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = eastern
+        let parts = calendar.dateComponents([.day, .hour, .minute], from: now, to: deadline)
+        return "WEEK \(window) PICKS LOCK IN \(max(0, parts.day ?? 0))D \(max(0, parts.hour ?? 0))H \(max(0, parts.minute ?? 0))M"
     }
 
     static func windowLabel(_ window: Int) -> String {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = eastern
-        let start = calendar.date(byAdding: .day, value: max(0, window - 1) * 7, to: openingTip)!
+        let start = start(of: window)
         let end = calendar.date(byAdding: .day, value: 6, to: start)!
         let formatter = DateFormatter(); formatter.timeZone = eastern; formatter.dateFormat = "MMM d"
         return "WEEK \(window) · \(formatter.string(from: start).uppercased())–\(formatter.string(from: end).uppercased())"
@@ -114,6 +126,10 @@ struct FieldhouseGame: Identifiable, Equatable {
     let home: String
     let spread: String
     let tip: String
+}
+
+enum FieldhousePickVisibility {
+    static func canSeeRoomPicks(at now: Date, gameTip: Date) -> Bool { now >= gameTip }
 }
 
 enum FieldhouseGameCatalog {
@@ -605,7 +621,7 @@ private struct FieldhouseHomeMasthead: View {
                 HStack {
                     Label("SHOT CLOCK", systemImage: "timer").font(.caption2.weight(.black)).tracking(1.3)
                     Spacer()
-                    Text(FieldhouseSeasonCalendar.missionClock(at: context.date)).font(.caption.weight(.black))
+                    Text(FieldhouseSeasonCalendar.lockClock(at: context.date, window: state.window)).font(.caption.weight(.black))
                 }.foregroundStyle(.orange)
             }
         }
@@ -661,6 +677,8 @@ private struct FieldhousePicksPage: View {
             laneSelector
             if lane == .liveBoard {
                 liveBoard
+            } else if state.picksLocked {
+                lockedUpcomingBoard
             } else if !state.cardIsPublished || state.publishedGames.count != FieldhouseGameCatalog.weeklyCardSize {
                 FieldhouseHero(kicker: "WEEK \(state.window) · ON DECK", title: "CARD NOT POSTED YET", detail: "Week \(state.scoringWindow) remains on the floor while the commissioner builds the next ten-game card.", icon: "hourglass")
             } else {
@@ -705,7 +723,7 @@ private struct FieldhousePicksPage: View {
     private var laneSelector: some View {
         HStack(spacing: 8) {
             laneButton(.liveBoard, week: state.scoringWindow, title: "LIVE BOARD", icon: "dot.radiowaves.left.and.right")
-            laneButton(.makePicks, week: state.window, title: "MAKE PICKS", icon: "checkmark.seal.fill")
+            laneButton(.makePicks, week: state.window, title: state.picksLocked ? "LOCKED BOARD" : "MAKE PICKS", icon: state.picksLocked ? "lock.fill" : "checkmark.seal.fill")
         }
         .padding(6)
         .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 17))
@@ -748,6 +766,36 @@ private struct FieldhousePicksPage: View {
                 .padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 13))
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(.white.opacity(0.10)))
             }
+        }
+    }
+
+    private var lockedUpcomingBoard: some View {
+        VStack(spacing: 10) {
+            FieldhouseHero(
+                kicker: "WEEK \(state.window) · LOCKED · AWAITING TIP",
+                title: "YOUR BOARD IS SET",
+                detail: "Your picks remain visible to you. Room selections declassify one matchup at a time when each game tips.",
+                icon: "lock.shield.fill"
+            )
+            ForEach(Array(state.publishedGames.enumerated()), id: \.element.id) { index, game in
+                HStack(spacing: 10) {
+                    Image(systemName: "lock.fill").foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(game.away) at \(game.home)").font(.caption.weight(.black))
+                        Text("YOUR PICK · \(state.sideSelections[index] ?? "—") · CONF \(state.confidenceSelections[index] ?? 0)")
+                            .font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.58))
+                    }
+                    Spacer()
+                    Text("ROOM SEALED").font(.system(size: 8, weight: .black)).foregroundStyle(.orange)
+                }
+                .padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(.orange.opacity(0.22)))
+            }
+            Button("REOPEN PICKS BEFORE FIRST TIP") { state.picksLocked = false }
+                .font(.caption.weight(.black)).foregroundStyle(.orange)
+                .frame(maxWidth: .infinity).padding(15)
+                .background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 15))
+                .overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.35)))
         }
     }
 
