@@ -1225,6 +1225,7 @@ private struct FieldhouseHomePage: View {
     @State private var showingLeagueSwitcher = false
     @State private var showingCardBuilder = false
     @State private var showingCommissionerCommand = false
+    @State private var showingAnnouncements = false
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHomeMasthead(state: state)
@@ -1257,6 +1258,15 @@ private struct FieldhouseHomePage: View {
             if let certifiedWindow = state.lastCertifiedWindow, let certifiedPoints = state.lastCertifiedPoints {
                 FieldhouseAction(kicker: "LAST CERTIFIED SCORECARD", title: "Week \(certifiedWindow) · \(certifiedPoints) points", detail: "Permanent weekly receipt.", icon: "clipboard.fill")
             }
+            Button { showingAnnouncements = true } label: {
+                FieldhouseAction(
+                    kicker: "OFFICIAL TRANSMISSION",
+                    title: "Announcements",
+                    detail: "Commissioner posts, room updates, and official yelling.",
+                    icon: "megaphone.fill"
+                )
+            }
+            .buttonStyle(.plain)
         }
         .sheet(isPresented: $showingLeagueSwitcher) {
             FieldhouseLeagueSwitcher(league: Binding(get: { state.league }, set: { state.selectLeague($0) }), dismiss: { showingLeagueSwitcher = false })
@@ -1272,6 +1282,10 @@ private struct FieldhouseHomePage: View {
         }
         .sheet(isPresented: $showingCommissionerCommand) {
             FieldhouseCommissionerCommand(state: $state)
+        }
+        .sheet(isPresented: $showingAnnouncements) {
+            NavigationStack { AnnouncementsView() }
+                .preferredColorScheme(.dark)
         }
         .onAppear {
             if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-trophies") {
