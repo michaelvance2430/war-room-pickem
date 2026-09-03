@@ -44,6 +44,17 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(FieldhouseLeague.activeBuild, .ncaam)
     }
 
+    func testOnlyCommissionersCanBuildAnUnpublishedPlayerCard() {
+        var state = FieldhouseSeasonState()
+        state.isCommissioner = false
+        XCTAssertFalse(state.cardIsPublished)
+        XCTAssertFalse(state.canBuildCard)
+        state.isCommissioner = true
+        XCTAssertTrue(state.canBuildCard)
+        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: .teamScores90))
+        XCTAssertFalse(state.canBuildCard)
+    }
+
     func testFieldhouseUsesMondaySundayWindowsAndNamesTheLockWeek() {
         let calendar = Calendar(identifier: .gregorian)
         XCTAssertEqual(calendar.component(.weekday, from: FieldhouseSeasonCalendar.openingTip), 2)

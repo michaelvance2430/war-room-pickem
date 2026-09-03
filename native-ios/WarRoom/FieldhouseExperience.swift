@@ -451,6 +451,7 @@ struct FieldhouseSeasonState {
     var lastCertifiedWindow: Int?
     var lastCertifiedPoints: Int?
     var phase: FieldhouseSeasonPhase = .regularSeason
+    var isCommissioner = true
     var seasonHasStarted = true
     var cardIsPublished = false
     var publishedGames: [FieldhouseGame] = []
@@ -516,6 +517,7 @@ struct FieldhouseSeasonState {
     }
     var canRebalanceRegions: Bool { !seasonHasStarted }
     var canSelectChampionshipTrophy: Bool { !seasonHasStarted }
+    var canBuildCard: Bool { isCommissioner && !cardIsPublished }
     func hasOutstandingPickTask(at date: Date) -> Bool {
         cardIsPublished && !picksLocked && canEditPicks(at: date)
     }
@@ -920,9 +922,12 @@ private struct FieldhouseHomePage: View {
                     FieldhouseHomeButton(title: "SWITCH LEAGUE", icon: "antenna.radiowaves.left.and.right")
                 }.buttonStyle(.plain)
             }
-            Button { showingCommissionerCommand = true } label: {
-                FieldhouseAction(kicker: "COMMISSIONER COMMAND", title: "Manage your league", detail: "Cards, players, regions, and season controls.", icon: "person.3.fill")
-            }.buttonStyle(.plain)
+            if state.isCommissioner {
+                Button { showingCommissionerCommand = true } label: {
+                    FieldhouseAction(kicker: "COMMISSIONER COMMAND", title: "Manage your league", detail: "Cards, players, regions, and season controls.", icon: "person.3.fill")
+                }.buttonStyle(.plain)
+            }
+            playerCommand
             Button { desk = .picks } label: {
                 FieldhouseAction(
                     kicker: state.scoringIsComplete ? "FINAL HORN · WEEK \(state.scoringWindow)" : "ON THE FLOOR · WEEK \(state.scoringWindow)",
@@ -939,17 +944,6 @@ private struct FieldhouseHomePage: View {
                 FieldhouseMetric(value: "\(state.regularHellfiresRemaining)/2", label: "HELLFIRES READY")
             }
             postseasonCard
-            Button {
-                if state.cardIsPublished { desk = .picks }
-                else { showingCardBuilder = true }
-            } label: {
-                FieldhouseAction(
-                    kicker: state.cardIsPublished ? "ON DECK · WEEK \(state.window) · PICKS OPEN" : "ON DECK · WEEK \(state.window)",
-                    title: state.cardIsPublished ? "Make Your 10 Picks" : "Build Next Week's Card",
-                    detail: state.cardIsPublished ? "Ten shared games. One card. Locks at the first selected tip." : "Choose the ten-game board while Week \(state.scoringWindow) keeps scoring.",
-                    icon: state.cardIsPublished ? "arrow.right.circle.fill" : "hammer.fill"
-                )
-            }.buttonStyle(.plain)
             Button { desk = .standings } label: { FieldhouseAction(kicker: "REGIONAL WAR MAP", title: "Battle Toward the Middle", detail: "East, West, South, and Midwest each send survivors inward.", icon: "square.grid.2x2.fill") }.buttonStyle(.plain)
         }
         .sheet(isPresented: $showingLeagueSwitcher) {
@@ -981,6 +975,25 @@ private struct FieldhouseHomePage: View {
                 lockAt: lockAt
             )
         }
+    }
+
+    private var playerCommand: some View {
+        Button {
+            if state.cardIsPublished { desk = .picks }
+            else if state.canBuildCard { showingCardBuilder = true }
+        } label: {
+            FieldhouseAction(
+                kicker: state.cardIsPublished ? "PLAYER COMMAND · WEEK \(state.window) · PICKS OPEN" : "PLAYER COMMAND · WEEK \(state.window)",
+                title: state.cardIsPublished ? "Make Your 10 Picks" : (state.isCommissioner ? "Build Next Week's Card" : "Card Not Posted Yet"),
+                detail: state.cardIsPublished
+                    ? "Ten shared games. One card. Locks at the first selected tip."
+                    : (state.isCommissioner ? "Pull the odds and publish the next board." : "The commissioner is building the next ten-game board."),
+                icon: state.cardIsPublished ? "checkmark.seal.fill" : (state.isCommissioner ? "hammer.fill" : "hourglass")
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!state.cardIsPublished && !state.canBuildCard)
+        .opacity(!state.cardIsPublished && !state.canBuildCard ? 0.72 : 1)
     }
 
     private var postseasonCard: some View {
