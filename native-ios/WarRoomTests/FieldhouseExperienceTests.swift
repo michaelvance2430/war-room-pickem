@@ -49,4 +49,45 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertNil(state.confidenceSelections[1])
         XCTAssertTrue(state.confidenceAvailable(5, for: 2))
     }
+
+    func testCommissionerCannotPublishAnIncompleteCard() {
+        var state = FieldhouseSeasonState()
+        XCTAssertFalse(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(4)), prop: "Will a ranked team trail at halftime?"))
+        XCTAssertFalse(state.cardIsPublished)
+        XCTAssertFalse(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(5)), prop: "   "))
+        XCTAssertFalse(state.cardIsPublished)
+
+        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(5)), prop: "Will a ranked team trail at halftime?"))
+        XCTAssertTrue(state.cardIsPublished)
+        XCTAssertEqual(state.publishedGames.count, 5)
+        XCTAssertEqual(state.publishedProp, "Will a ranked team trail at halftime?")
+    }
+
+    func testPlayerCannotLockUntilEveryRequiredDecisionIsComplete() {
+        var state = FieldhouseSeasonState()
+        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(5)), prop: "Will a ranked team trail at halftime?"))
+        XCTAssertFalse(state.cardIsComplete)
+        for index in 0..<5 {
+            state.sideSelections[index] = state.publishedGames[index].home
+            state.confidenceSelections[index] = index + 1
+        }
+        state.bestBetGame = 0
+        XCTAssertFalse(state.cardIsComplete)
+        state.propAnswer = "YES"
+        XCTAssertTrue(state.cardIsComplete)
+    }
+
+    func testSeasonStartLocksRegionRebalancing() {
+        var state = FieldhouseSeasonState()
+        XCTAssertFalse(state.canRebalanceRegions)
+        state.seasonHasStarted = false
+        XCTAssertTrue(state.canRebalanceRegions)
+    }
+
+    func testLateEntryUsesBottomFifteenPercentAndClosesAtPostseason() {
+        let scores = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10]
+        XCTAssertEqual(FieldhouseLateEntryRule.entryScore(existingScores: scores), 15)
+        XCTAssertTrue(FieldhouseLateEntryRule.acceptsEntries(during: .conferenceChampionships))
+        XCTAssertFalse(FieldhouseLateEntryRule.acceptsEntries(during: .postseason))
+    }
 }

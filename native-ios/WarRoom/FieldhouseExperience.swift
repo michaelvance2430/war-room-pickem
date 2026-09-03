@@ -32,6 +32,24 @@ enum WarRoomPostseasonRule {
     }
 }
 
+enum FieldhouseSeasonPhase: String {
+    case preseason = "PRESEASON"
+    case regularSeason = "REGULAR SEASON"
+    case conferenceChampionships = "CONFERENCE CHAMPIONSHIPS"
+    case postseason = "POSTSEASON"
+}
+
+enum FieldhouseLateEntryRule {
+    static func entryScore(existingScores: [Int]) -> Int {
+        guard !existingScores.isEmpty else { return 0 }
+        let sampleCount = max(1, Int(ceil(Double(existingScores.count) * 0.15)))
+        let bottom = existingScores.sorted().prefix(sampleCount)
+        return Int((Double(bottom.reduce(0, +)) / Double(bottom.count)).rounded())
+    }
+
+    static func acceptsEntries(during phase: FieldhouseSeasonPhase) -> Bool { phase != .postseason }
+}
+
 enum FieldhouseRegion: String, CaseIterable, Identifiable {
     case east = "EAST"
     case west = "WEST"
@@ -64,9 +82,34 @@ enum FieldhouseDesk: String, CaseIterable, Identifiable {
     }
 }
 
+struct FieldhouseGame: Identifiable, Equatable {
+    let id: String
+    let away: String
+    let home: String
+    let spread: String
+    let tip: String
+}
+
+enum FieldhouseGameCatalog {
+    static let windowOne = [
+        FieldhouseGame(id: "gonzaga-duke", away: "Gonzaga Bulldogs", home: "Duke Blue Devils", spread: "Duke -3.5", tip: "7:00 PM"),
+        FieldhouseGame(id: "auburn-houston", away: "Auburn Tigers", home: "Houston Cougars", spread: "Houston -2.5", tip: "7:30 PM"),
+        FieldhouseGame(id: "uconn-kansas", away: "UConn Huskies", home: "Kansas Jayhawks", spread: "Kansas -1.5", tip: "8:00 PM"),
+        FieldhouseGame(id: "iowa-state-tennessee", away: "Iowa State Cyclones", home: "Tennessee Volunteers", spread: "Tennessee -4.5", tip: "8:30 PM"),
+        FieldhouseGame(id: "baylor-alabama", away: "Baylor Bears", home: "Alabama Crimson Tide", spread: "Alabama -5.5", tip: "9:00 PM"),
+        FieldhouseGame(id: "purdue-michigan-state", away: "Purdue Boilermakers", home: "Michigan State Spartans", spread: "Purdue -2.5", tip: "9:30 PM"),
+        FieldhouseGame(id: "kentucky-north-carolina", away: "Kentucky Wildcats", home: "North Carolina Tar Heels", spread: "North Carolina -1.5", tip: "10:00 PM"),
+        FieldhouseGame(id: "arizona-illinois", away: "Arizona Wildcats", home: "Illinois Fighting Illini", spread: "Arizona -3.5", tip: "10:30 PM")
+    ]
+}
+
 struct FieldhouseSeasonState {
     var window = 1
+    var phase: FieldhouseSeasonPhase = .regularSeason
+    var seasonHasStarted = true
     var cardIsPublished = false
+    var publishedGames: [FieldhouseGame] = []
+    var publishedProp = ""
     var playerCount = 100
     var regionPlayerCount = 25
     var rank = 5
@@ -80,10 +123,18 @@ struct FieldhouseSeasonState {
     var confidenceSelections: [Int: Int] = [:]
     var bestBetGame: Int?
     var propAnswer: String?
+    var picksLocked = false
 
     var regularHellfiresRemaining: Int { max(0, 2 - regularHellfiresUsed) }
+    var canRebalanceRegions: Bool { !seasonHasStarted }
     var postseasonStatus: WarRoomPostseasonStatus {
         WarRoomPostseasonRule.status(rank: rank, playerCount: regionPlayerCount)
+    }
+    var cardIsComplete: Bool {
+        guard cardIsPublished, publishedGames.count == 5, sideSelections.count == 5,
+              confidenceSelections.count == 5, Set(confidenceSelections.values) == Set(1...5),
+              bestBetGame != nil, propAnswer != nil else { return false }
+        return (0..<5).allSatisfy { sideSelections[$0] != nil && confidenceSelections[$0] != nil }
     }
 
     func confidenceAvailable(_ value: Int, for game: Int) -> Bool {
@@ -93,6 +144,21 @@ struct FieldhouseSeasonState {
     mutating func toggleConfidence(_ value: Int, for game: Int) {
         guard confidenceSelections[game] == value || confidenceAvailable(value, for: game) else { return }
         confidenceSelections[game] = confidenceSelections[game] == value ? nil : value
+    }
+
+    @discardableResult
+    mutating func publishCard(games: [FieldhouseGame], prop: String) -> Bool {
+        let cleanProp = prop.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard games.count == 5, Set(games.map(\.id)).count == 5, !cleanProp.isEmpty else { return false }
+        publishedGames = games
+        publishedProp = cleanProp
+        cardIsPublished = true
+        sideSelections = [:]
+        confidenceSelections = [:]
+        bestBetGame = nil
+        propAnswer = nil
+        picksLocked = false
+        return true
     }
 }
 
@@ -316,6 +382,7 @@ private struct FieldhouseHomePage: View {
     @Binding var desk: FieldhouseDesk
     @State private var showingLeagueSwitcher = false
     @State private var showingCardBuilder = false
+    @State private var showingCommissionerCommand = false
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHomeMasthead(state: state)
@@ -331,7 +398,7 @@ private struct FieldhouseHomePage: View {
                     FieldhouseHomeButton(title: "SWITCH LEAGUE", icon: "antenna.radiowaves.left.and.right")
                 }.buttonStyle(.plain)
             }
-            Button { } label: {
+            Button { showingCommissionerCommand = true } label: {
                 FieldhouseAction(kicker: "COMMISSIONER COMMAND", title: "Manage your league", detail: "Cards, players, regions, and season controls.", icon: "person.3.fill")
             }.buttonStyle(.plain)
             FieldhouseHero(
@@ -363,10 +430,12 @@ private struct FieldhouseHomePage: View {
                 .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingCardBuilder) {
-            FieldhouseCardBuilder(window: state.window) {
-                state.cardIsPublished = true
-                showingCardBuilder = false
+            FieldhouseCardBuilder(window: state.window) { games, prop in
+                if state.publishCard(games: games, prop: prop) { showingCardBuilder = false }
             }
+        }
+        .sheet(isPresented: $showingCommissionerCommand) {
+            FieldhouseCommissionerCommand(state: $state)
         }
     }
 
@@ -381,27 +450,92 @@ private struct FieldhouseHomePage: View {
     private func cut(_ label: String, _ value: Int, _ note: String, _ color: Color) -> some View { VStack(spacing: 3) { Text("\(value)").font(.title2.weight(.black)).foregroundStyle(color); Text(label).font(.system(size: 7, weight: .black)); Text(note).font(.system(size: 6, weight: .black)).foregroundStyle(.white.opacity(0.42)) }.frame(maxWidth: .infinity) }
 }
 
-private struct FieldhouseCardBuilder: View {
-    let window: Int
-    let publish: () -> Void
+private struct FieldhouseCommissionerCommand: View {
+    @Binding var state: FieldhouseSeasonState
     @Environment(\.dismiss) private var dismiss
+    private let demoScores = [87, 82, 79, 76, 74, 72, 69, 66, 63, 61, 58, 55, 53, 49, 45, 42, 39, 35, 31, 28, 24, 19, 16, 12, 8]
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("WINDOW \(window) · COMMISSIONER").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
-                Text("BUILD THE CARD").font(.system(size: 36, weight: .black)).fontWidth(.condensed)
-                Text("Select five Division I games, confirm the spreads, then write the three-point floor prop.")
-                    .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
-                ForEach(1...5, id: \.self) { game in
-                    HStack { Text("GAME \(game)").font(.caption.weight(.black)); Spacer(); Text("SELECT MATCHUP").font(.caption2.weight(.black)).foregroundStyle(.orange); Image(systemName: "chevron.right") }
-                        .padding(14).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 13))
+            ZStack {
+                FieldhouseBackdrop().ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 12) {
+                        FieldhouseHero(kicker: "COMMISSIONER CONTROL", title: "LEAGUE OPERATIONS", detail: "Players, regions, card state, and season rules from one place.", icon: "person.3.fill")
+                        commandRow("PLAYERS", detail: "25 active · late entry seed \(FieldhouseLateEntryRule.entryScore(existingScores: demoScores)) points", icon: "person.2.fill", status: FieldhouseLateEntryRule.acceptsEntries(during: state.phase) ? "OPEN" : "CLOSED", color: .green)
+                        commandRow("REGION ASSIGNMENTS", detail: "East · West · South · Midwest", icon: "square.grid.2x2.fill", status: state.canRebalanceRegions ? "EDIT" : "LOCKED", color: state.canRebalanceRegions ? .orange : .red)
+                        commandRow("WINDOW \(state.window) CARD", detail: state.cardIsPublished ? "Five games and prop published" : "Commissioner must build the card", icon: "list.bullet.clipboard.fill", status: state.cardIsPublished ? "LIVE" : "BUILD", color: state.cardIsPublished ? .green : .orange)
+                        commandRow("SEASON PHASE", detail: "Transitions control entry eligibility and regional seeding", icon: "calendar.badge.clock", status: state.phase.rawValue, color: .orange)
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("HARD RULES").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
+                            Label("Region rebalancing locks when the season begins.", systemImage: "lock.fill")
+                            Label("Late entries receive the rounded average of the bottom 15%.", systemImage: "person.badge.plus")
+                            Label("New entries close when postseason begins.", systemImage: "calendar.badge.exclamationmark")
+                        }.font(.caption.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading).padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.28)))
+                    }.padding(14).padding(.bottom, 28)
                 }
-                Button(action: publish) {
-                    Text("PUBLISH WINDOW \(window)").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16).foregroundStyle(.black).background(.orange, in: RoundedRectangle(cornerRadius: 15))
-                }.buttonStyle(.plain)
-                Spacer()
-            }.padding().background(FieldhouseBackdrop().ignoresSafeArea()).navigationTitle("Commissioner Command").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("CANCEL") { dismiss() }.font(.caption.weight(.black)) } }
+            }.navigationTitle("Commissioner Command").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("DONE") { dismiss() }.font(.caption.weight(.black)) } }
+        }.preferredColorScheme(.dark)
+    }
+
+    private func commandRow(_ title: String, detail: String, icon: String, status: String, color: Color) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon).font(.title3.weight(.black)).foregroundStyle(.orange).frame(width: 42, height: 42).background(.orange.opacity(0.12), in: Circle())
+            VStack(alignment: .leading, spacing: 4) { Text(title).font(.headline.weight(.black)); Text(detail).font(.caption).foregroundStyle(.white.opacity(0.52)) }
+            Spacer(); Text(status).font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(color).padding(.horizontal, 9).padding(.vertical, 6).background(color.opacity(0.12), in: Capsule())
+        }.padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.22)))
+    }
+}
+
+private struct FieldhouseCardBuilder: View {
+    let window: Int
+    let publish: ([FieldhouseGame], String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedIDs: Set<String> = []
+    @State private var prop = ""
+    private var selectedGames: [FieldhouseGame] { FieldhouseGameCatalog.windowOne.filter { selectedIDs.contains($0.id) } }
+    private var cleanProp: String { prop.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var ready: Bool { selectedGames.count == 5 && !cleanProp.isEmpty }
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                FieldhouseBackdrop().ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("WINDOW \(window) · COMMISSIONER").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
+                        Text("BUILD THE CARD").font(.system(size: 36, weight: .black)).fontWidth(.condensed)
+                        Text("Select exactly five Division I games, confirm the spreads, then write the three-point floor prop.")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
+                        Text("\(selectedGames.count)/5 GAMES SELECTED").font(.caption.weight(.black)).foregroundStyle(selectedGames.count == 5 ? .green : .orange)
+                        ForEach(FieldhouseGameCatalog.windowOne) { game in
+                            let selected = selectedIDs.contains(game.id)
+                            Button {
+                                if selected { selectedIDs.remove(game.id) }
+                                else if selectedIDs.count < 5 { selectedIDs.insert(game.id) }
+                            } label: {
+                                HStack(spacing: 11) {
+                                    Image(systemName: selected ? "checkmark.circle.fill" : "circle").font(.title3).foregroundStyle(selected ? .orange : .white.opacity(0.38))
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("\(game.away) at \(game.home)").font(.subheadline.weight(.black)).multilineTextAlignment(.leading)
+                                        Text("\(game.spread) · \(game.tip)").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.48))
+                                    }
+                                    Spacer()
+                                }.padding(13).background(selected ? .orange.opacity(0.14) : .black.opacity(0.70), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? .orange : .white.opacity(0.10)))
+                            }.buttonStyle(.plain).disabled(!selected && selectedIDs.count == 5)
+                        }
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("WEEKLY PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.orange)
+                            TextField("Write a yes-or-no basketball question", text: $prop, axis: .vertical)
+                                .lineLimit(2...4).padding(12).background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        Button { publish(selectedGames, cleanProp) } label: {
+                            Text("PUBLISH WINDOW \(window)").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
+                                .foregroundStyle(.black).background(ready ? Color.orange : Color.gray, in: RoundedRectangle(cornerRadius: 15))
+                        }.buttonStyle(.plain).disabled(!ready)
+                    }.padding().padding(.bottom, 24)
+                }
+            }.navigationTitle("Commissioner Command").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarLeading) { Button("CANCEL") { dismiss() }.font(.caption.weight(.black)) } }
         }.preferredColorScheme(.dark)
     }
 }
@@ -473,58 +607,81 @@ private struct FieldhouseLeagueSwitcher: View {
 private struct FieldhousePicksPage: View {
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
+    @State private var confirmingLock = false
     var body: some View {
         VStack(spacing: 12) {
-            FieldhouseHero(kicker: "SATURDAY CARD · WINDOW \(state.window)", title: "FIVE GAMES.\nNO EMPTY POSSESSIONS.", detail: "Pick the spread, assign confidence, mark one Best Bet, and answer the floor prop.", icon: "list.number")
-            Button { guard state.regularHellfiresRemaining > 0 else { return }; state.regularHellfiresUsed += 1; strikePresentation = WeaponStrikeCatalog.presentation(for: "cbb") } label: {
-                FieldhouseAction(kicker: "HELLFIRE · \(state.regularHellfiresRemaining)/2 AVAILABLE", title: state.regularHellfiresRemaining == 0 ? "Hellfires Expended" : "Deploy Hellfire", detail: "Always visible before the first game. Uses one authorization and fills the card.", icon: "scope")
-            }.buttonStyle(.plain).disabled(state.regularHellfiresRemaining == 0).opacity(state.regularHellfiresRemaining == 0 ? 0.45 : 1)
-            ForEach(1...5, id: \.self) { game in
-                gameCard(game)
-            }
-            VStack(alignment: .leading, spacing: 9) {
-                Text("FLOOR PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.orange)
-                Text("Will either ranked team trail at halftime?").font(.headline.weight(.black))
-                HStack(spacing: 9) {
-                    propButton("YES")
-                    propButton("NO")
+            if !state.cardIsPublished || state.publishedGames.count != 5 {
+                FieldhouseHero(kicker: "WINDOW \(state.window) · WAITING", title: "CARD NOT POSTED YET", detail: "The commissioner is still building this window. Picks open when the five-game slate is published.", icon: "hourglass")
+            } else {
+                FieldhouseHero(kicker: "SATURDAY CARD · WINDOW \(state.window)", title: "FIVE GAMES.\nNO EMPTY POSSESSIONS.", detail: "Pick the spread, assign confidence, mark one Best Bet, and answer the floor prop.", icon: "list.number")
+                Button { deployHellfire() } label: {
+                    FieldhouseAction(kicker: "HELLFIRE · \(state.regularHellfiresRemaining)/2 AVAILABLE", title: state.regularHellfiresRemaining == 0 ? "Hellfires Expended" : "Deploy Hellfire", detail: "Always visible before the first game. Uses one authorization and fills the card.", icon: "scope")
+                }.buttonStyle(.plain).disabled(state.regularHellfiresRemaining == 0 || state.picksLocked).opacity(state.regularHellfiresRemaining == 0 || state.picksLocked ? 0.45 : 1)
+                ForEach(Array(state.publishedGames.enumerated()), id: \.element.id) { index, game in
+                    gameCard(index: index, game: game)
                 }
-            }.padding(15).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.28)))
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("FLOOR PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.orange)
+                    Text(state.publishedProp).font(.headline.weight(.black))
+                    HStack(spacing: 9) { propButton("YES"); propButton("NO") }
+                }.padding(15).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.28)))
+                if state.picksLocked {
+                    VStack(spacing: 9) {
+                        Label("WINDOW \(state.window) PICKS LOCKED", systemImage: "lock.fill").font(.headline.weight(.black)).foregroundStyle(.green)
+                        Button("REOPEN PICKS BEFORE FIRST TIP") { state.picksLocked = false }
+                            .font(.caption.weight(.black)).foregroundStyle(.orange)
+                    }.frame(maxWidth: .infinity).padding(16).background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.green.opacity(0.45)))
+                } else {
+                    Button { confirmingLock = true } label: {
+                        Label("LOCK WINDOW \(state.window) PICKS", systemImage: "lock.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(17)
+                            .foregroundStyle(.black).background(state.cardIsComplete ? Color.orange : Color.gray, in: RoundedRectangle(cornerRadius: 15))
+                    }.buttonStyle(.plain).disabled(!state.cardIsComplete)
+                    if !state.cardIsComplete {
+                        Text("Pick all five games, use confidence 1–5 once each, mark one Best Bet, and answer the prop.")
+                            .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.52)).multilineTextAlignment(.center)
+                    }
+                }
+            }
+        }
+        .alert("Lock these picks?", isPresented: $confirmingLock) {
+            Button("NOT YET", role: .cancel) {}
+            Button("LOCK PICKS") { state.picksLocked = true }
+        } message: {
+            Text("Your card is complete. You can reopen and change it only before the first tip.")
         }
     }
 
-    private func gameCard(_ game: Int) -> some View {
-        let away = ["Gonzaga", "Auburn", "UConn", "Iowa State", "Baylor"][game - 1]
-        let home = ["Duke", "Houston", "Kansas", "Tennessee", "Alabama"][game - 1]
-        let selected = state.sideSelections[game]
+    private func gameCard(index: Int, game matchup: FieldhouseGame) -> some View {
+        let selected = state.sideSelections[index]
         return VStack(alignment: .leading, spacing: 11) {
             HStack {
-                Text("COURT \(game) · FIRST TIP 7:\(game)0 PM").font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(.orange)
+                Text("COURT \(index + 1) · FIRST TIP \(matchup.tip)").font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(.orange)
                 Spacer()
                 Button {
-                    state.bestBetGame = state.bestBetGame == game ? nil : game
+                    state.bestBetGame = state.bestBetGame == index ? nil : index
                 } label: {
-                    Label("BEST BET", systemImage: state.bestBetGame == game ? "star.fill" : "star")
-                        .font(.system(size: 8, weight: .black)).foregroundStyle(state.bestBetGame == game ? .yellow : .white.opacity(0.52))
-                }.buttonStyle(.plain)
+                    Label("BEST BET", systemImage: state.bestBetGame == index ? "star.fill" : "star")
+                        .font(.system(size: 8, weight: .black)).foregroundStyle(state.bestBetGame == index ? .yellow : .white.opacity(0.52))
+                }.buttonStyle(.plain).disabled(state.picksLocked)
             }
             HStack(spacing: 8) {
-                sideButton(away, game: game, selected: selected)
+                sideButton(matchup.away, game: index, selected: selected)
                 Text("AT").font(.caption2.weight(.black)).foregroundStyle(.white.opacity(0.38))
-                sideButton(home, game: game, selected: selected)
+                sideButton(matchup.home, game: index, selected: selected)
             }
+            Text(matchup.spread).font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.52))
             HStack(spacing: 7) {
                 Text("CONFIDENCE").font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.48))
                 ForEach(1...5, id: \.self) { value in
-                    let chosen = state.confidenceSelections[game] == value
-                    let available = state.confidenceAvailable(value, for: game)
+                    let chosen = state.confidenceSelections[index] == value
+                    let available = state.confidenceAvailable(value, for: index)
                     Button {
-                        state.toggleConfidence(value, for: game)
+                        state.toggleConfidence(value, for: index)
                     } label: {
                         Text("\(value)").font(.caption.weight(.black)).frame(width: 32, height: 32)
                             .foregroundStyle(chosen ? .black : (available ? .white : .white.opacity(0.22)))
                             .background(chosen ? Color.orange : Color.white.opacity(0.07), in: Circle())
-                    }.buttonStyle(.plain).disabled(!available)
+                    }.buttonStyle(.plain).disabled(!available || state.picksLocked)
                 }
             }
         }.padding(14).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(selected == nil ? .white.opacity(0.12) : .orange.opacity(0.42)))
@@ -536,7 +693,7 @@ private struct FieldhousePicksPage: View {
                 .frame(maxWidth: .infinity).padding(.vertical, 12)
                 .foregroundStyle(selected == team ? .black : .white)
                 .background(selected == team ? Color.orange : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
-        }.buttonStyle(.plain)
+        }.buttonStyle(.plain).disabled(state.picksLocked)
     }
 
     private func propButton(_ answer: String) -> some View {
@@ -544,7 +701,19 @@ private struct FieldhousePicksPage: View {
             Text(answer).font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(13)
                 .foregroundStyle(state.propAnswer == answer ? .black : .white)
                 .background(state.propAnswer == answer ? Color.orange : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
-        }.buttonStyle(.plain)
+        }.buttonStyle(.plain).disabled(state.picksLocked)
+    }
+
+    private func deployHellfire() {
+        guard state.regularHellfiresRemaining > 0, state.publishedGames.count == 5 else { return }
+        for (index, game) in state.publishedGames.enumerated() {
+            state.sideSelections[index] = game.spread.hasPrefix(game.away.components(separatedBy: " ").first ?? "") ? game.away : game.home
+            state.confidenceSelections[index] = 5 - index
+        }
+        state.bestBetGame = 0
+        state.propAnswer = "YES"
+        state.regularHellfiresUsed += 1
+        strikePresentation = WeaponStrikeCatalog.presentation(for: "cbb")
     }
 }
 
