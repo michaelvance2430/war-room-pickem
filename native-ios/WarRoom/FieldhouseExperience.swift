@@ -911,8 +911,9 @@ struct FieldhouseNativePreviewView: View {
         let initialState = Self.makePreviewState(for: initialLeague)
         let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
         let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
+        let reviewLocker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-locker")
         _state = State(initialValue: initialState)
-        _desk = State(initialValue: reviewPicks ? .picks : .home)
+        _desk = State(initialValue: reviewLocker ? .locker : (reviewPicks ? .picks : .home))
         _showingEntrance = State(initialValue: !reviewMode)
     }
 
@@ -2217,16 +2218,60 @@ private struct FieldhouseNationalBracketMap: View {
 }
 
 private struct FieldhouseDispatchPage: View { var body: some View { VStack(spacing: 13) { FieldhouseHero(kicker: "THE FIELDHOUSE DISPATCH", title: "FINAL SCORES.\nFULL RECEIPTS.", detail: "Regional movement, busted chalk, buzzer beaters, and the weekly floor report.", icon: "newspaper.fill"); FieldhouseAction(kicker: "FRONT PAGE", title: "THE PAINT BELONGED TO NOBODY", detail: "Three favorites fell. One Best Bet survived. The Midwest is already hostile.", icon: "doc.text.image.fill") } } }
+
+private struct FieldhouseLockerMessage: Identifiable {
+    let id: String
+    let author: String
+    let body: String
+    let avatarURL: String?
+    let isMine: Bool
+}
+
+private struct FieldhouseChatAvatar: View {
+    let urlString: String?
+    let name: String
+    let accent: Color
+
+    private var url: URL? { urlString.flatMap(URL.init(string:)) }
+    private var initials: String {
+        name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
+    }
+
+    var body: some View {
+        ZStack {
+            Circle().fill(accent.opacity(0.18))
+            if let url {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image { image.resizable().scaledToFill() }
+                    else { fallback }
+                }
+            } else {
+                fallback
+            }
+        }
+        .frame(width: 38, height: 38)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(accent.opacity(0.72), lineWidth: 1.5))
+        .shadow(color: accent.opacity(0.18), radius: 7)
+        .accessibilityLabel("\(name) profile photo")
+    }
+
+    private var fallback: some View {
+        Text(initials).font(.system(size: 11, weight: .black)).foregroundStyle(accent)
+    }
+}
+
 private struct FieldhouseLockerPage: View {
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     private static let bottomAnchor = "fieldhouse-locker-bottom"
     @State private var draft = ""
+    @State private var selectedProfile: FieldhouseLockerMessage?
     @State private var messages = [
-        ("Full Court Mess", "That bracket has six exits and you found all seven."),
-        ("Midwest to the Middle", "Book it. This region belongs to us."),
-        ("Riley V.", "Two Hellfires and still down twelve is nasty work."),
-        ("Bracket Buster", "Receipts are permanent. Keep talking.")
+        FieldhouseLockerMessage(id: "full-court-1", author: "Full Court Mess", body: "That bracket has six exits and you found all seven.", avatarURL: nil, isMine: false),
+        FieldhouseLockerMessage(id: "midwest-1", author: "Midwest to the Middle", body: "Book it. This region belongs to us.", avatarURL: nil, isMine: false),
+        FieldhouseLockerMessage(id: "riley-1", author: "Riley V.", body: "Two Hellfires and still down twelve is nasty work.", avatarURL: nil, isMine: true),
+        FieldhouseLockerMessage(id: "buster-1", author: "Bracket Buster", body: "Receipts are permanent. Keep talking.", avatarURL: nil, isMine: false)
     ]
 
     var body: some View {
@@ -2239,12 +2284,29 @@ private struct FieldhouseLockerPage: View {
                             Text("THE LOCKER\nROOM").font(.system(size: 36, weight: .black)).fontWidth(.condensed).lineSpacing(-4)
                             Text("NO PRESS. NO PR TEAM. NO ALIBIS.").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(.red)
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(18).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 18)).overlay(alignment: .leading) { Rectangle().fill(accent).frame(width: 4).padding(.vertical, 12) }
-                        ForEach(Array(messages.enumerated()), id: \.offset) { _, message in
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(message.0.uppercased()).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(accent)
-                                Text(message.1).font(.subheadline.weight(.semibold))
-                                HStack(spacing: 12) { Text("🔥 2"); Text("😂 1"); Text("🏀") }.font(.caption).foregroundStyle(.white.opacity(0.55))
-                            }.frame(maxWidth: .infinity, alignment: .leading).padding(13).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.20)))
+                        ForEach(messages) { message in
+                            HStack(alignment: .top, spacing: 9) {
+                                if message.isMine { Spacer(minLength: 38) }
+                                if !message.isMine {
+                                    profileButton(for: message)
+                                }
+                                VStack(alignment: message.isMine ? .trailing : .leading, spacing: 5) {
+                                    Button { selectedProfile = message } label: {
+                                        Text(message.isMine ? "YOU" : message.author.uppercased()).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(accent)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityHint("Opens this player's profile")
+                                    Text(message.body).font(.subheadline.weight(.semibold)).multilineTextAlignment(message.isMine ? .trailing : .leading)
+                                    HStack(spacing: 12) { Text("🔥 2"); Text("😂 1"); Text("🏀") }.font(.caption).foregroundStyle(.white.opacity(0.55))
+                                }
+                                .frame(maxWidth: .infinity, alignment: message.isMine ? .trailing : .leading)
+                                .padding(13)
+                                .background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15))
+                                .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.20)))
+                                if message.isMine {
+                                    profileButton(for: message)
+                                } else { Spacer(minLength: 38) }
+                            }
                         }
                         Color.clear.frame(height: 1).id(Self.bottomAnchor)
                     }.padding(.top, 8)
@@ -2258,12 +2320,69 @@ private struct FieldhouseLockerPage: View {
                 Button {
                     let clean = draft.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !clean.isEmpty else { return }
-                    messages.append(("YOU", clean)); draft = ""
+                    messages.append(FieldhouseLockerMessage(id: UUID().uuidString, author: "Riley V.", body: clean, avatarURL: nil, isMine: true)); draft = ""
                 } label: {
                     Image(systemName: "paperplane.fill").font(.headline).foregroundStyle(.black).frame(width: 46, height: 46).background(accent, in: Circle())
                 }.buttonStyle(.plain)
             }.padding(.vertical, 8)
         }
+        .sheet(item: $selectedProfile) { message in
+            FieldhouseLockerProfileSheet(message: message)
+        }
+        .onAppear {
+            if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-locker-profile") {
+                selectedProfile = messages.first
+            }
+        }
+    }
+
+    private func profileButton(for message: FieldhouseLockerMessage) -> some View {
+        Button { selectedProfile = message } label: {
+            FieldhouseChatAvatar(urlString: message.avatarURL, name: message.author, accent: accent)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open \(message.author) profile")
+    }
+}
+
+private struct FieldhouseLockerProfileSheet: View {
+    @Environment(\.fieldhouseLeague) private var league
+    @Environment(\.dismiss) private var dismiss
+    let message: FieldhouseLockerMessage
+    private var accent: Color { FieldhouseTheme.accent(for: league) }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                FieldhouseBackdrop().ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 16) {
+                        FieldhouseChatAvatar(urlString: message.avatarURL, name: message.author, accent: accent)
+                            .scaleEffect(2.35)
+                            .frame(height: 112)
+                        Text(message.author).font(.system(size: 34, weight: .black)).fontWidth(.condensed)
+                        Text("\(league.rawValue) PLAYER DOSSIER").font(.caption2.weight(.black)).tracking(2).foregroundStyle(accent)
+                        HStack(spacing: 9) {
+                            FieldhouseMetric(value: "#8", label: "REGION")
+                            FieldhouseMetric(value: "6-4", label: "ATS")
+                            FieldhouseMetric(value: "1/2", label: "HELLFIRES")
+                        }
+                        FieldhouseAction(kicker: "FAVORITE TEAM", title: league == .ncaaw ? "South Carolina Gamecocks" : "Duke Blue Devils", detail: "Public profile selection", icon: "heart.fill")
+                        FieldhouseAction(kicker: "CRYSTAL BALL · SEALED", title: "UConn Huskies", detail: "Preseason championship prediction", icon: "sparkles")
+                        FieldhouseAction(kicker: "LATEST TRANSMISSION", title: message.body, detail: "From the Locker Room", icon: "bubble.left.fill")
+                    }
+                    .padding(18).padding(.bottom, 28)
+                }
+            }
+            .navigationTitle("Player Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("DONE") { dismiss() }.font(.caption.weight(.black))
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
     }
 }
 private struct FieldhouseProfilePage: View {
