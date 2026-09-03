@@ -3,6 +3,7 @@
 ## Active
 
 - [ ] **Build 21 weapon scoring parity** - Repair NFL postseason JDAM risk/reward scoring and preserve the verified Fieldhouse Hellfire rules when Fieldhouse is integrated. Full acceptance criteria are recorded in `native-ios/PARKING_LOT.md`.
+- [ ] **Match Fieldhouse You page to the shared profile standard** - Reuse the CFB/NFL You-page hierarchy and behavior exactly. Keep only Fieldhouse-specific skin, basketball statistics, trophies, and copy different. Hold implementation until Mike says build.
 
 ## Waiting On
 
