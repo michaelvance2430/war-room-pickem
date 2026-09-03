@@ -264,9 +264,11 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.propAnswer, "YES")
         XCTAssertEqual(state.regularHellfiresRemaining, 1)
         XCTAssertTrue(state.hellfireDeployedOnCurrentCard)
-        XCTAssertTrue(state.lockPicks(at: state.pickLockDate.addingTimeInterval(-1)))
-        XCTAssertFalse(state.reopenPicks(at: state.pickLockDate.addingTimeInterval(-1)))
         XCTAssertTrue(state.picksLocked)
+        let originalConfidences = state.confidenceSelections
+        state.toggleConfidence(10, for: 1)
+        XCTAssertEqual(state.confidenceSelections, originalConfidences)
+        XCTAssertFalse(state.reopenPicks(at: state.pickLockDate.addingTimeInterval(-1)))
 
         var lateState = FieldhouseSeasonState()
         XCTAssertTrue(lateState.publishCard(games: games, prop: .teamScores90))
@@ -340,6 +342,25 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(points, 32)
     }
 
+    func testRegularSeasonHellfireDoublesCorrectGamePointsWithoutPenalizingMisses() {
+        let games = Array(FieldhouseGameCatalog.windowOne.prefix(2))
+        let results = [
+            games[0].id: FieldhouseGameResult(gameID: games[0].id, awayScore: 78, homeScore: 76, phase: .final),
+            games[1].id: FieldhouseGameResult(gameID: games[1].id, awayScore: 71, homeScore: 74, phase: .final)
+        ]
+        let points = FieldhouseScoreEngine.points(
+            games: games,
+            results: results,
+            selections: [0: games[0].away, 1: games[1].away],
+            confidences: [0: 10, 1: 9],
+            bestBetGame: 0,
+            prop: nil,
+            propAnswer: nil,
+            gameMultiplier: 2
+        )
+        XCTAssertEqual(points, 40)
+    }
+
     func testPreviewLiveBoardPointsAreDerivedFromGameResults() {
         let state = FieldhouseSeasonState()
         XCTAssertEqual(state.scoringFinalGames, 6)
@@ -377,6 +398,7 @@ final class FieldhouseExperienceTests: XCTestCase {
         state.bestBetGame = 0
         state.propAnswer = "NO"
         XCTAssertTrue(state.lockPicks(at: state.pickLockDate.addingTimeInterval(-1)))
+        state.hellfireDeployedOnCurrentCard = true
 
         let priorWindow = state.scoringWindow
         let promotedWindow = state.window
@@ -390,6 +412,7 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.scoringResults.values.filter(\.isFinal).count, 0)
         XCTAssertEqual(state.scoringProp, .gameWithinThree)
         XCTAssertEqual(state.scoringPropAnswer, "NO")
+        XCTAssertTrue(state.scoringUsedHellfire)
     }
 
     func testSeasonStartLocksRegionRebalancing() {

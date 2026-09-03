@@ -356,13 +356,14 @@ enum FieldhouseScoreEngine {
         confidences: [Int: Int],
         bestBetGame: Int?,
         prop: FieldhousePropKind?,
-        propAnswer: String?
+        propAnswer: String?,
+        gameMultiplier: Int = 1
     ) -> Int {
         var total = 0
         for (index, game) in games.enumerated() {
             guard let result = results[game.id], let winner = result.coverWinner(in: game),
                   selections[index] == winner, let confidence = confidences[index] else { continue }
-            total += confidence * (bestBetGame == index ? 2 : 1)
+            total += confidence * (bestBetGame == index ? 2 : 1) * gameMultiplier
         }
         if let prop, let propAnswer,
            let correctAnswer = FieldhousePropEvaluator.answer(for: prop, games: games, results: results),
@@ -448,6 +449,7 @@ struct FieldhouseSeasonState {
     var scoringBestBetGame: Int? = 0
     var scoringProp: FieldhousePropKind = .teamScores90
     var scoringPropAnswer = "YES"
+    var scoringUsedHellfire = false
     var lastCertifiedWindow: Int?
     var lastCertifiedPoints: Int?
     var phase: FieldhouseSeasonPhase = .regularSeason
@@ -491,7 +493,8 @@ struct FieldhouseSeasonState {
             confidences: scoringConfidences,
             bestBetGame: scoringBestBetGame,
             prop: scoringProp,
-            propAnswer: scoringPropAnswer
+            propAnswer: scoringPropAnswer,
+            gameMultiplier: scoringUsedHellfire ? 2 : 1
         )
     }
     var scoringPropResult: Bool? {
@@ -506,7 +509,7 @@ struct FieldhouseSeasonState {
               let winner = result.coverWinner(in: scoringGames[index]),
               let selection = scoringSelections[index], let confidence = scoringConfidences[index] else { return nil }
         guard selection == winner else { return 0 }
-        return confidence * (scoringBestBetGame == index ? 2 : 1)
+        return confidence * (scoringBestBetGame == index ? 2 : 1) * (scoringUsedHellfire ? 2 : 1)
     }
     func roomPicksAreVisible(for gameID: String) -> Bool {
         guard let result = scoringResults[gameID] else { return false }
@@ -577,6 +580,7 @@ struct FieldhouseSeasonState {
         propAnswer = "YES"
         regularHellfiresUsed += 1
         hellfireDeployedOnCurrentCard = true
+        picksLocked = true
         return true
     }
 
@@ -598,6 +602,7 @@ struct FieldhouseSeasonState {
         scoringBestBetGame = bestBetGame
         scoringProp = publishedProp
         scoringPropAnswer = propAnswer
+        scoringUsedHellfire = hellfireDeployedOnCurrentCard
 
         window += 1
         cardIsPublished = false
@@ -617,7 +622,8 @@ struct FieldhouseSeasonState {
     }
 
     mutating func toggleConfidence(_ value: Int, for game: Int) {
-        guard confidenceSelections[game] == value || confidenceAvailable(value, for: game) else { return }
+        guard !picksLocked,
+              confidenceSelections[game] == value || confidenceAvailable(value, for: game) else { return }
         confidenceSelections[game] = confidenceSelections[game] == value ? nil : value
     }
 
@@ -1359,7 +1365,7 @@ private struct FieldhousePicksPage: View {
             Button("CANCEL", role: .cancel) {}
             Button("DEPLOY HELLFIRE", role: .destructive) { deployHellfire() }
         } message: {
-            Text("This cannot be undone. One of your two regular-season Hellfires will be permanently spent. Hellfire fills all ten favorites, confidence points, Best Bet, and the prop. You may still adjust those picks before the first tip, but the Hellfire will not be returned.")
+            Text("This cannot be undone. Hellfire fills and permanently locks all ten favorites, confidence points, Best Bet, and the prop. Every correct game pick scores double. Wrong picks lose nothing. This card cannot be edited or reopened.")
         }
         .onReceive(Timer.publish(every: 15, on: .main, in: .common).autoconnect()) { date in
             now = date
@@ -1372,7 +1378,7 @@ private struct FieldhousePicksPage: View {
         VStack(spacing: 12) {
             FieldhouseHero(kicker: "ON DECK · WEEK \(state.window)", title: "TEN GAMES.\nNO EMPTY POSSESSIONS.", detail: "Pick the spread, assign confidence 1–10, mark one Best Bet, and answer the floor prop.", icon: "list.number")
                 Button { confirmingHellfire = true } label: {
-                    FieldhouseAction(kicker: "HELLFIRE · \(state.regularHellfiresRemaining)/2 AVAILABLE", title: state.regularHellfiresRemaining == 0 ? "Hellfires Expended" : "Deploy Hellfire", detail: "Always visible before the first game. Uses one authorization and fills the card.", icon: "scope")
+                    FieldhouseAction(kicker: "HELLFIRE · \(state.regularHellfiresRemaining)/2 AVAILABLE", title: state.regularHellfiresRemaining == 0 ? "Hellfires Expended" : "Deploy Hellfire", detail: "One-way door: fills and locks the card. Correct game picks score double; misses cost nothing.", icon: "scope")
                 }.buttonStyle(.plain).disabled(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now)).opacity(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now) ? 0.45 : 1)
                 ForEach(Array(state.publishedGames.enumerated()), id: \.element.id) { index, game in
                     gameCard(index: index, game: game)
