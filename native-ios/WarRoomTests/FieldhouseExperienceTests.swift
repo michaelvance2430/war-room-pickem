@@ -207,6 +207,16 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.scoringGamePoints(at: 1), 0)
         XCTAssertNil(state.scoringGamePoints(at: 6))
         XCTAssertNil(state.scoringPropResult)
+        XCTAssertTrue(state.roomPicksAreVisible(for: state.scoringGames[0].id))
+    }
+
+    func testRoomPicksStaySealedUntilOfficialGameStateIsLive() {
+        var state = FieldhouseSeasonState()
+        let game = state.scoringGames[0]
+        state.scoringResults[game.id] = FieldhouseGameResult(gameID: game.id, awayScore: 0, homeScore: 0, phase: .scheduled)
+        XCTAssertFalse(state.roomPicksAreVisible(for: game.id))
+        state.scoringResults[game.id] = FieldhouseGameResult(gameID: game.id, awayScore: 2, homeScore: 0, phase: .live(period: "1H"))
+        XCTAssertTrue(state.roomPicksAreVisible(for: game.id))
     }
 
     func testCompletedFloorPromotesLockedOnDeckCardAtItsFirstTip() {

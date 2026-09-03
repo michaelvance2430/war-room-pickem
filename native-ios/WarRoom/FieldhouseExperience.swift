@@ -404,6 +404,13 @@ struct FieldhouseSeasonState {
         guard selection == winner else { return 0 }
         return confidence * (scoringBestBetGame == index ? 2 : 1)
     }
+    func roomPicksAreVisible(for gameID: String) -> Bool {
+        guard let result = scoringResults[gameID] else { return false }
+        switch result.phase {
+        case .scheduled: return false
+        case .live, .final: return true
+        }
+    }
     var canRebalanceRegions: Bool { !seasonHasStarted }
     var postseasonStatus: WarRoomPostseasonStatus {
         WarRoomPostseasonRule.status(rank: rank, playerCount: regionPlayerCount)
@@ -1153,6 +1160,13 @@ private struct FieldhousePicksPage: View {
                         if let gamePoints = state.scoringGamePoints(at: index) {
                             Text("YOUR PICK · \(state.scoringSelections[index] ?? "—") · CONF \(state.scoringConfidences[index] ?? 0)\(state.scoringBestBetGame == index ? " · BEST BET ×2" : "")")
                                 .font(.system(size: 8, weight: .black)).foregroundStyle(gamePoints > 0 ? .green : .red)
+                        }
+                        if state.roomPicksAreVisible(for: game.id) {
+                            Text("ROOM PICKS · \(14 + index) \(game.away.uppercased()) · \(11 + index) \(game.home.uppercased())")
+                                .font(.system(size: 7, weight: .black)).foregroundStyle(.cyan)
+                        } else {
+                            Text("ROOM PICKS SEALED UNTIL \(game.tip)")
+                                .font(.system(size: 7, weight: .black)).foregroundStyle(.white.opacity(0.38))
                         }
                     }
                     Spacer()
