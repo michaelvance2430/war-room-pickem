@@ -42,32 +42,32 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertNil(state.bestBetGame)
         XCTAssertNil(state.propAnswer)
 
-        state.toggleConfidence(5, for: 1)
-        XCTAssertEqual(state.confidenceSelections[1], 5)
-        XCTAssertFalse(state.confidenceAvailable(5, for: 2))
-        state.toggleConfidence(5, for: 1)
+        state.toggleConfidence(10, for: 1)
+        XCTAssertEqual(state.confidenceSelections[1], 10)
+        XCTAssertFalse(state.confidenceAvailable(10, for: 2))
+        state.toggleConfidence(10, for: 1)
         XCTAssertNil(state.confidenceSelections[1])
-        XCTAssertTrue(state.confidenceAvailable(5, for: 2))
+        XCTAssertTrue(state.confidenceAvailable(10, for: 2))
     }
 
     func testCommissionerCannotPublishAnIncompleteCard() {
         var state = FieldhouseSeasonState()
-        XCTAssertFalse(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(4)), prop: "Will a ranked team trail at halftime?"))
+        XCTAssertFalse(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(9)), prop: "Will a ranked team trail at halftime?"))
         XCTAssertFalse(state.cardIsPublished)
-        XCTAssertFalse(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(5)), prop: "   "))
+        XCTAssertFalse(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: "   "))
         XCTAssertFalse(state.cardIsPublished)
 
-        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(5)), prop: "Will a ranked team trail at halftime?"))
+        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: "Will a ranked team trail at halftime?"))
         XCTAssertTrue(state.cardIsPublished)
-        XCTAssertEqual(state.publishedGames.count, 5)
+        XCTAssertEqual(state.publishedGames.count, 10)
         XCTAssertEqual(state.publishedProp, "Will a ranked team trail at halftime?")
     }
 
     func testPlayerCannotLockUntilEveryRequiredDecisionIsComplete() {
         var state = FieldhouseSeasonState()
-        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(5)), prop: "Will a ranked team trail at halftime?"))
+        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: "Will a ranked team trail at halftime?"))
         XCTAssertFalse(state.cardIsComplete)
-        for index in 0..<5 {
+        for index in 0..<10 {
             state.sideSelections[index] = state.publishedGames[index].home
             state.confidenceSelections[index] = index + 1
         }

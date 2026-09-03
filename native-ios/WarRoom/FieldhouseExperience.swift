@@ -1,5 +1,31 @@
 import SwiftUI
 
+enum FieldhouseSeasonCalendar {
+    static let eastern = TimeZone(identifier: "America/New_York")!
+    static var openingTip: Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = eastern
+        components.year = 2026; components.month = 11; components.day = 2; components.hour = 0
+        return components.date!
+    }
+
+    static func missionClock(at now: Date) -> String {
+        guard now < openingTip else { return "LIVE · FIRST TIP" }
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = eastern
+        let parts = calendar.dateComponents([.day, .hour, .minute], from: now, to: openingTip)
+        return "\(max(0, parts.day ?? 0))D \(max(0, parts.hour ?? 0))H \(max(0, parts.minute ?? 0))M · OPENING TIP"
+    }
+
+    static func windowLabel(_ window: Int) -> String {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = eastern
+        let start = calendar.date(byAdding: .day, value: max(0, window - 1) * 7, to: openingTip)!
+        let end = calendar.date(byAdding: .day, value: 6, to: start)!
+        let formatter = DateFormatter(); formatter.timeZone = eastern; formatter.dateFormat = "MMM d"
+        return "WEEK \(window) · \(formatter.string(from: start).uppercased())–\(formatter.string(from: end).uppercased())"
+    }
+}
+
 enum WarRoomPostseasonStatus: Equatable {
     case championship(seed: Int)
     case activeNoBrass
@@ -91,6 +117,7 @@ struct FieldhouseGame: Identifiable, Equatable {
 }
 
 enum FieldhouseGameCatalog {
+    static let weeklyCardSize = 10
     static let windowOne = [
         FieldhouseGame(id: "gonzaga-duke", away: "Gonzaga Bulldogs", home: "Duke Blue Devils", spread: "Duke -3.5", tip: "7:00 PM"),
         FieldhouseGame(id: "auburn-houston", away: "Auburn Tigers", home: "Houston Cougars", spread: "Houston -2.5", tip: "7:30 PM"),
@@ -99,12 +126,21 @@ enum FieldhouseGameCatalog {
         FieldhouseGame(id: "baylor-alabama", away: "Baylor Bears", home: "Alabama Crimson Tide", spread: "Alabama -5.5", tip: "9:00 PM"),
         FieldhouseGame(id: "purdue-michigan-state", away: "Purdue Boilermakers", home: "Michigan State Spartans", spread: "Purdue -2.5", tip: "9:30 PM"),
         FieldhouseGame(id: "kentucky-north-carolina", away: "Kentucky Wildcats", home: "North Carolina Tar Heels", spread: "North Carolina -1.5", tip: "10:00 PM"),
-        FieldhouseGame(id: "arizona-illinois", away: "Arizona Wildcats", home: "Illinois Fighting Illini", spread: "Arizona -3.5", tip: "10:30 PM")
+        FieldhouseGame(id: "arizona-illinois", away: "Arizona Wildcats", home: "Illinois Fighting Illini", spread: "Arizona -3.5", tip: "10:30 PM"),
+        FieldhouseGame(id: "marquette-creighton", away: "Marquette Golden Eagles", home: "Creighton Bluejays", spread: "Creighton -1.5", tip: "SAT · 3:30 PM"),
+        FieldhouseGame(id: "ucla-oregon", away: "UCLA Bruins", home: "Oregon Ducks", spread: "UCLA -2.5", tip: "SAT · 6:00 PM"),
+        FieldhouseGame(id: "texas-tech-baylor", away: "Texas Tech Red Raiders", home: "Baylor Bears", spread: "Baylor -3.5", tip: "SUN · 2:00 PM"),
+        FieldhouseGame(id: "villanova-st-johns", away: "Villanova Wildcats", home: "St. John's Red Storm", spread: "St. John's -4.5", tip: "SUN · 5:00 PM")
     ]
 }
 
 struct FieldhouseSeasonState {
-    var window = 1
+    // Basketball is double-buffered: one week scores while the next accepts picks.
+    var window = 2
+    var scoringWindow = 1
+    var scoringFinalGames = 6
+    var scoringLiveGames = 4
+    var scoringPoints = 34
     var phase: FieldhouseSeasonPhase = .regularSeason
     var seasonHasStarted = true
     var cardIsPublished = false
@@ -131,10 +167,11 @@ struct FieldhouseSeasonState {
         WarRoomPostseasonRule.status(rank: rank, playerCount: regionPlayerCount)
     }
     var cardIsComplete: Bool {
-        guard cardIsPublished, publishedGames.count == 5, sideSelections.count == 5,
-              confidenceSelections.count == 5, Set(confidenceSelections.values) == Set(1...5),
+        let count = FieldhouseGameCatalog.weeklyCardSize
+        guard cardIsPublished, publishedGames.count == count, sideSelections.count == count,
+              confidenceSelections.count == count, Set(confidenceSelections.values) == Set(1...count),
               bestBetGame != nil, propAnswer != nil else { return false }
-        return (0..<5).allSatisfy { sideSelections[$0] != nil && confidenceSelections[$0] != nil }
+        return (0..<count).allSatisfy { sideSelections[$0] != nil && confidenceSelections[$0] != nil }
     }
 
     func confidenceAvailable(_ value: Int, for game: Int) -> Bool {
@@ -149,7 +186,8 @@ struct FieldhouseSeasonState {
     @discardableResult
     mutating func publishCard(games: [FieldhouseGame], prop: String) -> Bool {
         let cleanProp = prop.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard games.count == 5, Set(games.map(\.id)).count == 5, !cleanProp.isEmpty else { return false }
+        let count = FieldhouseGameCatalog.weeklyCardSize
+        guard games.count == count, Set(games.map(\.id)).count == count, !cleanProp.isEmpty else { return false }
         publishedGames = games
         publishedProp = cleanProp
         cardIsPublished = true
@@ -401,11 +439,11 @@ private struct FieldhouseHomePage: View {
             Button { showingCommissionerCommand = true } label: {
                 FieldhouseAction(kicker: "COMMISSIONER COMMAND", title: "Manage your league", detail: "Cards, players, regions, and season controls.", icon: "person.3.fill")
             }.buttonStyle(.plain)
-            FieldhouseHero(
-                kicker: state.cardIsPublished ? "THIS WINDOW · CARD LIVE" : "COMMISSIONER ACTION REQUIRED",
-                title: state.cardIsPublished ? "MAKE YOUR PICKS" : "BUILD THE CARD",
-                detail: state.cardIsPublished ? "Five games. Confidence 5 through 1. One Best Bet. One weekly prop." : "Pull the Division I board, select five games, write the prop, and publish Window \(state.window).",
-                icon: state.cardIsPublished ? "checkmark.seal.fill" : "hammer.fill"
+            FieldhouseAction(
+                kicker: "ON THE FLOOR · WEEK \(state.scoringWindow)",
+                title: "\(state.scoringFinalGames) FINAL · \(state.scoringLiveGames) LIVE",
+                detail: "\(state.scoringPoints) points and moving. Open Picks to see the live board and your scorecard.",
+                icon: "basketball.fill"
             )
             HStack(spacing: 10) {
                 FieldhouseMetric(value: "#\(state.rank)", label: "YOUR SEED LINE")
@@ -417,9 +455,9 @@ private struct FieldhouseHomePage: View {
                 else { showingCardBuilder = true }
             } label: {
                 FieldhouseAction(
-                    kicker: state.cardIsPublished ? "WINDOW \(state.window) · CARD OPEN" : "COMMISSIONER COMMAND",
-                    title: state.cardIsPublished ? "Make Your Picks" : "Build the Card",
-                    detail: state.cardIsPublished ? "The hardwood remembers every decision." : "Choose the five-game board and release it to the room.",
+                    kicker: state.cardIsPublished ? "ON DECK · WEEK \(state.window) · PICKS OPEN" : "ON DECK · WEEK \(state.window)",
+                    title: state.cardIsPublished ? "Make Your 10 Picks" : "Build Next Week's Card",
+                    detail: state.cardIsPublished ? "Ten shared games. One card. Locks at the first selected tip." : "Choose the ten-game board while Week \(state.scoringWindow) keeps scoring.",
                     icon: state.cardIsPublished ? "arrow.right.circle.fill" : "hammer.fill"
                 )
             }.buttonStyle(.plain)
@@ -463,7 +501,8 @@ private struct FieldhouseCommissionerCommand: View {
                         FieldhouseHero(kicker: "COMMISSIONER CONTROL", title: "LEAGUE OPERATIONS", detail: "Players, regions, card state, and season rules from one place.", icon: "person.3.fill")
                         commandRow("PLAYERS", detail: "25 active · late entry seed \(FieldhouseLateEntryRule.entryScore(existingScores: demoScores)) points", icon: "person.2.fill", status: FieldhouseLateEntryRule.acceptsEntries(during: state.phase) ? "OPEN" : "CLOSED", color: .green)
                         commandRow("REGION ASSIGNMENTS", detail: "East · West · South · Midwest", icon: "square.grid.2x2.fill", status: state.canRebalanceRegions ? "EDIT" : "LOCKED", color: state.canRebalanceRegions ? .orange : .red)
-                        commandRow("WINDOW \(state.window) CARD", detail: state.cardIsPublished ? "Five games and prop published" : "Commissioner must build the card", icon: "list.bullet.clipboard.fill", status: state.cardIsPublished ? "LIVE" : "BUILD", color: state.cardIsPublished ? .green : .orange)
+                        commandRow("WEEK \(state.scoringWindow) · ON THE FLOOR", detail: "\(state.scoringFinalGames) final · \(state.scoringLiveGames) live", icon: "basketball.fill", status: "SCORING", color: .green)
+                        commandRow("WEEK \(state.window) · ON DECK", detail: state.cardIsPublished ? "Ten games and prop published" : "Commissioner must build the next card", icon: "list.bullet.clipboard.fill", status: state.cardIsPublished ? "PICKS OPEN" : "BUILD", color: state.cardIsPublished ? .orange : .yellow)
                         commandRow("SEASON PHASE", detail: "Transitions control entry eligibility and regional seeding", icon: "calendar.badge.clock", status: state.phase.rawValue, color: .orange)
                         VStack(alignment: .leading, spacing: 7) {
                             Text("HARD RULES").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
@@ -495,7 +534,8 @@ private struct FieldhouseCardBuilder: View {
     @State private var prop = ""
     private var selectedGames: [FieldhouseGame] { FieldhouseGameCatalog.windowOne.filter { selectedIDs.contains($0.id) } }
     private var cleanProp: String { prop.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var ready: Bool { selectedGames.count == 5 && !cleanProp.isEmpty }
+    private let cardSize = FieldhouseGameCatalog.weeklyCardSize
+    private var ready: Bool { selectedGames.count == cardSize && !cleanProp.isEmpty }
     var body: some View {
         NavigationStack {
             ZStack {
@@ -504,14 +544,14 @@ private struct FieldhouseCardBuilder: View {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("WINDOW \(window) · COMMISSIONER").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
                         Text("BUILD THE CARD").font(.system(size: 36, weight: .black)).fontWidth(.condensed)
-                        Text("Select exactly five Division I games, confirm the spreads, then write the three-point floor prop.")
+                        Text("Select exactly ten Division I games from the Monday–Sunday window, confirm the spreads, then write the three-point floor prop.")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
-                        Text("\(selectedGames.count)/5 GAMES SELECTED").font(.caption.weight(.black)).foregroundStyle(selectedGames.count == 5 ? .green : .orange)
+                        Text("\(selectedGames.count)/\(cardSize) GAMES SELECTED").font(.caption.weight(.black)).foregroundStyle(selectedGames.count == cardSize ? .green : .orange)
                         ForEach(FieldhouseGameCatalog.windowOne) { game in
                             let selected = selectedIDs.contains(game.id)
                             Button {
                                 if selected { selectedIDs.remove(game.id) }
-                                else if selectedIDs.count < 5 { selectedIDs.insert(game.id) }
+                                else if selectedIDs.count < cardSize { selectedIDs.insert(game.id) }
                             } label: {
                                 HStack(spacing: 11) {
                                     Image(systemName: selected ? "checkmark.circle.fill" : "circle").font(.title3).foregroundStyle(selected ? .orange : .white.opacity(0.38))
@@ -521,7 +561,7 @@ private struct FieldhouseCardBuilder: View {
                                     }
                                     Spacer()
                                 }.padding(13).background(selected ? .orange.opacity(0.14) : .black.opacity(0.70), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? .orange : .white.opacity(0.10)))
-                            }.buttonStyle(.plain).disabled(!selected && selectedIDs.count == 5)
+                            }.buttonStyle(.plain).disabled(!selected && selectedIDs.count == cardSize)
                         }
                         VStack(alignment: .leading, spacing: 7) {
                             Text("WEEKLY PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.orange)
@@ -556,16 +596,18 @@ private struct FieldhouseHomeMasthead: View {
                     .frame(width: 68, height: 68).background(.orange, in: RoundedRectangle(cornerRadius: 17))
                 VStack(alignment: .leading, spacing: 4) {
                     Text("THE FIELDHOUSE").font(.system(size: 31, weight: .black)).fontWidth(.condensed)
-                    Text("NCAA D1 · WINDOW \(state.window) · REGULAR SEASON")
+                    Text("NCAA D1 · \(FieldhouseSeasonCalendar.windowLabel(state.window)) · \(state.phase.rawValue)")
                         .font(.system(size: 9, weight: .black)).tracking(1.2).foregroundStyle(.white.opacity(0.55))
                 }
             }
             Divider().overlay(.orange.opacity(0.45))
-            HStack {
-                Label("SHOT CLOCK", systemImage: "timer").font(.caption2.weight(.black)).tracking(1.3)
-                Spacer()
-                Text("3D 04H 12M · FIRST TIP").font(.caption.weight(.black))
-            }.foregroundStyle(.orange)
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                HStack {
+                    Label("SHOT CLOCK", systemImage: "timer").font(.caption2.weight(.black)).tracking(1.3)
+                    Spacer()
+                    Text(FieldhouseSeasonCalendar.missionClock(at: context.date)).font(.caption.weight(.black))
+                }.foregroundStyle(.orange)
+            }
         }
         .padding(18)
         .background(LinearGradient(colors: [.orange.opacity(0.25), .black.opacity(0.86)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 22))
@@ -604,16 +646,25 @@ private struct FieldhouseLeagueSwitcher: View {
     }
 }
 
+private enum FieldhousePicksLane: String {
+    case liveBoard
+    case makePicks
+}
+
 private struct FieldhousePicksPage: View {
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
     @State private var confirmingLock = false
+    @State private var lane: FieldhousePicksLane = .liveBoard
     var body: some View {
         VStack(spacing: 12) {
-            if !state.cardIsPublished || state.publishedGames.count != 5 {
-                FieldhouseHero(kicker: "WINDOW \(state.window) · WAITING", title: "CARD NOT POSTED YET", detail: "The commissioner is still building this window. Picks open when the five-game slate is published.", icon: "hourglass")
+            laneSelector
+            if lane == .liveBoard {
+                liveBoard
+            } else if !state.cardIsPublished || state.publishedGames.count != FieldhouseGameCatalog.weeklyCardSize {
+                FieldhouseHero(kicker: "WEEK \(state.window) · ON DECK", title: "CARD NOT POSTED YET", detail: "Week \(state.scoringWindow) remains on the floor while the commissioner builds the next ten-game card.", icon: "hourglass")
             } else {
-                FieldhouseHero(kicker: "SATURDAY CARD · WINDOW \(state.window)", title: "FIVE GAMES.\nNO EMPTY POSSESSIONS.", detail: "Pick the spread, assign confidence, mark one Best Bet, and answer the floor prop.", icon: "list.number")
+                FieldhouseHero(kicker: "ON DECK · WEEK \(state.window)", title: "TEN GAMES.\nNO EMPTY POSSESSIONS.", detail: "Pick the spread, assign confidence 1–10, mark one Best Bet, and answer the floor prop.", icon: "list.number")
                 Button { deployHellfire() } label: {
                     FieldhouseAction(kicker: "HELLFIRE · \(state.regularHellfiresRemaining)/2 AVAILABLE", title: state.regularHellfiresRemaining == 0 ? "Hellfires Expended" : "Deploy Hellfire", detail: "Always visible before the first game. Uses one authorization and fills the card.", icon: "scope")
                 }.buttonStyle(.plain).disabled(state.regularHellfiresRemaining == 0 || state.picksLocked).opacity(state.regularHellfiresRemaining == 0 || state.picksLocked ? 0.45 : 1)
@@ -637,7 +688,7 @@ private struct FieldhousePicksPage: View {
                             .foregroundStyle(.black).background(state.cardIsComplete ? Color.orange : Color.gray, in: RoundedRectangle(cornerRadius: 15))
                     }.buttonStyle(.plain).disabled(!state.cardIsComplete)
                     if !state.cardIsComplete {
-                        Text("Pick all five games, use confidence 1–5 once each, mark one Best Bet, and answer the prop.")
+                        Text("Pick all ten games, use confidence 1–10 once each, mark one Best Bet, and answer the prop.")
                             .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.52)).multilineTextAlignment(.center)
                     }
                 }
@@ -648,6 +699,55 @@ private struct FieldhousePicksPage: View {
             Button("LOCK PICKS") { state.picksLocked = true }
         } message: {
             Text("Your card is complete. You can reopen and change it only before the first tip.")
+        }
+    }
+
+    private var laneSelector: some View {
+        HStack(spacing: 8) {
+            laneButton(.liveBoard, week: state.scoringWindow, title: "LIVE BOARD", icon: "dot.radiowaves.left.and.right")
+            laneButton(.makePicks, week: state.window, title: "MAKE PICKS", icon: "checkmark.seal.fill")
+        }
+        .padding(6)
+        .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 17))
+        .overlay(RoundedRectangle(cornerRadius: 17).stroke(.orange.opacity(0.34)))
+    }
+
+    private func laneButton(_ target: FieldhousePicksLane, week: Int, title: String, icon: String) -> some View {
+        Button { lane = target } label: {
+            VStack(spacing: 4) {
+                Text("WEEK \(week)").font(.system(size: 8, weight: .black)).tracking(1.2)
+                Label(title, systemImage: icon).font(.caption.weight(.black))
+            }
+            .foregroundStyle(lane == target ? .black : .white.opacity(0.62))
+            .frame(maxWidth: .infinity).padding(.vertical, 11)
+            .background(lane == target ? Color.orange : .clear, in: RoundedRectangle(cornerRadius: 12))
+        }.buttonStyle(.plain)
+    }
+
+    private var liveBoard: some View {
+        VStack(spacing: 10) {
+            FieldhouseHero(
+                kicker: "ON THE FLOOR · WEEK \(state.scoringWindow)",
+                title: "THE BOARD IS LIVE",
+                detail: "\(state.scoringFinalGames) final · \(state.scoringLiveGames) live · your scorecard: \(state.scoringPoints) points",
+                icon: "basketball.fill"
+            )
+            ForEach(Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize).enumerated()), id: \.element.id) { index, game in
+                HStack(spacing: 10) {
+                    Image(systemName: index < state.scoringFinalGames ? "checkmark.circle.fill" : "dot.radiowaves.left.and.right")
+                        .foregroundStyle(index < state.scoringFinalGames ? .green : .orange)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(game.away) at \(game.home)").font(.caption.weight(.black))
+                        Text("\(game.spread) · \(index < state.scoringFinalGames ? "FINAL" : "LIVE")")
+                            .font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.48))
+                    }
+                    Spacer()
+                    Text(index < state.scoringFinalGames ? "FINAL" : "2H")
+                        .font(.caption2.weight(.black)).foregroundStyle(index < state.scoringFinalGames ? .green : .orange)
+                }
+                .padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(.white.opacity(0.10)))
+            }
         }
     }
 
@@ -672,7 +772,7 @@ private struct FieldhousePicksPage: View {
             Text(matchup.spread).font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.52))
             HStack(spacing: 7) {
                 Text("CONFIDENCE").font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.48))
-                ForEach(1...5, id: \.self) { value in
+                ForEach(1...FieldhouseGameCatalog.weeklyCardSize, id: \.self) { value in
                     let chosen = state.confidenceSelections[index] == value
                     let available = state.confidenceAvailable(value, for: index)
                     Button {
@@ -705,7 +805,7 @@ private struct FieldhousePicksPage: View {
     }
 
     private func deployHellfire() {
-        guard state.regularHellfiresRemaining > 0, state.publishedGames.count == 5 else { return }
+        guard state.regularHellfiresRemaining > 0, state.publishedGames.count == FieldhouseGameCatalog.weeklyCardSize else { return }
         for (index, game) in state.publishedGames.enumerated() {
             state.sideSelections[index] = game.spread.hasPrefix(game.away.components(separatedBy: " ").first ?? "") ? game.away : game.home
             state.confidenceSelections[index] = 5 - index
