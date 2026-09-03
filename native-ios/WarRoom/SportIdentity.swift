@@ -92,8 +92,18 @@ struct SportIdentity {
     }
 
     var isNFL: Bool { sportId == "nfl" }
-    var accent: Color { isNFL ? .cyan : .yellow }
-    var secondaryAccent: Color { isNFL ? .blue : .green }
+    var isFieldhouse: Bool { ["cbb", "ncaam", "ncaaw"].contains(sportId) }
+    var isNCAAW: Bool { sportId == "ncaaw" }
+    var accent: Color {
+        if isNCAAW { return Color(red: 0.25, green: 0.92, blue: 0.86) }
+        if isFieldhouse { return .orange }
+        return isNFL ? .cyan : .yellow
+    }
+    var secondaryAccent: Color {
+        if isNCAAW { return Color(red: 0.84, green: 0.32, blue: 1.0) }
+        if isFieldhouse { return Color(red: 1.0, green: 0.32, blue: 0.08) }
+        return isNFL ? .blue : .green
+    }
     var gameDay: String { isNFL ? "SUNDAY" : "SATURDAY" }
     var openingWeek: Int { isNFL ? 1 : 0 }
 

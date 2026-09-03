@@ -951,6 +951,13 @@ struct FieldhouseNativePreviewView: View {
                     FieldhouseLockerPage().padding(.horizontal, 14)
                 } else if desk == .picks {
                     FieldhousePicksPage(state: $state, strikePresentation: $strikePresentation)
+                } else if desk == .profile {
+                    NavigationStack {
+                        ScrollView {
+                            FieldhouseProfilePage(state: $state)
+                                .padding(14).padding(.bottom, 30)
+                        }
+                    }
                 } else {
                     ScrollView {
                         Group {
@@ -959,7 +966,7 @@ struct FieldhouseNativePreviewView: View {
                             case .picks: EmptyView()
                             case .standings: FieldhouseStandingsPage(state: $state)
                             case .locker: EmptyView()
-                            case .profile: FieldhouseProfilePage(state: $state)
+                            case .profile: EmptyView()
                             }
                         }
                         .padding(14).padding(.bottom, 30)
@@ -2400,6 +2407,16 @@ private struct FieldhouseProfilePage: View {
     @State private var earnedExpanded = false
     @State private var searchText = ""
     @State private var activeDestination: FieldhouseProfileDestination?
+    @State private var selectedAchievement: ProfileAchievement?
+    private let previewUserID = UUID(uuidString: "09544d2b-6eca-4131-a321-c000586c9029")!
+    private var sportID: String { state.league == .ncaaw ? "ncaaw" : "ncaam" }
+    private var demoAchievements: [ProfileAchievement] {
+        [
+            ProfileAchievement(leagueId: FieldhousePreviewIdentity.leagueID(for: state.league), code: "saturday_starter", title: "First Tip", flavor: "Made the first Fieldhouse pick and entered the permanent record.", earnedAt: "2026-11-02T18:00:00Z"),
+            ProfileAchievement(leagueId: FieldhousePreviewIdentity.leagueID(for: state.league), code: "favorite_team", title: "Hardwood Homer", flavor: "Picked a favorite team and stood by it in public.", earnedAt: "2026-11-02T18:01:00Z"),
+            ProfileAchievement(leagueId: FieldhousePreviewIdentity.leagueID(for: state.league), code: "best_bet_hit", title: "Heat Check", flavor: "Hit a Fieldhouse Best Bet.", earnedAt: "2026-11-09T04:00:00Z")
+        ]
+    }
     private var catalog: [String] { FieldhouseTeamCatalog.teams(for: state.league) }
     private var teams: [String] {
         return searchText.isEmpty ? catalog : catalog.filter { $0.localizedCaseInsensitiveContains(searchText) }
@@ -2435,9 +2452,9 @@ private struct FieldhouseProfilePage: View {
                     .frame(maxHeight: 280)
                 }
             }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.3)))
-            dossierButton(.arsenal, "Arsenal", "Hellfire inventory and permanent receipts", "scope", .red)
-            dossierButton(.dogTags, "Campaign Dog Tags", "Your identity across every War Room sport", "tag.fill", accent)
-            dossierButton(.passport, "Profile Passport", "League history, seasons and permanent record", "book.closed.fill", accent)
+            ProfileArsenalView(userId: previewUserID, sportId: sportID)
+            CampaignDogTagsView(userId: previewUserID)
+            ProfilePassportView(userId: previewUserID, isOwner: true)
             currentCampaign
 
             dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
@@ -2463,15 +2480,20 @@ private struct FieldhouseProfilePage: View {
                     .foregroundStyle(accent)
                 }.buttonStyle(.plain)
                 if earnedExpanded {
-                    ForEach(["FIRST TIP · MADE YOUR FIRST PICK", "HARDWOOD HOMER · PICKED YOUR FAVORITE", "HEAT CHECK · HIT A BEST BET"], id: \.self) { item in
-                        HStack { Image(systemName: "basketball.fill").foregroundStyle(accent); Text(item).font(.caption.weight(.black)); Spacer() }
-                            .padding(11).background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 11))
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                        ForEach(demoAchievements) { achievement in
+                            Button { selectedAchievement = achievement } label: {
+                                AchievementArtifactTile(achievement: achievement, sportId: sportID)
+                            }.buttonStyle(.plain)
+                        }
                     }
                 }
             }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.3)))
 
             dossierLabel("CHEEVO VAULT", detail: "FOUR ROOMS. ONE CONCERNING PERSONALITY.")
-            dossierButton(.cheevoVault, "Open Cheevo Vault", "Inspect every earned artifact", "shippingbox.fill", accent)
+            Button { activeDestination = .cheevoVault } label: {
+                CheevoVaultDoor(earned: demoAchievements, sportId: sportID)
+            }.buttonStyle(.plain)
 
             dossierLabel("TROPHY CASE", detail: "THE ROOM CANNOT DELETE HISTORY")
             dossierInfo("No permanent hardware yet", "The engraver checked twice", "trophy.fill", .yellow)
@@ -2494,15 +2516,17 @@ private struct FieldhouseProfilePage: View {
         .sheet(item: $activeDestination) { destination in
             FieldhouseProfileDestinationView(state: $state, destination: destination)
         }
+        .sheet(item: $selectedAchievement) { achievement in
+            AchievementEvidenceView(achievement: achievement, visual: achievementVisual(for: achievement.code), sportId: sportID)
+                .presentationDetents([.large]).presentationDragIndicator(.hidden)
+        }
     }
 
     private var profileHero: some View {
         VStack(spacing: 10) {
             Text("PLAYER DOSSIER").font(.caption2.weight(.black)).tracking(2.4).foregroundStyle(accent)
-            Circle().fill(accent.opacity(0.18)).frame(width: 104, height: 104)
-                .overlay(Text("RV").font(.system(size: 34, weight: .black)).foregroundStyle(accent))
-                .overlay(Circle().stroke(accent, lineWidth: 3))
-            Text("FLOOR GENERAL · RANK 5").font(.caption.weight(.black)).tracking(1.4).foregroundStyle(accent)
+            ProfileAvatar(urlString: nil, name: "Riley V.", size: 104, borderId: nil, accent: accent)
+            ProfileRankPlacard(progress: CareerRanks.resolve(points: 230, seasons: 1, sports: 3), isOwner: true, sportId: sportID)
             Text("Riley V.").font(.system(size: 32, weight: .black)).fontWidth(.condensed)
             HStack(spacing: 7) {
                 profileTag("COMMISSIONER", color: .green)
@@ -2578,7 +2602,7 @@ private struct FieldhouseProfilePage: View {
 }
 
 private enum FieldhouseProfileDestination: String, Identifiable {
-    case arsenal, dogTags, passport, scorecard, rivalry, cheevoVault, crystalBall
+    case scorecard, rivalry, cheevoVault, crystalBall
     case editProfile, announcements, rules, privacy, leagueCommand, signOut
     var id: String { rawValue }
 }
@@ -2592,17 +2616,34 @@ private struct FieldhouseProfileDestinationView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Label(kicker, systemImage: icon)
-                        .font(.caption.weight(.black)).tracking(1.6).foregroundStyle(accent)
-                    Text(title).font(.system(size: 34, weight: .black)).fontWidth(.condensed)
-                    Text(detail).font(.body.weight(.semibold)).foregroundStyle(.white.opacity(0.68))
-                    content
+            Group {
+                switch destination {
+                case .cheevoVault:
+                    CheevoVaultView(earned: demoAchievements, sportId: sportID)
+                case .editProfile:
+                    NativeProfileView()
+                case .announcements:
+                    AnnouncementsView()
+                case .rules:
+                    HowToPlayView(sportId: sportID)
+                case .privacy:
+                    SafetyAndSupportView()
+                case .leagueCommand:
+                    LeagueCommandCenterView(memberships: [])
+                default:
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Label(kicker, systemImage: icon)
+                                .font(.caption.weight(.black)).tracking(1.6).foregroundStyle(accent)
+                            Text(title).font(.system(size: 34, weight: .black)).fontWidth(.condensed)
+                            Text(detail).font(.body.weight(.semibold)).foregroundStyle(.white.opacity(0.68))
+                            content
+                        }
+                        .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .background(FieldhouseBackdrop(leagueOverride: state.league).ignoresSafeArea())
                 }
-                .padding(20).frame(maxWidth: .infinity, alignment: .leading)
             }
-            .background(FieldhouseBackdrop(leagueOverride: state.league).ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { dismiss() } label: { Label("Back", systemImage: "chevron.left") }
@@ -2613,17 +2654,17 @@ private struct FieldhouseProfileDestinationView: View {
         .preferredColorScheme(.dark)
     }
 
+    private var sportID: String { state.league == .ncaaw ? "ncaaw" : "ncaam" }
+    private var demoAchievements: [ProfileAchievement] {
+        [
+            ProfileAchievement(leagueId: FieldhousePreviewIdentity.leagueID(for: state.league), code: "saturday_starter", title: "First Tip", flavor: "Made the first Fieldhouse pick and entered the permanent record.", earnedAt: "2026-11-02T18:00:00Z"),
+            ProfileAchievement(leagueId: FieldhousePreviewIdentity.leagueID(for: state.league), code: "favorite_team", title: "Hardwood Homer", flavor: "Picked a favorite team and stood by it in public.", earnedAt: "2026-11-02T18:01:00Z"),
+            ProfileAchievement(leagueId: FieldhousePreviewIdentity.leagueID(for: state.league), code: "best_bet_hit", title: "Heat Check", flavor: "Hit a Fieldhouse Best Bet.", earnedAt: "2026-11-09T04:00:00Z")
+        ]
+    }
+
     @ViewBuilder private var content: some View {
         switch destination {
-        case .arsenal:
-            detailCard("REGULAR SEASON HELLFIRE", "\(state.regularHellfiresRemaining)/2 remaining · Locks all ten picks permanently · Correct picks score 2×")
-            detailCard("POSTSEASON HELLFIRE", state.bracketHellfireUsed ? "Deployed · Permanent receipt saved" : "1 available · 1.5× bracket scoring with the 60% threshold")
-        case .dogTags:
-            detailCard("RILEY V.", "Commissioner · Midwest Region · Identity follows you across every War Room sport")
-            detailCard("CURRENT PATCH", "The Fieldhouse \(state.league.rawValue)")
-        case .passport:
-            detailCard("ACTIVE CAMPAIGN", "The Fieldhouse \(state.league.rawValue) · Week \(state.window)")
-            detailCard("PERMANENT RECORD", "1 season · \(state.scoringPoints) career points · Rank \(state.rank)")
         case .scorecard:
             detailCard("WEEK \(state.scoringWindow)", "\(state.scoringPoints) points · \(state.scoringFinalGames) final · \(state.scoringLiveGames) live")
             detailCard("PROP", state.scoringPropResult == nil ? "Pending final game data" : "Scored autonomously from the completed board")
@@ -2662,9 +2703,6 @@ private struct FieldhouseProfileDestinationView: View {
     private var kicker: String { destination == .signOut ? "ACCOUNT CONTROL" : "PLAYER DOSSIER" }
     private var title: String {
         switch destination {
-        case .arsenal: "Arsenal"
-        case .dogTags: "Campaign Dog Tags"
-        case .passport: "Profile Passport"
         case .scorecard: "Season Scorecard"
         case .rivalry: "Rivalry Report"
         case .cheevoVault: "Cheevo Vault"
@@ -2679,9 +2717,6 @@ private struct FieldhouseProfileDestinationView: View {
     }
     private var detail: String {
         switch destination {
-        case .arsenal: "Inventory, deployment rules, and permanent receipts."
-        case .dogTags: "Your War Room identity, without sport-specific reinvention."
-        case .passport: "Every campaign and season follows one player record."
         case .scorecard: "The points, status, and source of the current weekly total."
         case .rivalry: "Your position against the people trying to catch you."
         case .cheevoVault: "Every earned artifact in one cabinet."
@@ -2696,9 +2731,6 @@ private struct FieldhouseProfileDestinationView: View {
     }
     private var icon: String {
         switch destination {
-        case .arsenal: "scope"
-        case .dogTags: "tag.fill"
-        case .passport: "book.closed.fill"
         case .scorecard: "checklist.checked"
         case .rivalry: "person.2.fill"
         case .cheevoVault: "shippingbox.fill"

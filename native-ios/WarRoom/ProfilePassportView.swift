@@ -90,6 +90,12 @@ struct ProfilePassportView: View {
         if sports.contains("nfl") {
             rows.append(.init(id: "nfl", label: "NFL", name: "Sunday Desk", detail: "A pro football campaign in the book.", flavor: "Late window. Long memory.", year: year, symbol: "tv.fill", color: .blue))
         }
+        if sports.contains("cbb") || sports.contains("ncaam") {
+            rows.append(.init(id: "ncaam", label: "NCAAM", name: "Fieldhouse", detail: "A men's Division I basketball campaign in the book.", flavor: "The hardwood keeps receipts.", year: year, symbol: "basketball.fill", color: .orange))
+        }
+        if sports.contains("ncaaw") {
+            rows.append(.init(id: "ncaaw", label: "NCAAW", name: "Fieldhouse", detail: "A women's Division I basketball campaign in the book.", flavor: "Pure basketball. Better passport stamp.", year: year, symbol: "basketball.fill", color: Color(red: 0.25, green: 0.92, blue: 0.86)))
+        }
         if sports.contains("soccer_wwc") {
             rows.append(.init(id: "wwc", label: "WWC", name: "World Cup Visa", detail: "Tournament energy, passport realness.", flavor: "Emerald heat. Gold ink.", year: year, symbol: "globe.americas.fill", color: .green))
         }

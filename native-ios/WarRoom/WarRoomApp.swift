@@ -12,6 +12,8 @@ struct WarRoomApp: App {
                 FieldhouseNativePreviewView(
                     initialLeague: ProcessInfo.processInfo.arguments.contains("--fieldhouse-ncaaw") ? .ncaaw : .ncaam
                 )
+                .environmentObject(auth)
+                .task { await auth.restore() }
             } else {
                 RootView()
                     .environmentObject(auth)

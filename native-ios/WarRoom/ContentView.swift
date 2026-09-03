@@ -5952,7 +5952,7 @@ private struct PlaceholderView: View {
     }
 }
 
-private struct YouView: View {
+struct YouView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var leagues: [LeagueMembership] = []
     @State private var profile: Profile?
@@ -6455,7 +6455,7 @@ private struct FavoriteTeamShrine: View {
     }
 }
 
-private struct AchievementVisual {
+struct AchievementVisual {
     let icon: String
     let glyph: String?
     let color: Color
@@ -6765,8 +6765,10 @@ private extension CheevoDefinition {
     }
 }
 
-private struct CheevoVaultDoor: View {
+struct CheevoVaultDoor: View {
     let earned: [ProfileAchievement]
+    var sportId: String = "cfb"
+    private var accent: Color { SportIdentity(sportId).accent }
     private var earnedIds: Set<String> {
         Set(earned.map { $0.code == "the_creator" ? "the_commissioner" : $0.code })
     }
@@ -6781,7 +6783,7 @@ private struct CheevoVaultDoor: View {
                         .font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.48))
                 }
                 Spacer()
-                Image(systemName: "chevron.right.circle.fill").font(.title2).foregroundStyle(.yellow)
+                Image(systemName: "chevron.right.circle.fill").font(.title2).foregroundStyle(accent)
             }
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(CheevoRarity.allCases) { rarity in
@@ -6801,13 +6803,14 @@ private struct CheevoVaultDoor: View {
             }
         }
         .padding(15).background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.yellow.opacity(0.3)))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.3)))
     }
 }
 
-private struct CheevoVaultView: View {
+struct CheevoVaultView: View {
     let earned: [ProfileAchievement]
     let sportId: String
+    private var identity: SportIdentity { SportIdentity(sportId) }
     private var earnedIds: Set<String> {
         Set(earned.map { $0.code == "the_creator" ? "the_commissioner" : $0.code })
     }
@@ -6819,7 +6822,7 @@ private struct CheevoVaultView: View {
             ScrollView {
                 VStack(spacing: 15) {
                     VStack(spacing: 5) {
-                        Text("AUTHORIZED PERSONNEL ONLY").font(.system(size: 8, weight: .black)).tracking(2).foregroundStyle(.yellow.opacity(0.74))
+                        Text("AUTHORIZED PERSONNEL ONLY").font(.system(size: 8, weight: .black)).tracking(2).foregroundStyle(identity.accent.opacity(0.74))
                         Text("CHEEVO VAULT").font(.system(size: 30, weight: .black)).fontWidth(.condensed)
                         Text("PICK A RARITY. REVIEW THE EVIDENCE.").font(.system(size: 9, weight: .black)).tracking(1.4).foregroundStyle(.white.opacity(0.48))
                     }.padding(.vertical, 18)
@@ -7146,7 +7149,7 @@ private func trophyFeaturePriority(_ type: String) -> Int {
     }
 }
 
-private func achievementVisual(for code: String) -> AchievementVisual {
+func achievementVisual(for code: String) -> AchievementVisual {
     switch code.lowercased() {
     case "the_creator": return AchievementVisual(icon: "shield.lefthalf.filled", glyph: "🪖", color: .green)
     case "the_commissioner": return AchievementVisual(icon: "crown.fill", glyph: "👑", color: .yellow)
@@ -7359,7 +7362,7 @@ private func achievementArtifactName(for code: String) -> String? {
     }
 }
 
-private struct AchievementArtifactTile: View {
+struct AchievementArtifactTile: View {
     let achievement: ProfileAchievement
     let sportId: String
     private var visual: AchievementVisual { achievementVisual(for: achievement.code) }
@@ -7501,7 +7504,7 @@ private struct GeneratedCheevoArtifactView: View {
     }
 }
 
-private struct AchievementEvidenceView: View {
+struct AchievementEvidenceView: View {
     @Environment(\.dismiss) private var dismiss
     let achievement: ProfileAchievement
     let visual: AchievementVisual
@@ -7680,7 +7683,7 @@ private struct TrophyEvidenceView: View {
     }
 }
 
-private struct NativeProfileView: View {
+struct NativeProfileView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var displayName = ""
     @State private var originalName = ""
@@ -8308,16 +8311,20 @@ private struct AvatarLightboxView: View {
     }
 }
 
-private struct HowToPlayView: View {
+struct HowToPlayView: View {
     let sportId: String
-    private var isNFL: Bool { sportId.lowercased() == "nfl" }
-    private var steps: [(String, String, String)] { [
-        ("hand.tap.fill", "Pick a side", "Every game. The fence scores zero."),
-        ("number.circle.fill", "Set confidence", "Use each number once. Higher means louder."),
-        ("star.fill", "Mark one Best Bet", "It doubles the confidence points. Choose bravely or irresponsibly."),
-        ("questionmark.bubble.fill", "Answer the prop", "Free points, assuming you possess foresight."),
-        ("lock.fill", "Lock it in", "You can edit until the first kickoff. Then history gets a pen."),
-    ] }
+    private var identity: SportIdentity { SportIdentity(sportId) }
+    private var isNFL: Bool { identity.isNFL }
+    private var steps: [(String, String, String)] {
+        let close = identity.isFieldhouse ? "first tip" : "first kickoff"
+        return [
+            ("hand.tap.fill", "Pick a side", "Every game. The fence scores zero."),
+            ("number.circle.fill", "Set confidence", "Use each number once. Higher means louder."),
+            ("star.fill", "Mark one Best Bet", "It doubles the confidence points. Choose bravely or irresponsibly."),
+            ("questionmark.bubble.fill", "Answer the prop", "Free points, assuming you possess foresight."),
+            ("lock.fill", "Lock it in", "You can edit until the \(close). Then history gets a pen."),
+        ]
+    }
 
     var body: some View {
         ScrollView {
@@ -8335,11 +8342,20 @@ private struct HowToPlayView: View {
                     }
                     .padding(16).background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(.blue.opacity(0.5)))
+                } else if identity.isFieldhouse {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("FIELDHOUSE · TEN-GAME WEEKLY CARD", systemImage: "basketball.fill")
+                            .font(.caption.weight(.black)).tracking(1).foregroundStyle(identity.accent)
+                        Text("Pick ten Division I games against the spread, use confidence 1 through 10 exactly once, call one Best Bet, and answer the weekly prop. Each game becomes public at its own tip time.")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.72))
+                    }
+                    .padding(16).background(identity.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(identity.accent.opacity(0.5)))
                 }
                 ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                     HStack(alignment: .top, spacing: 14) {
                         ZStack {
-                            Circle().fill(isNFL ? .cyan : .green)
+                            Circle().fill(identity.isFieldhouse ? identity.accent : (isNFL ? .cyan : .green))
                             Text("\(index + 1)").font(.headline.weight(.black)).foregroundStyle(.black)
                         }
                         .frame(width: 38, height: 38)
@@ -8360,7 +8376,7 @@ private struct HowToPlayView: View {
     }
 }
 
-private struct AnnouncementsView: View {
+struct AnnouncementsView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var league: LeagueMembership?
     @State private var items: [Announcement] = []

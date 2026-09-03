@@ -137,8 +137,9 @@ struct ProfileRankPlacard: View {
     let progress: CareerRankProgress
     let isOwner: Bool
     var sportId: String = "cfb"
-    private var isNFL: Bool { sportId.lowercased() == "nfl" }
-    private var accent: Color { isNFL ? .cyan : .yellow }
+    private var identity: SportIdentity { SportIdentity(sportId) }
+    private var isNFL: Bool { identity.isNFL }
+    private var accent: Color { identity.accent }
 
     var body: some View {
         NavigationLink {
@@ -152,7 +153,7 @@ struct ProfileRankPlacard: View {
                 ProgressView(value: progress.progress).tint(accent).frame(width: 128)
                 Text(progress.next == nil ? "MAXIMUM RANK" : "\(progress.points) PP · \(progress.pointsToNext) TO \(progress.next!.abbreviation)")
                     .font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(.white.opacity(0.52))
-                Text("PROMOTION BOARD  ›").font(.system(size: 8, weight: .black)).tracking(1.2).foregroundStyle(isNFL ? .blue : .green)
+                Text("PROMOTION BOARD  ›").font(.system(size: 8, weight: .black)).tracking(1.2).foregroundStyle(identity.secondaryAccent)
             }
             .padding(.horizontal, 18).padding(.vertical, 11)
             .background(.black.opacity(0.72), in: UnevenRoundedRectangle(topLeadingRadius: 3, bottomLeadingRadius: 18, bottomTrailingRadius: 3, topTrailingRadius: 18))
@@ -168,9 +169,10 @@ struct PromotionBoardView: View {
     let showsRequirements: Bool
     var sportId: String = "cfb"
     @State private var selectedRank: CareerRank?
-    private var isNFL: Bool { sportId.lowercased() == "nfl" }
-    private var accent: Color { isNFL ? .cyan : .yellow }
-    private var secondary: Color { isNFL ? .blue : .green }
+    private var identity: SportIdentity { SportIdentity(sportId) }
+    private var isNFL: Bool { identity.isNFL }
+    private var accent: Color { identity.accent }
+    private var secondary: Color { identity.secondaryAccent }
 
     var body: some View {
         ZStack {

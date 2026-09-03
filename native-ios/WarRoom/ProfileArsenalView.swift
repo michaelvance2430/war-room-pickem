@@ -7,13 +7,13 @@ struct ProfileArsenalView: View {
     @State private var service = WeaponServiceSummary.empty
     @State private var loading = true
     private var identity: SportIdentity { SportIdentity(sportId) }
-    private var accent: Color { identity.isNFL ? .cyan : .yellow }
+    private var accent: Color { identity.accent }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(identity.isNFL ? "PRO FOOTBALL ORDNANCE FILE" : "PROFILE ARSENAL").font(.system(size: 9, weight: .black)).tracking(2).foregroundStyle(accent)
+                    Text(identity.isNFL ? "PRO FOOTBALL ORDNANCE FILE" : (identity.isFieldhouse ? "FIELDHOUSE ORDNANCE FILE" : "PROFILE ARSENAL")).font(.system(size: 9, weight: .black)).tracking(2).foregroundStyle(accent)
                     Text("WEAPONS SERVICE RECORD").font(.title3.weight(.black)).fontWidth(.condensed)
                     Text(loading ? "PULLING PERMANENT ORDERS…" : "\(service.totalAuthorizations) CAREER AUTHORIZATION\(service.totalAuthorizations == 1 ? "" : "S") · \(service.campaigns) CAMPAIGN\(service.campaigns == 1 ? "" : "S")")
                         .font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.white.opacity(0.46))
@@ -24,7 +24,7 @@ struct ProfileArsenalView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
                 if sportId.lowercased() == "nfl" {
                     weapon(.jdam, "JDAM", service.jdams)
-                } else if sportId.lowercased() == "cbb" {
+                } else if ["cbb", "ncaam", "ncaaw"].contains(sportId.lowercased()) {
                     weapon(.hellfire, "HELLFIRE", service.hellfires)
                 } else {
                     weapon(.nuke, "TACTICAL NUKE", service.tacticalNukes)
@@ -42,7 +42,7 @@ struct ProfileArsenalView: View {
 
     private func weapon(_ kind: ArsenalKind, _ name: String, _ count: Int) -> some View {
         VStack(spacing: 7) {
-            ArsenalInsignia(kind: kind, size: 58, active: count > 0, accentOverride: identity.isNFL && kind == .jdam ? .blue : nil)
+            ArsenalInsignia(kind: kind, size: 58, active: count > 0, accentOverride: identity.isFieldhouse && kind == .hellfire ? accent : (identity.isNFL && kind == .jdam ? .blue : nil))
             Text(name).font(.system(size: 9, weight: .black)).tracking(0.5).multilineTextAlignment(.center)
             Text(count > 0 ? "\(count) CAREER CALL\(count == 1 ? "" : "S")" : "NOT YET CALLED")
                 .font(.system(size: 7, weight: .black)).foregroundStyle(count > 0 ? accent : .white.opacity(0.28))
