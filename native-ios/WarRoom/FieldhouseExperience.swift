@@ -15,14 +15,17 @@ enum FieldhouseSeasonCalendar {
         return calendar.date(byAdding: .day, value: max(0, window - 1) * 7, to: openingTip)!
     }
 
-    static func lockDate(for window: Int) -> Date {
+    static func fallbackLockDate(for window: Int) -> Date {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = eastern
-        // Preview deadline. Production uses the earliest tip on the published card.
         return calendar.date(byAdding: .hour, value: 19 + (3 * 24), to: start(of: window))!
     }
 
-    static func lockClock(at now: Date, window: Int) -> String {
-        let deadline = lockDate(for: window)
+    static func lockDate(for window: Int, games: [FieldhouseGame]) -> Date {
+        games.map { $0.tipDate(in: window) }.min() ?? fallbackLockDate(for: window)
+    }
+
+    static func lockClock(at now: Date, window: Int, games: [FieldhouseGame] = []) -> String {
+        let deadline = lockDate(for: window, games: games)
         guard now < deadline else { return "WEEK \(window) PICKS LOCKED" }
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = eastern
         let parts = calendar.dateComponents([.day, .hour, .minute], from: now, to: deadline)
@@ -82,6 +85,7 @@ enum FieldhouseLeague: String, CaseIterable, Identifiable {
     case ncaaw = "NCAAW"
     var id: String { rawValue }
     var displayName: String { "THE FIELDHOUSE · \(rawValue)" }
+    static let activeBuild: FieldhouseLeague = .ncaam
 }
 
 struct FieldhouseTrophyOption: Identifiable, Equatable {
@@ -160,6 +164,27 @@ struct FieldhouseGame: Identifiable, Equatable {
     let home: String
     let spread: String
     let tip: String
+    let dayOffset: Int
+    let tipHour: Int
+    let tipMinute: Int
+
+    init(id: String, away: String, home: String, spread: String, tip: String, dayOffset: Int = 3, tipHour: Int = 19, tipMinute: Int = 0) {
+        self.id = id
+        self.away = away
+        self.home = home
+        self.spread = spread
+        self.tip = tip
+        self.dayOffset = dayOffset
+        self.tipHour = tipHour
+        self.tipMinute = tipMinute
+    }
+
+    func tipDate(in window: Int) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = FieldhouseSeasonCalendar.eastern
+        let day = calendar.date(byAdding: .day, value: dayOffset, to: FieldhouseSeasonCalendar.start(of: window))!
+        return calendar.date(bySettingHour: tipHour, minute: tipMinute, second: 0, of: day)!
+    }
 }
 
 enum FieldhousePickVisibility {
@@ -169,24 +194,24 @@ enum FieldhousePickVisibility {
 enum FieldhouseGameCatalog {
     static let weeklyCardSize = 10
     static let windowOne = [
-        FieldhouseGame(id: "gonzaga-duke", away: "Gonzaga Bulldogs", home: "Duke Blue Devils", spread: "Duke -3.5", tip: "7:00 PM"),
-        FieldhouseGame(id: "auburn-houston", away: "Auburn Tigers", home: "Houston Cougars", spread: "Houston -2.5", tip: "7:30 PM"),
-        FieldhouseGame(id: "uconn-kansas", away: "UConn Huskies", home: "Kansas Jayhawks", spread: "Kansas -1.5", tip: "8:00 PM"),
-        FieldhouseGame(id: "iowa-state-tennessee", away: "Iowa State Cyclones", home: "Tennessee Volunteers", spread: "Tennessee -4.5", tip: "8:30 PM"),
-        FieldhouseGame(id: "baylor-alabama", away: "Baylor Bears", home: "Alabama Crimson Tide", spread: "Alabama -5.5", tip: "9:00 PM"),
-        FieldhouseGame(id: "purdue-michigan-state", away: "Purdue Boilermakers", home: "Michigan State Spartans", spread: "Purdue -2.5", tip: "9:30 PM"),
-        FieldhouseGame(id: "kentucky-north-carolina", away: "Kentucky Wildcats", home: "North Carolina Tar Heels", spread: "North Carolina -1.5", tip: "10:00 PM"),
-        FieldhouseGame(id: "arizona-illinois", away: "Arizona Wildcats", home: "Illinois Fighting Illini", spread: "Arizona -3.5", tip: "10:30 PM"),
-        FieldhouseGame(id: "marquette-creighton", away: "Marquette Golden Eagles", home: "Creighton Bluejays", spread: "Creighton -1.5", tip: "SAT · 3:30 PM"),
-        FieldhouseGame(id: "ucla-oregon", away: "UCLA Bruins", home: "Oregon Ducks", spread: "UCLA -2.5", tip: "SAT · 6:00 PM"),
-        FieldhouseGame(id: "texas-tech-baylor", away: "Texas Tech Red Raiders", home: "Baylor Bears", spread: "Baylor -3.5", tip: "SUN · 2:00 PM"),
-        FieldhouseGame(id: "villanova-st-johns", away: "Villanova Wildcats", home: "St. John's Red Storm", spread: "St. John's -4.5", tip: "SUN · 5:00 PM")
+        FieldhouseGame(id: "gonzaga-duke", away: "Gonzaga Bulldogs", home: "Duke Blue Devils", spread: "Duke -3.5", tip: "THU · 7:00 PM", tipHour: 19),
+        FieldhouseGame(id: "auburn-houston", away: "Auburn Tigers", home: "Houston Cougars", spread: "Houston -2.5", tip: "THU · 7:30 PM", tipHour: 19, tipMinute: 30),
+        FieldhouseGame(id: "uconn-kansas", away: "UConn Huskies", home: "Kansas Jayhawks", spread: "Kansas -1.5", tip: "THU · 8:00 PM", tipHour: 20),
+        FieldhouseGame(id: "iowa-state-tennessee", away: "Iowa State Cyclones", home: "Tennessee Volunteers", spread: "Tennessee -4.5", tip: "THU · 8:30 PM", tipHour: 20, tipMinute: 30),
+        FieldhouseGame(id: "baylor-alabama", away: "Baylor Bears", home: "Alabama Crimson Tide", spread: "Alabama -5.5", tip: "THU · 9:00 PM", tipHour: 21),
+        FieldhouseGame(id: "purdue-michigan-state", away: "Purdue Boilermakers", home: "Michigan State Spartans", spread: "Purdue -2.5", tip: "THU · 9:30 PM", tipHour: 21, tipMinute: 30),
+        FieldhouseGame(id: "kentucky-north-carolina", away: "Kentucky Wildcats", home: "North Carolina Tar Heels", spread: "North Carolina -1.5", tip: "THU · 10:00 PM", tipHour: 22),
+        FieldhouseGame(id: "arizona-illinois", away: "Arizona Wildcats", home: "Illinois Fighting Illini", spread: "Arizona -3.5", tip: "THU · 10:30 PM", tipHour: 22, tipMinute: 30),
+        FieldhouseGame(id: "marquette-creighton", away: "Marquette Golden Eagles", home: "Creighton Bluejays", spread: "Creighton -1.5", tip: "SAT · 3:30 PM", dayOffset: 5, tipHour: 15, tipMinute: 30),
+        FieldhouseGame(id: "ucla-oregon", away: "UCLA Bruins", home: "Oregon Ducks", spread: "UCLA -2.5", tip: "SAT · 6:00 PM", dayOffset: 5, tipHour: 18),
+        FieldhouseGame(id: "texas-tech-baylor", away: "Texas Tech Red Raiders", home: "Baylor Bears", spread: "Baylor -3.5", tip: "SUN · 2:00 PM", dayOffset: 6, tipHour: 14),
+        FieldhouseGame(id: "villanova-st-johns", away: "Villanova Wildcats", home: "St. John's Red Storm", spread: "St. John's -4.5", tip: "SUN · 5:00 PM", dayOffset: 6, tipHour: 17)
     ]
 }
 
 struct FieldhouseSeasonState {
-    var league: FieldhouseLeague = .ncaaw
-    var championshipTrophyID = FieldhouseTrophyCatalog.ncaaw[0].id
+    var league: FieldhouseLeague = .activeBuild
+    var championshipTrophyID = FieldhouseTrophyCatalog.ncaam[0].id
     // Basketball is double-buffered: one week scores while the next accepts picks.
     var window = 2
     var scoringWindow = 1
@@ -224,6 +249,26 @@ struct FieldhouseSeasonState {
               confidenceSelections.count == count, Set(confidenceSelections.values) == Set(1...count),
               bestBetGame != nil, propAnswer != nil else { return false }
         return (0..<count).allSatisfy { sideSelections[$0] != nil && confidenceSelections[$0] != nil }
+    }
+
+    var pickLockDate: Date { FieldhouseSeasonCalendar.lockDate(for: window, games: publishedGames) }
+
+    func canEditPicks(at date: Date) -> Bool {
+        cardIsPublished && date < pickLockDate
+    }
+
+    @discardableResult
+    mutating func lockPicks(at date: Date) -> Bool {
+        guard cardIsComplete, canEditPicks(at: date) else { return false }
+        picksLocked = true
+        return true
+    }
+
+    @discardableResult
+    mutating func reopenPicks(at date: Date) -> Bool {
+        guard picksLocked, canEditPicks(at: date) else { return false }
+        picksLocked = false
+        return true
     }
 
     func confidenceAvailable(_ value: Int, for game: Int) -> Bool {
@@ -339,7 +384,7 @@ private struct FieldhouseSeasonSetupView: View {
                 Text(step == 0 ? "This follows your profile across every Fieldhouse league. You can change your favorite team later from You." : "The Crystal Ball is mandatory. This championship call locks when you confirm it.")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
                 if pendingTeam == nil {
-                    TextField("Search all \(FieldhouseTeamCatalog.all.count) Division I teams", text: $searchText)
+                    TextField("Search all \(FieldhouseTeamCatalog.all.count) NCAAM Division I teams", text: $searchText)
                         .textInputAutocapitalization(.words).autocorrectionDisabled()
                         .padding(13).background(.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
                     ScrollView {
@@ -459,7 +504,7 @@ private struct FieldhouseEntranceView: View {
                     .shadow(color: .orange.opacity(0.75), radius: 28)
                 Text("COURTSIDE PASS").font(.system(size: 12, weight: .black)).tracking(4).foregroundStyle(.orange)
                 Text("THE\nFIELDHOUSE").font(.system(size: 58, weight: .black)).fontWidth(.condensed).multilineTextAlignment(.center)
-                Text("NCAAM · NCAAW").font(.system(size: 12, weight: .black)).tracking(3).foregroundStyle(.orange)
+                Text("NCAAM").font(.system(size: 12, weight: .black)).tracking(3).foregroundStyle(.orange)
                 Text("FOUR REGIONS · ONE ROAD TO THE MIDDLE")
                     .font(.system(size: 10, weight: .black)).tracking(1.8).foregroundStyle(.white.opacity(0.58))
                 Spacer()
@@ -468,7 +513,7 @@ private struct FieldhouseEntranceView: View {
                         .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(17)
                         .foregroundStyle(.black).background(.orange, in: RoundedRectangle(cornerRadius: 16))
                 }.buttonStyle(.plain)
-                Text("TWO LEAGUES · TWELVE TROPHIES · ONE FIELDHOUSE")
+                Text("DIVISION I MEN'S BASKETBALL · SIX TROPHIES · ONE FIELDHOUSE")
                     .font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(.white.opacity(0.42))
             }.padding(24).padding(.bottom, 18)
         }.preferredColorScheme(.dark)
@@ -692,7 +737,7 @@ private struct FieldhouseHomeMasthead: View {
                 HStack {
                     Label("SHOT CLOCK", systemImage: "timer").font(.caption2.weight(.black)).tracking(1.3)
                     Spacer()
-                    Text(FieldhouseSeasonCalendar.lockClock(at: context.date, window: state.window)).font(.caption.weight(.black))
+                    Text(FieldhouseSeasonCalendar.lockClock(at: context.date, window: state.window, games: state.publishedGames)).font(.caption.weight(.black))
                 }.foregroundStyle(.orange)
             }
         }
@@ -728,7 +773,7 @@ private struct FieldhouseLeagueSwitcher: View {
                         }.padding(14).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
                     }.buttonStyle(.plain)
                 }
-                ForEach(FieldhouseLeague.allCases) { option in
+                ForEach([FieldhouseLeague.activeBuild]) { option in
                     Button { league = option; dismiss() } label: {
                         HStack {
                             Image(systemName: "basketball.fill").foregroundStyle(.orange).frame(width: 30)
@@ -781,7 +826,7 @@ private struct FieldhousePicksPage: View {
         }
         .alert("Lock these picks?", isPresented: $confirmingLock) {
             Button("NOT YET", role: .cancel) {}
-            Button("LOCK PICKS") { state.picksLocked = true }
+            Button("LOCK PICKS") { _ = state.lockPicks(at: Date()) }
         } message: {
             Text("Your card is complete. You can reopen and change it only before the first tip.")
         }
@@ -804,7 +849,7 @@ private struct FieldhousePicksPage: View {
                 if state.picksLocked {
                     VStack(spacing: 9) {
                         Label("WINDOW \(state.window) PICKS LOCKED", systemImage: "lock.fill").font(.headline.weight(.black)).foregroundStyle(.green)
-                        Button("REOPEN PICKS BEFORE FIRST TIP") { state.picksLocked = false }
+                        Button("REOPEN PICKS BEFORE FIRST TIP") { _ = state.reopenPicks(at: Date()) }
                             .font(.caption.weight(.black)).foregroundStyle(.orange)
                     }.frame(maxWidth: .infinity).padding(16).background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.green.opacity(0.45)))
                 } else {
@@ -920,11 +965,13 @@ private struct FieldhousePicksPage: View {
                 .padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 13))
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(.orange.opacity(0.22)))
             }
-            Button("REOPEN PICKS BEFORE FIRST TIP") { state.picksLocked = false }
+            Button("REOPEN PICKS BEFORE FIRST TIP") { _ = state.reopenPicks(at: Date()) }
                 .font(.caption.weight(.black)).foregroundStyle(.orange)
                 .frame(maxWidth: .infinity).padding(15)
                 .background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 15))
                 .overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.35)))
+                .disabled(!state.canEditPicks(at: Date()))
+                .opacity(state.canEditPicks(at: Date()) ? 1 : 0.45)
         }
     }
 

@@ -18,13 +18,17 @@ final class FieldhouseExperienceTests: XCTestCase {
 
     func testChangingFieldhouseLeagueResetsTrophyToThatLeagueCollection() {
         var state = FieldhouseSeasonState()
-        XCTAssertEqual(state.league, .ncaaw)
-        XCTAssertEqual(state.championshipTrophyID, FieldhouseTrophyCatalog.ncaaw[0].id)
-
-        state.selectLeague(.ncaam)
+        XCTAssertEqual(state.league, .ncaam)
         XCTAssertEqual(state.championshipTrophyID, FieldhouseTrophyCatalog.ncaam[0].id)
-        XCTAssertTrue(FieldhouseTrophyCatalog.ncaam.map(\.id).contains(state.championshipTrophyID))
-        XCTAssertFalse(FieldhouseTrophyCatalog.ncaaw.map(\.id).contains(state.championshipTrophyID))
+
+        state.selectLeague(.ncaaw)
+        XCTAssertEqual(state.championshipTrophyID, FieldhouseTrophyCatalog.ncaaw[0].id)
+        XCTAssertTrue(FieldhouseTrophyCatalog.ncaaw.map(\.id).contains(state.championshipTrophyID))
+        XCTAssertFalse(FieldhouseTrophyCatalog.ncaam.map(\.id).contains(state.championshipTrophyID))
+    }
+
+    func testCurrentFieldhouseBuildExposesNCAAMFirst() {
+        XCTAssertEqual(FieldhouseLeague.activeBuild, .ncaam)
     }
 
     func testFieldhouseUsesMondaySundayWindowsAndNamesTheLockWeek() {
@@ -113,6 +117,30 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertFalse(state.cardIsComplete)
         state.propAnswer = "YES"
         XCTAssertTrue(state.cardIsComplete)
+    }
+
+    func testPublishedCardLocksAtItsEarliestExactTip() {
+        let games = Array(FieldhouseGameCatalog.windowOne.prefix(10))
+        let earliestTip = games.map { $0.tipDate(in: 2) }.min()!
+        XCTAssertEqual(FieldhouseSeasonCalendar.lockDate(for: 2, games: games), earliestTip)
+        XCTAssertEqual(games[0].tip, "THU · 7:00 PM")
+    }
+
+    func testPicksCannotLockOrReopenAfterFirstTip() {
+        var state = FieldhouseSeasonState()
+        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: "Will a ranked team trail at halftime?"))
+        for index in 0..<10 {
+            state.sideSelections[index] = state.publishedGames[index].home
+            state.confidenceSelections[index] = index + 1
+        }
+        state.bestBetGame = 0
+        state.propAnswer = "YES"
+
+        let beforeTip = state.pickLockDate.addingTimeInterval(-1)
+        let atTip = state.pickLockDate
+        XCTAssertTrue(state.lockPicks(at: beforeTip))
+        XCTAssertFalse(state.reopenPicks(at: atTip))
+        XCTAssertTrue(state.picksLocked)
     }
 
     func testSeasonStartLocksRegionRebalancing() {
