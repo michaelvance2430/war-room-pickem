@@ -77,6 +77,40 @@ enum FieldhouseSeasonPhase: String {
     case postseason = "POSTSEASON"
 }
 
+enum FieldhouseLeague: String, CaseIterable, Identifiable {
+    case ncaam = "NCAAM"
+    case ncaaw = "NCAAW"
+    var id: String { rawValue }
+    var displayName: String { "THE FIELDHOUSE · \(rawValue)" }
+}
+
+struct FieldhouseTrophyOption: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let detail: String
+    let asset: String
+}
+
+enum FieldhouseTrophyCatalog {
+    static let ncaam = [
+        FieldhouseTrophyOption(id: "m-iron-rim", name: "The Iron Rim", detail: "Nobody came through the lane clean.", asset: "FieldhouseMTheIronRim"),
+        FieldhouseTrophyOption(id: "m-net-cutter", name: "The Net Cutter", detail: "Bring your own ladder.", asset: "FieldhouseMTheNetCutter"),
+        FieldhouseTrophyOption(id: "m-hardwood-crown", name: "The Hardwood Crown", detail: "The court belongs to one room.", asset: "FieldhouseMTheHardwoodCrown"),
+        FieldhouseTrophyOption(id: "m-final-possession", name: "The Final Possession", detail: "The clock reached zero. You did not.", asset: "FieldhouseMTheFinalPossession"),
+        FieldhouseTrophyOption(id: "m-glass-house", name: "The Glass House", detail: "Own the boards. Own the room.", asset: "FieldhouseMTheGlassHouse"),
+        FieldhouseTrophyOption(id: "m-fieldhouse-cup", name: "The Fieldhouse Cup", detail: "Old building. Permanent address.", asset: "FieldhouseMTheFieldhouseCup")
+    ]
+    static let ncaaw = [
+        FieldhouseTrophyOption(id: "w-pure-game", name: "The Pure Game", detail: "The version with footwork.", asset: "FieldhouseWThePureGame"),
+        FieldhouseTrophyOption(id: "w-extra-pass", name: "The Extra Pass", detail: "Apparently all five players can touch the ball.", asset: "FieldhouseWTheExtraPass"),
+        FieldhouseTrophyOption(id: "w-94-feet", name: "Ninety-Four Feet", detail: "Every possession. The entire floor.", asset: "FieldhouseWNinetyFourFeet"),
+        FieldhouseTrophyOption(id: "w-nylon-standard", name: "The Nylon Standard", detail: "Backboard optional.", asset: "FieldhouseWTheNylonStandard"),
+        FieldhouseTrophyOption(id: "w-forty-minutes", name: "Forty Minutes", detail: "No hero-ball exemption.", asset: "FieldhouseWFortyMinutes"),
+        FieldhouseTrophyOption(id: "w-better-bracket", name: "The Better Bracket", detail: "We said what we said.", asset: "FieldhouseWTheBetterBracket")
+    ]
+    static func options(for league: FieldhouseLeague) -> [FieldhouseTrophyOption] { league == .ncaam ? ncaam : ncaaw }
+}
+
 enum FieldhouseLateEntryRule {
     static func entryScore(existingScores: [Int]) -> Int {
         guard !existingScores.isEmpty else { return 0 }
@@ -151,6 +185,8 @@ enum FieldhouseGameCatalog {
 }
 
 struct FieldhouseSeasonState {
+    var league: FieldhouseLeague = .ncaaw
+    var championshipTrophyID = FieldhouseTrophyCatalog.ncaaw[0].id
     // Basketball is double-buffered: one week scores while the next accepts picks.
     var window = 2
     var scoringWindow = 1
@@ -197,6 +233,11 @@ struct FieldhouseSeasonState {
     mutating func toggleConfidence(_ value: Int, for game: Int) {
         guard confidenceSelections[game] == value || confidenceAvailable(value, for: game) else { return }
         confidenceSelections[game] = confidenceSelections[game] == value ? nil : value
+    }
+
+    mutating func selectLeague(_ newLeague: FieldhouseLeague) {
+        league = newLeague
+        championshipTrophyID = FieldhouseTrophyCatalog.options(for: newLeague)[0].id
     }
 
     @discardableResult
@@ -375,7 +416,7 @@ private struct FieldhouseHeader: View {
                 Label("COLLEGE BASKETBALL", systemImage: "basketball.fill").font(.system(size: 9, weight: .black)).tracking(1.8).foregroundStyle(.orange)
                 Spacer(); Text("NATIVE FIELDHOUSE").font(.system(size: 8, weight: .black)).tracking(1.2).foregroundStyle(.white.opacity(0.42))
             }
-            Text("THE FIELDHOUSE").font(.system(size: 31, weight: .black)).fontWidth(.condensed)
+            Text(state.league.displayName).font(.system(size: 29, weight: .black)).fontWidth(.condensed)
             Text("WINDOW \(state.window) · FOUR REGIONS · ONE ROAD TO THE MIDDLE").font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.55))
         }
         .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 13)
@@ -418,6 +459,7 @@ private struct FieldhouseEntranceView: View {
                     .shadow(color: .orange.opacity(0.75), radius: 28)
                 Text("COURTSIDE PASS").font(.system(size: 12, weight: .black)).tracking(4).foregroundStyle(.orange)
                 Text("THE\nFIELDHOUSE").font(.system(size: 58, weight: .black)).fontWidth(.condensed).multilineTextAlignment(.center)
+                Text("NCAAM · NCAAW").font(.system(size: 12, weight: .black)).tracking(3).foregroundStyle(.orange)
                 Text("FOUR REGIONS · ONE ROAD TO THE MIDDLE")
                     .font(.system(size: 10, weight: .black)).tracking(1.8).foregroundStyle(.white.opacity(0.58))
                 Spacer()
@@ -426,7 +468,7 @@ private struct FieldhouseEntranceView: View {
                         .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(17)
                         .foregroundStyle(.black).background(.orange, in: RoundedRectangle(cornerRadius: 16))
                 }.buttonStyle(.plain)
-                Text("NCAA DIVISION I · MEN'S AND WOMEN'S COLLEGE BASKETBALL")
+                Text("TWO LEAGUES · TWELVE TROPHIES · ONE FIELDHOUSE")
                     .font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(.white.opacity(0.42))
             }.padding(24).padding(.bottom, 18)
         }.preferredColorScheme(.dark)
@@ -457,12 +499,14 @@ private struct FieldhouseHomePage: View {
             Button { showingCommissionerCommand = true } label: {
                 FieldhouseAction(kicker: "COMMISSIONER COMMAND", title: "Manage your league", detail: "Cards, players, regions, and season controls.", icon: "person.3.fill")
             }.buttonStyle(.plain)
-            FieldhouseAction(
-                kicker: "ON THE FLOOR · WEEK \(state.scoringWindow)",
-                title: "\(state.scoringFinalGames) FINAL · \(state.scoringLiveGames) LIVE",
-                detail: "\(state.scoringPoints) points and moving. Open Picks to see the live board and your scorecard.",
-                icon: "basketball.fill"
-            )
+            Button { desk = .picks } label: {
+                FieldhouseAction(
+                    kicker: "ON THE FLOOR · WEEK \(state.scoringWindow)",
+                    title: "\(state.scoringFinalGames) FINAL · \(state.scoringLiveGames) LIVE",
+                    detail: "\(state.scoringPoints) points and moving. Tap to open the live board and your scorecard.",
+                    icon: "basketball.fill"
+                )
+            }.buttonStyle(.plain)
             HStack(spacing: 10) {
                 FieldhouseMetric(value: "#\(state.rank)", label: "YOUR SEED LINE")
                 FieldhouseMetric(value: "\(state.regularHellfiresRemaining)/2", label: "HELLFIRES READY")
@@ -482,7 +526,7 @@ private struct FieldhouseHomePage: View {
             Button { desk = .standings } label: { FieldhouseAction(kicker: "REGIONAL WAR MAP", title: "Battle Toward the Middle", detail: "East, West, South, and Midwest each send survivors inward.", icon: "square.grid.2x2.fill") }.buttonStyle(.plain)
         }
         .sheet(isPresented: $showingLeagueSwitcher) {
-            FieldhouseLeagueSwitcher(dismiss: { showingLeagueSwitcher = false })
+            FieldhouseLeagueSwitcher(league: Binding(get: { state.league }, set: { state.selectLeague($0) }), dismiss: { showingLeagueSwitcher = false })
                 .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingCardBuilder) {
@@ -519,6 +563,7 @@ private struct FieldhouseCommissionerCommand: View {
                         FieldhouseHero(kicker: "COMMISSIONER CONTROL", title: "LEAGUE OPERATIONS", detail: "Players, regions, card state, and season rules from one place.", icon: "person.3.fill")
                         commandRow("PLAYERS", detail: "25 active · late entry seed \(FieldhouseLateEntryRule.entryScore(existingScores: demoScores)) points", icon: "person.2.fill", status: FieldhouseLateEntryRule.acceptsEntries(during: state.phase) ? "OPEN" : "CLOSED", color: .green)
                         commandRow("REGION ASSIGNMENTS", detail: "East · West · South · Midwest", icon: "square.grid.2x2.fill", status: state.canRebalanceRegions ? "EDIT" : "LOCKED", color: state.canRebalanceRegions ? .orange : .red)
+                        trophySelector
                         commandRow("WEEK \(state.scoringWindow) · ON THE FLOOR", detail: "\(state.scoringFinalGames) final · \(state.scoringLiveGames) live", icon: "basketball.fill", status: "SCORING", color: .green)
                         commandRow("WEEK \(state.window) · ON DECK", detail: state.cardIsPublished ? "Ten games and prop published" : "Commissioner must build the next card", icon: "list.bullet.clipboard.fill", status: state.cardIsPublished ? "PICKS OPEN" : "BUILD", color: state.cardIsPublished ? .orange : .yellow)
                         commandRow("SEASON PHASE", detail: "Transitions control entry eligibility and regional seeding", icon: "calendar.badge.clock", status: state.phase.rawValue, color: .orange)
@@ -541,6 +586,30 @@ private struct FieldhouseCommissionerCommand: View {
             VStack(alignment: .leading, spacing: 4) { Text(title).font(.headline.weight(.black)); Text(detail).font(.caption).foregroundStyle(.white.opacity(0.52)) }
             Spacer(); Text(status).font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(color).padding(.horizontal, 9).padding(.vertical, 6).background(color.opacity(0.12), in: Capsule())
         }.padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.22)))
+    }
+
+    private var trophySelector: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("\(state.league.rawValue) · CHAMPIONSHIP TROPHY").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.orange)
+            Text("This collection is exclusive to \(state.league.displayName).").font(.caption).foregroundStyle(.white.opacity(0.52))
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(FieldhouseTrophyCatalog.options(for: state.league)) { trophy in
+                    let selected = state.championshipTrophyID == trophy.id
+                    Button { state.championshipTrophyID = trophy.id } label: {
+                        VStack(spacing: 7) {
+                            Image(trophy.asset).resizable().scaledToFit().frame(height: 112)
+                            Text(trophy.name.uppercased()).font(.system(size: 9, weight: .black)).multilineTextAlignment(.center)
+                            Text(trophy.detail).font(.system(size: 8, weight: .semibold)).foregroundStyle(.white.opacity(0.55)).multilineTextAlignment(.center).lineLimit(2)
+                        }
+                        .frame(maxWidth: .infinity).padding(10)
+                        .background(selected ? .orange.opacity(0.16) : .black.opacity(0.74), in: RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(selected ? .orange : .white.opacity(0.10), lineWidth: selected ? 2 : 1))
+                    }.buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15))
+        .overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.28)))
     }
 }
 
@@ -613,8 +682,8 @@ private struct FieldhouseHomeMasthead: View {
                 Image(systemName: "basketball.fill").font(.system(size: 38, weight: .black)).foregroundStyle(.black)
                     .frame(width: 68, height: 68).background(.orange, in: RoundedRectangle(cornerRadius: 17))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("THE FIELDHOUSE").font(.system(size: 31, weight: .black)).fontWidth(.condensed)
-                    Text("NCAA D1 · \(FieldhouseSeasonCalendar.windowLabel(state.window)) · \(state.phase.rawValue)")
+                    Text(state.league.displayName).font(.system(size: 28, weight: .black)).fontWidth(.condensed)
+                    Text("\(state.league.rawValue) · \(FieldhouseSeasonCalendar.windowLabel(state.window)) · \(state.phase.rawValue)")
                         .font(.system(size: 9, weight: .black)).tracking(1.2).foregroundStyle(.white.opacity(0.55))
                 }
             }
@@ -645,16 +714,26 @@ private struct FieldhouseHomeButton: View {
 }
 
 private struct FieldhouseLeagueSwitcher: View {
+    @Binding var league: FieldhouseLeague
     let dismiss: () -> Void
     var body: some View {
         NavigationStack {
             VStack(spacing: 10) {
-                ForEach([("CFB", "football.fill", "Saturday Situation Room"), ("NFL", "football.fill", "Sunday War Room"), ("FIELDHOUSE", "basketball.fill", "The Fieldhouse")], id: \.0) { sport, icon, league in
+                ForEach([("CFB", "football.fill", "Saturday Situation Room"), ("NFL", "football.fill", "Sunday War Room")], id: \.0) { sport, icon, title in
                     Button(action: dismiss) {
                         HStack {
-                            Image(systemName: icon).foregroundStyle(sport == "FIELDHOUSE" ? .orange : .green).frame(width: 30)
-                            VStack(alignment: .leading) { Text(sport).font(.caption.weight(.black)); Text(league).font(.headline.weight(.black)) }
-                            Spacer(); Image(systemName: sport == "FIELDHOUSE" ? "checkmark.circle.fill" : "chevron.right")
+                            Image(systemName: icon).foregroundStyle(.green).frame(width: 30)
+                            VStack(alignment: .leading) { Text(sport).font(.caption.weight(.black)); Text(title).font(.headline.weight(.black)) }
+                            Spacer(); Image(systemName: "chevron.right")
+                        }.padding(14).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+                    }.buttonStyle(.plain)
+                }
+                ForEach(FieldhouseLeague.allCases) { option in
+                    Button { league = option; dismiss() } label: {
+                        HStack {
+                            Image(systemName: "basketball.fill").foregroundStyle(.orange).frame(width: 30)
+                            VStack(alignment: .leading) { Text(option.rawValue).font(.caption.weight(.black)); Text(option.displayName).font(.headline.weight(.black)) }
+                            Spacer(); Image(systemName: league == option ? "checkmark.circle.fill" : "chevron.right")
                         }.padding(14).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
                     }.buttonStyle(.plain)
                 }

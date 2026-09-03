@@ -2,6 +2,31 @@ import XCTest
 @testable import WarRoom
 
 final class FieldhouseExperienceTests: XCTestCase {
+    func testMensAndWomensFieldhouseHaveDistinctSixTrophyCollections() {
+        XCTAssertEqual(FieldhouseTrophyCatalog.ncaam.count, 6)
+        XCTAssertEqual(FieldhouseTrophyCatalog.ncaaw.count, 6)
+
+        let mensIDs = Set(FieldhouseTrophyCatalog.ncaam.map(\.id))
+        let womensIDs = Set(FieldhouseTrophyCatalog.ncaaw.map(\.id))
+        let allAssets = FieldhouseTrophyCatalog.ncaam.map(\.asset) + FieldhouseTrophyCatalog.ncaaw.map(\.asset)
+
+        XCTAssertTrue(mensIDs.isDisjoint(with: womensIDs))
+        XCTAssertEqual(Set(allAssets).count, 12)
+        XCTAssertEqual(FieldhouseLeague.ncaam.displayName, "THE FIELDHOUSE · NCAAM")
+        XCTAssertEqual(FieldhouseLeague.ncaaw.displayName, "THE FIELDHOUSE · NCAAW")
+    }
+
+    func testChangingFieldhouseLeagueResetsTrophyToThatLeagueCollection() {
+        var state = FieldhouseSeasonState()
+        XCTAssertEqual(state.league, .ncaaw)
+        XCTAssertEqual(state.championshipTrophyID, FieldhouseTrophyCatalog.ncaaw[0].id)
+
+        state.selectLeague(.ncaam)
+        XCTAssertEqual(state.championshipTrophyID, FieldhouseTrophyCatalog.ncaam[0].id)
+        XCTAssertTrue(FieldhouseTrophyCatalog.ncaam.map(\.id).contains(state.championshipTrophyID))
+        XCTAssertFalse(FieldhouseTrophyCatalog.ncaaw.map(\.id).contains(state.championshipTrophyID))
+    }
+
     func testFieldhouseUsesMondaySundayWindowsAndNamesTheLockWeek() {
         let calendar = Calendar(identifier: .gregorian)
         XCTAssertEqual(calendar.component(.weekday, from: FieldhouseSeasonCalendar.openingTip), 2)
