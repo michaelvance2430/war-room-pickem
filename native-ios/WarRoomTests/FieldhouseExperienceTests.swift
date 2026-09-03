@@ -203,6 +203,10 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.scoringFinalGames, 6)
         XCTAssertEqual(state.scoringLiveGames, 4)
         XCTAssertEqual(state.scoringPoints, 34)
+        XCTAssertEqual(state.scoringGamePoints(at: 0), 20)
+        XCTAssertEqual(state.scoringGamePoints(at: 1), 0)
+        XCTAssertNil(state.scoringGamePoints(at: 6))
+        XCTAssertNil(state.scoringPropResult)
     }
 
     func testCompletedFloorPromotesLockedOnDeckCardAtItsFirstTip() {

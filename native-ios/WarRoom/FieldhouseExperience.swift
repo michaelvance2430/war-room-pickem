@@ -396,6 +396,14 @@ struct FieldhouseSeasonState {
     var scoringIsComplete: Bool {
         !scoringGames.isEmpty && scoringResults.values.filter(\.isFinal).count == scoringGames.count && scoringPropResult != nil
     }
+    func scoringGamePoints(at index: Int) -> Int? {
+        guard scoringGames.indices.contains(index),
+              let result = scoringResults[scoringGames[index].id], result.isFinal,
+              let winner = result.coverWinner(in: scoringGames[index]),
+              let selection = scoringSelections[index], let confidence = scoringConfidences[index] else { return nil }
+        guard selection == winner else { return 0 }
+        return confidence * (scoringBestBetGame == index ? 2 : 1)
+    }
     var canRebalanceRegions: Bool { !seasonHasStarted }
     var postseasonStatus: WarRoomPostseasonStatus {
         WarRoomPostseasonRule.status(rank: rank, playerCount: regionPlayerCount)
@@ -495,6 +503,7 @@ struct FieldhouseNativePreviewView: View {
     @State private var strikePresentation: StrikePresentation?
     @State private var showingEntrance = true
     @State private var showingSetup = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -538,6 +547,10 @@ struct FieldhouseNativePreviewView: View {
         }
         .fullScreenCover(isPresented: $showingSetup) {
             FieldhouseSeasonSetupView(state: $state) { showingSetup = false }
+        }
+        .onAppear { _ = state.advanceToNextWindow(at: Date()) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { _ = state.advanceToNextWindow(at: Date()) }
         }
     }
 }
@@ -733,12 +746,15 @@ private struct FieldhouseHomePage: View {
             }.buttonStyle(.plain)
             Button { desk = .picks } label: {
                 FieldhouseAction(
-                    kicker: "ON THE FLOOR · WEEK \(state.scoringWindow)",
-                    title: "\(state.scoringFinalGames) FINAL · \(state.scoringLiveGames) LIVE",
-                    detail: "\(state.scoringPoints) points and moving. Tap to open the live board and your scorecard.",
-                    icon: "basketball.fill"
+                    kicker: state.scoringIsComplete ? "FINAL HORN · WEEK \(state.scoringWindow)" : "ON THE FLOOR · WEEK \(state.scoringWindow)",
+                    title: state.scoringIsComplete ? "\(state.scoringPoints) POINTS · CERTIFIED" : "\(state.scoringFinalGames) FINAL · \(state.scoringLiveGames) LIVE",
+                    detail: state.scoringIsComplete ? "Your final receipt and prop result are ready." : "\(state.scoringPoints) points and moving. Tap to open the live board and your scorecard.",
+                    icon: state.scoringIsComplete ? "checkmark.seal.fill" : "basketball.fill"
                 )
             }.buttonStyle(.plain)
+            if let certifiedWindow = state.lastCertifiedWindow, let certifiedPoints = state.lastCertifiedPoints {
+                FieldhouseAction(kicker: "LAST CERTIFIED SCORECARD", title: "Week \(certifiedWindow) · \(certifiedPoints) points", detail: "Permanent weekly receipt.", icon: "clipboard.fill")
+            }
             HStack(spacing: 10) {
                 FieldhouseMetric(value: "#\(state.rank)", label: "YOUR SEED LINE")
                 FieldhouseMetric(value: "\(state.regularHellfiresRemaining)/2", label: "HELLFIRES READY")
@@ -1114,10 +1130,10 @@ private struct FieldhousePicksPage: View {
     private var liveBoard: some View {
         VStack(spacing: 10) {
             FieldhouseHero(
-                kicker: "ON THE FLOOR · WEEK \(state.scoringWindow)",
-                title: "THE BOARD IS LIVE",
+                kicker: state.scoringIsComplete ? "FINAL HORN · AUTOMATICALLY CERTIFIED" : "ON THE FLOOR · WEEK \(state.scoringWindow)",
+                title: state.scoringIsComplete ? "WEEK \(state.scoringWindow) IS FINAL" : (state.scoringLiveGames > 0 ? "THE BOARD IS LIVE" : "THE BOARD IS LOCKED"),
                 detail: "\(state.scoringFinalGames) final · \(state.scoringLiveGames) live · your scorecard: \(state.scoringPoints) points",
-                icon: "basketball.fill"
+                icon: state.scoringIsComplete ? "checkmark.seal.fill" : "basketball.fill"
             )
             ForEach(Array(state.scoringGames.enumerated()), id: \.element.id) { index, game in
                 let result = state.scoringResults[game.id]
@@ -1134,18 +1150,44 @@ private struct FieldhousePicksPage: View {
                             Text("COVERING · \(coverWinner.uppercased())")
                                 .font(.system(size: 8, weight: .black)).foregroundStyle(.green)
                         }
+                        if let gamePoints = state.scoringGamePoints(at: index) {
+                            Text("YOUR PICK · \(state.scoringSelections[index] ?? "—") · CONF \(state.scoringConfidences[index] ?? 0)\(state.scoringBestBetGame == index ? " · BEST BET ×2" : "")")
+                                .font(.system(size: 8, weight: .black)).foregroundStyle(gamePoints > 0 ? .green : .red)
+                        }
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 3) {
                         if let result { Text("\(result.awayScore)–\(result.homeScore)").font(.headline.weight(.black)) }
                         Text(isFinal ? "FINAL" : periodLabel(result))
                             .font(.caption2.weight(.black)).foregroundStyle(isFinal ? .green : .orange)
+                        if let gamePoints = state.scoringGamePoints(at: index) {
+                            Text("+\(gamePoints)").font(.headline.weight(.black)).foregroundStyle(gamePoints > 0 ? .green : .white.opacity(0.35))
+                        }
                     }
                 }
                 .padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 13))
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(.white.opacity(0.10)))
             }
+            scoringPropReceipt
         }
+    }
+
+    private var scoringPropReceipt: some View {
+        let result = state.scoringPropResult
+        let correctCall = result.map { state.scoringPropAnswer == ($0 ? "YES" : "NO") }
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text("FLOOR PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.orange)
+                Spacer()
+                Text(result == nil ? "PENDING" : (result == true ? "YES" : "NO"))
+                    .font(.caption.weight(.black)).foregroundStyle(result == nil ? .orange : .green)
+            }
+            Text(state.scoringProp.question).font(.subheadline.weight(.black))
+            Text(result == nil ? "Resolves automatically after all ten games are final." : "YOUR CALL · \(state.scoringPropAnswer) · \(correctCall == true ? "+3" : "+0")")
+                .font(.caption2.weight(.black)).foregroundStyle(correctCall == true ? .green : .white.opacity(0.50))
+        }
+        .padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke((result == nil ? Color.orange : Color.green).opacity(0.35)))
     }
 
     private func resultStatus(_ result: FieldhouseGameResult?) -> String {
