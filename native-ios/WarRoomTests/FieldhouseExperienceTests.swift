@@ -176,6 +176,13 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.scoringGames.count, FieldhouseGameCatalog.weeklyCardSize)
     }
 
+    func testMensAndWomensPreviewNotificationsUseDifferentLeagueIdentities() {
+        XCTAssertNotEqual(
+            FieldhousePreviewIdentity.leagueID(for: .ncaam),
+            FieldhousePreviewIdentity.leagueID(for: .ncaaw)
+        )
+    }
+
     func testOneHundredPlayerPostseasonCutIsSixteenSixtyEightSixteen() {
         let counts = WarRoomPostseasonRule.counts(playerCount: 100)
         XCTAssertEqual(counts.championship, 16)

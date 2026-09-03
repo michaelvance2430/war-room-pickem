@@ -98,8 +98,12 @@ enum FieldhouseNotificationScheduler {
     }
 }
 
-private enum FieldhousePreviewIdentity {
-    static let leagueID = UUID(uuidString: "F13D0000-0000-4000-8000-000000000001")!
+enum FieldhousePreviewIdentity {
+    static func leagueID(for league: FieldhouseLeague) -> UUID {
+        UUID(uuidString: league == .ncaam
+            ? "F13D0000-0000-4000-8000-000000000001"
+            : "F13D0000-0000-4000-8000-000000000004")!
+    }
 }
 
 enum FieldhouseSeasonCalendar {
@@ -898,31 +902,38 @@ struct FieldhouseNativePreviewView: View {
     private var stateScope: FieldhouseStateScope {
         FieldhouseStateScope(
             userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,
-            leagueID: state.league == .ncaam
-                ? FieldhousePreviewIdentity.leagueID
-                : UUID(uuidString: "F13D0000-0000-4000-8000-000000000004")!
+            leagueID: FieldhousePreviewIdentity.leagueID(for: state.league)
         )
     }
 
     init(initialLeague: FieldhouseLeague = .activeBuild) {
         self.initialLeague = initialLeague
-        var initialState = FieldhouseSeasonState()
-        initialState.selectLeague(initialLeague)
+        let initialState = Self.makePreviewState(for: initialLeague)
         let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
         let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
-        if reviewMode {
-            initialState.favoriteTeam = initialLeague == .ncaaw ? "South Carolina Gamecocks" : "Duke Blue Devils"
-            initialState.crystalBallChampion = initialLeague == .ncaaw ? "UConn Huskies" : "UConn Huskies"
-        }
-        if reviewPicks {
-            _ = initialState.publishCard(
-                games: Array(FieldhouseGameCatalog.games(for: initialLeague).prefix(FieldhouseGameCatalog.weeklyCardSize)),
-                prop: .teamScores90
-            )
-        }
         _state = State(initialValue: initialState)
         _desk = State(initialValue: reviewPicks ? .picks : .home)
         _showingEntrance = State(initialValue: !reviewMode)
+    }
+
+    private static func makePreviewState(for league: FieldhouseLeague) -> FieldhouseSeasonState {
+        var initialState = FieldhouseSeasonState()
+        initialState.selectLeague(league)
+        let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
+        let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
+        let reviewTrophies = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-trophies")
+        if reviewMode {
+            initialState.favoriteTeam = league == .ncaaw ? "South Carolina Gamecocks" : "Duke Blue Devils"
+            initialState.crystalBallChampion = "UConn Huskies"
+        }
+        if reviewPicks {
+            _ = initialState.publishCard(
+                games: Array(FieldhouseGameCatalog.games(for: league).prefix(FieldhouseGameCatalog.weeklyCardSize)),
+                prop: .teamScores90
+            )
+        }
+        if reviewTrophies { initialState.seasonHasStarted = false }
+        return initialState
     }
 
     var body: some View {
@@ -973,17 +984,10 @@ struct FieldhouseNativePreviewView: View {
             FieldhouseSeasonSetupView(state: $state) { showingSetup = false }
         }
         .onAppear {
-            var initialState = FieldhouseSeasonState()
-            initialState.selectLeague(initialLeague)
-            if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review") {
-                initialState.favoriteTeam = initialLeague == .ncaaw ? "South Carolina Gamecocks" : "Duke Blue Devils"
-                initialState.crystalBallChampion = "UConn Huskies"
-            }
+            let initialState = Self.makePreviewState(for: initialLeague)
             let initialScope = FieldhouseStateScope(
                 userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,
-                leagueID: initialLeague == .ncaam
-                    ? FieldhousePreviewIdentity.leagueID
-                    : UUID(uuidString: "F13D0000-0000-4000-8000-000000000004")!
+                leagueID: FieldhousePreviewIdentity.leagueID(for: initialLeague)
             )
             state = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
                 ? initialState
@@ -1264,6 +1268,11 @@ private struct FieldhouseHomePage: View {
         .sheet(isPresented: $showingCommissionerCommand) {
             FieldhouseCommissionerCommand(state: $state)
         }
+        .onAppear {
+            if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-trophies") {
+                showingCommissionerCommand = true
+            }
+        }
     }
 
     private func scheduleCardNotifications() {
@@ -1272,7 +1281,7 @@ private struct FieldhouseHomePage: View {
         let leagueName = state.league.displayName
         Task {
             await FieldhouseNotificationScheduler.cardPublished(
-                leagueID: FieldhousePreviewIdentity.leagueID,
+                leagueID: FieldhousePreviewIdentity.leagueID(for: state.league),
                 leagueName: leagueName,
                 week: week,
                 lockAt: lockAt
@@ -1322,6 +1331,7 @@ private struct FieldhouseCommissionerCommand: View {
     @Binding var state: FieldhouseSeasonState
     @Environment(\.dismiss) private var dismiss
     @State private var showingCardBuilder = false
+    @State private var pendingTrophy: FieldhouseTrophyOption?
     private let demoScores = [87, 82, 79, 76, 74, 72, 69, 66, 63, 61, 58, 55, 53, 49, 45, 42, 39, 35, 31, 28, 24, 19, 16, 12, 8]
     var body: some View {
         NavigationStack {
@@ -1366,6 +1376,22 @@ private struct FieldhouseCommissionerCommand: View {
                         }
                     }
                 }
+                .alert(
+                    "USE \(pendingTrophy?.name.uppercased() ?? "THIS TROPHY")?",
+                    isPresented: Binding(
+                        get: { pendingTrophy != nil },
+                        set: { if !$0 { pendingTrophy = nil } }
+                    ),
+                    presenting: pendingTrophy
+                ) { trophy in
+                    Button("CONFIRM TROPHY") {
+                        _ = state.selectChampionshipTrophy(trophy.id)
+                        pendingTrophy = nil
+                    }
+                    Button("CANCEL", role: .cancel) { pendingTrophy = nil }
+                } message: { _ in
+                    Text("You may change the selection before the season's first tip. At first tip, the league hardware locks permanently.")
+                }
         }.preferredColorScheme(.dark)
     }
 
@@ -1375,7 +1401,7 @@ private struct FieldhouseCommissionerCommand: View {
         let leagueName = state.league.displayName
         Task {
             await FieldhouseNotificationScheduler.cardPublished(
-                leagueID: FieldhousePreviewIdentity.leagueID,
+                leagueID: FieldhousePreviewIdentity.leagueID(for: state.league),
                 leagueName: leagueName,
                 week: week,
                 lockAt: lockAt
@@ -1404,7 +1430,7 @@ private struct FieldhouseCommissionerCommand: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(FieldhouseTrophyCatalog.options(for: state.league)) { trophy in
                     let selected = state.championshipTrophyID == trophy.id
-                    Button { _ = state.selectChampionshipTrophy(trophy.id) } label: {
+                    Button { pendingTrophy = trophy } label: {
                         VStack(spacing: 7) {
                             Image(trophy.asset).resizable().scaledToFit().frame(height: 112)
                             Text(trophy.name.uppercased()).font(.system(size: 9, weight: .black)).multilineTextAlignment(.center)
