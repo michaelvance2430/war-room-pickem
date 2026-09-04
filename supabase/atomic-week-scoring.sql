@@ -24,6 +24,7 @@ declare
   v_positive boolean;
   v_streak integer;
   v_details jsonb;
+  v_sport_id text;
   v_service boolean := coalesce(
     current_setting('request.jwt.claims', true)::jsonb ->> 'role',
     ''
@@ -51,6 +52,10 @@ begin
   if not found then
     raise exception 'Published week card not found';
   end if;
+
+  select lower(coalesce(sport_id, '')) into v_sport_id
+  from public.leagues
+  where id = p_league_id;
 
   select count(*) into v_game_count
   from public.card_games
@@ -149,12 +154,19 @@ begin
     group by p.id
   ), base_scores as (
     select p.id, coalesce(p.is_chaos, false) is_chaos,
-      (gp.points + case when p.prop_choice = p_prop_result then v_card.prop_points else 0 end)::integer base_points
+      gp.points::integer game_points,
+      (case when p.prop_choice = p_prop_result then v_card.prop_points else 0 end)::integer prop_points
     from public.picks p
     join game_points gp on gp.pick_id = p.id
   ), totals as (
     select id,
-      (base_points + case when is_chaos then (base_points + 1) / 2 else 0 end)::integer total
+      case
+        when is_chaos and v_sport_id in ('cbb', 'ncaam', 'ncaaw')
+          then (game_points * 2 + prop_points)::integer
+        when is_chaos
+          then (game_points + prop_points + (game_points + prop_points + 1) / 2)::integer
+        else (game_points + prop_points)::integer
+      end total
     from base_scores
   )
   update public.picks p
