@@ -110,6 +110,9 @@ assert.match(weeklyWorker, /away_score:game\.awayScore,home_score:game\.homeScor
 assert.match(atomicScoring, /add column if not exists away_score integer/);
 assert.match(atomicScoring, /x\.away_score,\s*x\.home_score,\s*case when x\.away_score is not null then 'odds_api'/);
 assert.match(client, /TOURNAMENT SCORECARD · LIVE/);
+assert.match(client, /ROUND-BY-ROUND LEDGER/);
+assert.match(client, /postseasonRoundReceipt\(for:/);
+assert.match(client, /case "title": 32/);
 assert.match(client, /state\.postseasonPoints\(for: standing\.userId\)/);
 assert.match(client, /activeStandings\.map\(\\\.totalPoints\)/);
 assert.match(client, /detail: "\\\(activeStandings\.count\) active/);

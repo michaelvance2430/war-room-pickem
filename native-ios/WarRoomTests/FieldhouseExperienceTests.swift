@@ -772,6 +772,39 @@ final class FieldhouseExperienceTests: XCTestCase {
         )
     }
 
+    func testTournamentScorecardKeepsBracketAndFreshPointsSeparatedByRound() {
+        var state = FieldhouseSeasonState()
+        let preview = FieldhouseOfficialField.previewRound(for: .ncaam)
+        let games = preview.games.enumerated().map { index, game in
+            FieldhouseOfficialGame(
+                gameID: game.gameID, roundKey: game.roundKey, roundOrder: game.roundOrder,
+                ordinal: game.ordinal, region: game.region, firstTeamID: game.firstTeamID,
+                secondTeamID: game.secondTeamID, firstSourceGameID: game.firstSourceGameID,
+                secondSourceGameID: game.secondSourceGameID, startsAt: game.startsAt,
+                winnerTeamID: index == 0 ? game.firstTeamID : nil
+            )
+        }
+        let field = FieldhouseOfficialField(
+            tournamentID: preview.tournamentID, sportID: preview.sportID, seasonKey: preview.seasonKey,
+            status: preview.status, firstTipAt: preview.firstTipAt, teams: preview.teams, games: games
+        )
+        state.officialPostseasonField = field
+        guard let game = field.games.first(where: { $0.roundKey == "r64" }),
+              let winner = game.winnerTeamID else {
+            return XCTFail("Preview field must include a final first-round game")
+        }
+        state.postseasonBracketPicks[game.gameID] = winner
+        state.postseasonRoundPicks["r64"] = [game.gameID: winner]
+        state.postseasonRoundSubmitted.insert("r64")
+
+        let receipt = state.postseasonRoundReceipt(for: "r64")
+        XCTAssertEqual(receipt?.bracketHits, 1)
+        XCTAssertEqual(receipt?.bracketPoints, 1)
+        XCTAssertEqual(receipt?.freshHits, 1)
+        XCTAssertEqual(receipt?.freshCardFiled, true)
+        XCTAssertEqual(FieldhousePostseasonScoreEngine.bracketWeight(for: "title"), 32)
+    }
+
     func testExpandedTournamentContainsSeventyFiveBracketDecisions() {
         XCTAssertEqual(FieldhousePostseasonRound.allCases.map(\.gameCount).reduce(0, +), 75)
         XCTAssertEqual(FieldhousePostseasonRound.openingRound.gameCount, 12)

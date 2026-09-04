@@ -1116,6 +1116,18 @@ enum FieldhouseLiveStandingsEngine {
 }
 
 enum FieldhousePostseasonScoreEngine {
+    static func bracketWeight(for roundKey: String) -> Int {
+        switch roundKey {
+        case "opening", "r64": 1
+        case "r32": 2
+        case "s16": 4
+        case "e8": 8
+        case "ff": 16
+        case "title": 32
+        default: 0
+        }
+    }
+
     static func adjustedPoints(
         rawPoints: Int,
         correctPicks: Int,
@@ -1127,6 +1139,16 @@ enum FieldhousePostseasonScoreEngine {
         let multiplier = clearedThreshold ? 1.5 : 0.5
         return Int((Double(rawPoints) * multiplier).rounded())
     }
+}
+
+struct FieldhousePostseasonRoundReceipt: Equatable {
+    let roundKey: String
+    let gameCount: Int
+    let finalGames: Int
+    let bracketHits: Int
+    let bracketPoints: Int
+    let freshHits: Int
+    let freshCardFiled: Bool
 }
 
 enum FieldhouseGameCatalog {
@@ -1268,6 +1290,28 @@ struct FieldhouseSeasonState: Codable, Equatable {
     }
     func postseasonPoints(for userID: UUID) -> Int {
         postseasonLeaderboardTotals[userID] ?? 0
+    }
+    func postseasonRoundReceipt(for roundKey: String) -> FieldhousePostseasonRoundReceipt? {
+        guard let field = officialPostseasonField else { return nil }
+        let games = field.games.filter { $0.roundKey == roundKey }
+        guard !games.isEmpty else { return nil }
+        let freshPicks = postseasonRoundPicks[roundKey] ?? [:]
+        let finalGames = games.filter { $0.winnerTeamID != nil }
+        let bracketHits = finalGames.filter { game in
+            postseasonBracketPicks[game.gameID] == game.winnerTeamID
+        }.count
+        let freshHits = finalGames.filter { game in
+            freshPicks[game.gameID] == game.winnerTeamID
+        }.count
+        return FieldhousePostseasonRoundReceipt(
+            roundKey: roundKey,
+            gameCount: games.count,
+            finalGames: finalGames.count,
+            bracketHits: bracketHits,
+            bracketPoints: bracketHits * FieldhousePostseasonScoreEngine.bracketWeight(for: roundKey),
+            freshHits: freshHits,
+            freshCardFiled: postseasonRoundSubmitted.contains(roundKey)
+        )
     }
     var activePostseasonRound: String? {
         officialPostseasonField.flatMap { FieldhouseBracketEngine.liveRoundKey(field: $0) }
@@ -2506,6 +2550,18 @@ private struct FieldhouseTournamentScorecardView: View {
                         .padding(16)
                         .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 18))
                         .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.38)))
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("ROUND-BY-ROUND LEDGER")
+                                .font(.caption.weight(.black)).tracking(1.5).foregroundStyle(accent)
+                            ForEach(FieldhouseBracketEngine.orderedRoundKeys, id: \.self) { roundKey in
+                                if let receipt = state.postseasonRoundReceipt(for: roundKey) {
+                                    roundReceipt(receipt)
+                                }
+                            }
+                        }
+                        .padding(16)
+                        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.38)))
                         Text("Scores refresh as official tournament games become final. No separate homepage or standings math is permitted.")
                             .font(.caption.weight(.bold)).foregroundStyle(.white.opacity(0.54))
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -2531,6 +2587,45 @@ private struct FieldhouseTournamentScorecardView: View {
             Spacer()
             Text("+\(value)").font(prominent ? .title2.weight(.black) : .headline.weight(.black)).foregroundStyle(color)
         }
+    }
+
+    private func roundReceipt(_ receipt: FieldhousePostseasonRoundReceipt) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text(FieldhouseBracketEngine.roundTitle(receipt.roundKey))
+                    .font(.subheadline.weight(.black)).foregroundStyle(.white)
+                Spacer()
+                Text("\(receipt.finalGames)/\(receipt.gameCount) FINAL")
+                    .font(.system(size: 8, weight: .black)).tracking(1)
+                    .foregroundStyle(receipt.finalGames == receipt.gameCount ? accent : .white.opacity(0.48))
+            }
+            HStack(spacing: 8) {
+                roundMetric("BRACKET", value: receipt.bracketPoints, detail: "\(receipt.bracketHits) hits")
+                roundMetric(
+                    "FRESH CARD",
+                    value: receipt.freshHits,
+                    detail: receipt.freshCardFiled ? "filed" : "not filed",
+                    muted: !receipt.freshCardFiled
+                )
+            }
+        }
+        .padding(12)
+        .background(accent.opacity(0.07), in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(accent.opacity(0.18)))
+    }
+
+    private func roundMetric(_ label: String, value: Int, detail: String, muted: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.system(size: 7, weight: .black)).tracking(0.9)
+                .foregroundStyle(.white.opacity(0.42))
+            Text(muted ? "—" : "+\(value)").font(.headline.weight(.black))
+                .foregroundStyle(muted ? .white.opacity(0.3) : accent)
+            Text(detail.uppercased()).font(.system(size: 7, weight: .bold)).tracking(0.6)
+                .foregroundStyle(.white.opacity(0.42))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(9)
+        .background(.black.opacity(0.56), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
