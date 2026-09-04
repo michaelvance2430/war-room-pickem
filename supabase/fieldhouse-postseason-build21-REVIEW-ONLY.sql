@@ -85,6 +85,21 @@ create table if not exists public.fieldhouse_round_entries (
   unique (tournament_id, league_id, user_id, round_key)
 );
 
+-- Public scoreboard facts live separately from private pick receipts. This is
+-- the single total consumed by the home scorecard, standings, and awards.
+create table if not exists public.fieldhouse_postseason_totals (
+  tournament_id uuid not null references public.fieldhouse_tournaments(id) on delete cascade,
+  league_id uuid not null references public.leagues(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete restrict,
+  bracket_correct_picks integer not null default 0 check (bracket_correct_picks between 0 and 75),
+  bracket_raw_points integer not null default 0 check (bracket_raw_points >= 0),
+  bracket_adjusted_points integer not null default 0,
+  round_points integer not null default 0 check (round_points >= 0),
+  total_points integer generated always as (bracket_adjusted_points + round_points) stored,
+  updated_at timestamptz not null default now(),
+  primary key (tournament_id, league_id, user_id)
+);
+
 create table if not exists public.fieldhouse_postseason_awards (
   id uuid primary key default gen_random_uuid(),
   tournament_id uuid not null references public.fieldhouse_tournaments(id) on delete restrict,
@@ -103,6 +118,8 @@ create index if not exists fieldhouse_brackets_league_idx
   on public.fieldhouse_bracket_entries (league_id, tournament_id);
 create index if not exists fieldhouse_round_entries_league_idx
   on public.fieldhouse_round_entries (league_id, tournament_id, round_key);
+create index if not exists fieldhouse_postseason_totals_leaderboard_idx
+  on public.fieldhouse_postseason_totals (tournament_id, league_id, total_points desc, user_id);
 create unique index if not exists fieldhouse_one_league_champion_idx
   on public.fieldhouse_postseason_awards(tournament_id,league_id,award_key)
   where award_key='league_champion';
@@ -115,6 +132,7 @@ alter table public.fieldhouse_tournament_teams enable row level security;
 alter table public.fieldhouse_tournament_games enable row level security;
 alter table public.fieldhouse_bracket_entries enable row level security;
 alter table public.fieldhouse_round_entries enable row level security;
+alter table public.fieldhouse_postseason_totals enable row level security;
 alter table public.fieldhouse_postseason_awards enable row level security;
 
 -- Published fields are universal public game facts. Draft fields remain service-only.
@@ -141,6 +159,13 @@ create policy "Players read own Fieldhouse bracket"
 create policy "Players read own Fieldhouse round picks"
   on public.fieldhouse_round_entries for select to authenticated
   using (user_id = (select auth.uid()));
+create policy "League members read Fieldhouse postseason totals"
+  on public.fieldhouse_postseason_totals for select to authenticated
+  using (exists (
+    select 1 from public.memberships m
+    where m.league_id = fieldhouse_postseason_totals.league_id
+      and m.user_id = (select auth.uid())
+  ));
 create policy "League members read Fieldhouse awards"
   on public.fieldhouse_postseason_awards for select to authenticated
   using (exists (
@@ -154,12 +179,14 @@ grant select on public.fieldhouse_tournaments,
   public.fieldhouse_tournament_games,
   public.fieldhouse_bracket_entries,
   public.fieldhouse_round_entries,
+  public.fieldhouse_postseason_totals,
   public.fieldhouse_postseason_awards to authenticated;
 revoke insert, update, delete on public.fieldhouse_tournaments,
   public.fieldhouse_tournament_teams,
   public.fieldhouse_tournament_games,
   public.fieldhouse_bracket_entries,
   public.fieldhouse_round_entries,
+  public.fieldhouse_postseason_totals,
   public.fieldhouse_postseason_awards from anon, authenticated;
 
 create or replace function public.fieldhouse_round_weight(p_round text)
@@ -503,6 +530,40 @@ begin
     where e2.tournament_id=p_tournament_id group by e2.id
   ) s where e.id=s.id;
   get diagnostics v_rounds=row_count;
+
+  with players as (
+    select tournament_id,league_id,user_id from public.fieldhouse_bracket_entries
+    where tournament_id=p_tournament_id and submitted_at is not null
+    union
+    select tournament_id,league_id,user_id from public.fieldhouse_round_entries
+    where tournament_id=p_tournament_id and submitted_at is not null
+  ), bracket as (
+    select tournament_id,league_id,user_id,correct_picks,raw_points,adjusted_points
+    from public.fieldhouse_bracket_entries
+    where tournament_id=p_tournament_id and submitted_at is not null
+  ), rounds as (
+    select tournament_id,league_id,user_id,coalesce(sum(points),0)::integer points
+    from public.fieldhouse_round_entries
+    where tournament_id=p_tournament_id and submitted_at is not null
+    group by tournament_id,league_id,user_id
+  )
+  insert into public.fieldhouse_postseason_totals(
+    tournament_id,league_id,user_id,bracket_correct_picks,bracket_raw_points,
+    bracket_adjusted_points,round_points,updated_at
+  )
+  select p.tournament_id,p.league_id,p.user_id,
+    coalesce(b.correct_picks,0),coalesce(b.raw_points,0),coalesce(b.adjusted_points,0),
+    coalesce(r.points,0),now()
+  from players p
+  left join bracket b using(tournament_id,league_id,user_id)
+  left join rounds r using(tournament_id,league_id,user_id)
+  on conflict(tournament_id,league_id,user_id) do update set
+    bracket_correct_picks=excluded.bracket_correct_picks,
+    bracket_raw_points=excluded.bracket_raw_points,
+    bracket_adjusted_points=excluded.bracket_adjusted_points,
+    round_points=excluded.round_points,
+    updated_at=now();
+
   return jsonb_build_object('ok',true,'bracketsScored',v_brackets,'roundEntriesScored',v_rounds,'final',v_final);
 end;
 $$;
@@ -558,15 +619,12 @@ begin
   perform public.score_fieldhouse_postseason(p_tournament_id);
 
   with totals as (
-    select b.league_id,b.user_id,m.fieldhouse_region,
-      b.adjusted_points+coalesce(sum(r.points),0)::integer total_points,
+    select p.league_id,p.user_id,m.fieldhouse_region,p.total_points,
       m.total_points regular_points,l.championship_trophy_id
-    from public.fieldhouse_bracket_entries b
-    join public.memberships m on m.league_id=b.league_id and m.user_id=b.user_id
-    join public.leagues l on l.id=b.league_id
-    left join public.fieldhouse_round_entries r on r.tournament_id=b.tournament_id and r.league_id=b.league_id and r.user_id=b.user_id
-    where b.tournament_id=p_tournament_id and b.submitted_at is not null
-    group by b.league_id,b.user_id,m.fieldhouse_region,m.total_points,l.championship_trophy_id
+    from public.fieldhouse_postseason_totals p
+    join public.memberships m on m.league_id=p.league_id and m.user_id=p.user_id
+    join public.leagues l on l.id=p.league_id
+    where p.tournament_id=p_tournament_id
   ), regional as (
     select *,row_number() over(partition by league_id,fieldhouse_region order by total_points desc,regular_points desc,user_id) place
     from totals where fieldhouse_region is not null
@@ -578,13 +636,11 @@ begin
     user_id=excluded.user_id,trophy_id=excluded.trophy_id,total_points=excluded.total_points,awarded_at=now();
 
   with totals as (
-    select b.league_id,b.user_id,b.adjusted_points+coalesce(sum(r.points),0)::integer total_points,
-      m.total_points regular_points,l.championship_trophy_id
-    from public.fieldhouse_bracket_entries b join public.memberships m on m.league_id=b.league_id and m.user_id=b.user_id
-    join public.leagues l on l.id=b.league_id
-    left join public.fieldhouse_round_entries r on r.tournament_id=b.tournament_id and r.league_id=b.league_id and r.user_id=b.user_id
-    where b.tournament_id=p_tournament_id and b.submitted_at is not null
-    group by b.league_id,b.user_id,b.adjusted_points,m.total_points,l.championship_trophy_id
+    select p.league_id,p.user_id,p.total_points,m.total_points regular_points,l.championship_trophy_id
+    from public.fieldhouse_postseason_totals p
+    join public.memberships m on m.league_id=p.league_id and m.user_id=p.user_id
+    join public.leagues l on l.id=p.league_id
+    where p.tournament_id=p_tournament_id
   ), ranked as (
     select *,row_number() over(partition by league_id order by total_points desc,regular_points desc,user_id) place from totals
   )

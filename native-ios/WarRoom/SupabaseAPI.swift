@@ -506,6 +506,32 @@ struct FieldhouseBracketEntryRecord: Decodable, Sendable {
     }
 }
 
+struct FieldhousePostseasonTotalRecord: Codable, Equatable, Identifiable, Sendable {
+    let tournamentId: UUID
+    let leagueId: UUID
+    let userId: UUID
+    let bracketCorrectPicks: Int
+    let bracketRawPoints: Int
+    let bracketAdjustedPoints: Int
+    let roundPoints: Int
+    let totalPoints: Int
+    let updatedAt: String
+
+    var id: UUID { userId }
+
+    enum CodingKeys: String, CodingKey {
+        case tournamentId = "tournament_id"
+        case leagueId = "league_id"
+        case userId = "user_id"
+        case bracketCorrectPicks = "bracket_correct_picks"
+        case bracketRawPoints = "bracket_raw_points"
+        case bracketAdjustedPoints = "bracket_adjusted_points"
+        case roundPoints = "round_points"
+        case totalPoints = "total_points"
+        case updatedAt = "updated_at"
+    }
+}
+
 struct FieldhouseBracketSaveResponse: Decodable, Sendable {
     let ok: Bool
     let locked: Bool
@@ -1723,6 +1749,17 @@ enum SupabaseAPI {
             URLQueryItem(name: "limit", value: "1")
         ]
         return try await send(authorizedRequest(url: components.url!, token: token), as: [FieldhouseBracketEntryRecord].self).first
+    }
+
+    static func fieldhousePostseasonTotals(token: String, tournamentId: UUID, leagueId: UUID) async throws -> [FieldhousePostseasonTotalRecord] {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/fieldhouse_postseason_totals"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "tournament_id,league_id,user_id,bracket_correct_picks,bracket_raw_points,bracket_adjusted_points,round_points,total_points,updated_at"),
+            URLQueryItem(name: "tournament_id", value: "eq.\(tournamentId.uuidString.lowercased())"),
+            URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
+            URLQueryItem(name: "order", value: "total_points.desc,bracket_adjusted_points.desc,user_id.asc")
+        ]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [FieldhousePostseasonTotalRecord].self)
     }
 
     static func saveFieldhouseBracket(token: String, leagueId: UUID, seasonKey: Int, picks: [String: String], hellfire: Bool) async throws -> FieldhouseBracketSaveResponse {

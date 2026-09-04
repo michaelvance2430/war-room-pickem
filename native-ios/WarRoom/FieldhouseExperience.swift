@@ -216,6 +216,7 @@ struct FieldhouseAuthenticatedSnapshot {
     var officialField: FieldhouseOfficialField? = nil
     var bracketEntry: FieldhouseBracketEntryRecord? = nil
     var roundEntries: [FieldhouseRoundEntryRecord] = []
+    var postseasonTotals: [FieldhousePostseasonTotalRecord] = []
 }
 
 private struct FieldhouseRepositoryError: LocalizedError {
@@ -287,22 +288,32 @@ enum FieldhouseAuthenticatedRepository {
         )
         let loadedBracket: FieldhouseBracketEntryRecord?
         let loadedRounds: [FieldhouseRoundEntryRecord]
+        let loadedPostseasonTotals: [FieldhousePostseasonTotalRecord]
         if let loadedField {
-            loadedBracket = try await SupabaseAPI.fieldhouseBracketEntry(
+            async let bracket = SupabaseAPI.fieldhouseBracketEntry(
                 token: token,
                 tournamentId: loadedField.tournamentID,
                 leagueId: membership.leagueId,
                 userId: userID
             )
-            loadedRounds = try await SupabaseAPI.fieldhouseRoundEntries(
+            async let rounds = SupabaseAPI.fieldhouseRoundEntries(
                 token: token,
                 tournamentId: loadedField.tournamentID,
                 leagueId: membership.leagueId,
                 userId: userID
             )
+            async let totals = SupabaseAPI.fieldhousePostseasonTotals(
+                token: token,
+                tournamentId: loadedField.tournamentID,
+                leagueId: membership.leagueId
+            )
+            loadedBracket = try await bracket
+            loadedRounds = try await rounds
+            loadedPostseasonTotals = try await totals
         } else {
             loadedBracket = nil
             loadedRounds = []
+            loadedPostseasonTotals = []
         }
         return try await FieldhouseAuthenticatedSnapshot(
             membership: membership,
@@ -316,7 +327,8 @@ enum FieldhouseAuthenticatedRepository {
             scoringPick: scoringPick,
             officialField: loadedField,
             bracketEntry: loadedBracket,
-            roundEntries: loadedRounds
+            roundEntries: loadedRounds,
+            postseasonTotals: loadedPostseasonTotals
         )
     }
 
@@ -1155,6 +1167,13 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var bracketSubmitted = false
     var postseasonRoundPicks: [String: [String: String]] = [:]
     var postseasonRoundSubmitted: Set<String> = []
+    var postseasonBracketCorrectPicks = 0
+    var postseasonBracketRawPoints = 0
+    var postseasonBracketAdjustedPoints = 0
+    var postseasonFreshRoundPoints = 0
+    var postseasonTotalPoints = 0
+    var postseasonLeaderboardTotals: [UUID: Int] = [:]
+    var postseasonScoreUpdatedAt: String?
     var selectedRegion: FieldhouseRegion = .midwest
     var favoriteTeam: String?
     var crystalBallChampion: String?
@@ -1166,6 +1185,12 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var hellfireDeployedOnCurrentCard = false
 
     var regularHellfiresRemaining: Int { max(0, 2 - regularHellfiresUsed) }
+    var postseasonScorecardIsActive: Bool {
+        officialPostseasonField != nil && (bracketSubmitted || !postseasonRoundSubmitted.isEmpty)
+    }
+    func postseasonPoints(for userID: UUID) -> Int {
+        postseasonLeaderboardTotals[userID] ?? 0
+    }
     var activePostseasonRound: String? {
         officialPostseasonField.flatMap { FieldhouseBracketEngine.liveRoundKey(field: $0) }
     }
@@ -1400,6 +1425,22 @@ enum FieldhouseStateHydrator {
         state.bracketHellfireUsed = snapshot.bracketEntry?.hellfireUsed == true
         state.postseasonRoundPicks = Dictionary(uniqueKeysWithValues: snapshot.roundEntries.map { ($0.roundKey, $0.picks) })
         state.postseasonRoundSubmitted = Set(snapshot.roundEntries.compactMap { $0.submittedAt == nil ? nil : $0.roundKey })
+        state.postseasonLeaderboardTotals = Dictionary(uniqueKeysWithValues: snapshot.postseasonTotals.map { ($0.userId, $0.totalPoints) })
+        if let ownTotal = snapshot.postseasonTotals.first(where: { $0.userId == userID }) {
+            state.postseasonBracketCorrectPicks = ownTotal.bracketCorrectPicks
+            state.postseasonBracketRawPoints = ownTotal.bracketRawPoints
+            state.postseasonBracketAdjustedPoints = ownTotal.bracketAdjustedPoints
+            state.postseasonFreshRoundPoints = ownTotal.roundPoints
+            state.postseasonTotalPoints = ownTotal.totalPoints
+            state.postseasonScoreUpdatedAt = ownTotal.updatedAt
+        } else {
+            state.postseasonBracketCorrectPicks = 0
+            state.postseasonBracketRawPoints = 0
+            state.postseasonBracketAdjustedPoints = 0
+            state.postseasonFreshRoundPoints = snapshot.roundEntries.reduce(0) { $0 + $1.points }
+            state.postseasonTotalPoints = state.postseasonFreshRoundPoints
+            state.postseasonScoreUpdatedAt = nil
+        }
 
         if let trophyID = snapshot.membership.leagues.championshipTrophyId,
            FieldhouseTrophyCatalog.options(for: league).contains(where: { $0.id == trophyID }) {
@@ -1570,7 +1611,8 @@ struct FieldhouseNativePreviewView: View {
         self.liveContext = nil
         let initialState = Self.makePreviewState(for: initialLeague)
         let reviewRound = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-round")
-        let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review") || reviewRound
+        let reviewScorecard = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-scorecard")
+        let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review") || reviewRound || reviewScorecard
         let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
         let reviewLocker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-locker")
         let reviewProfile = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-profile")
@@ -1578,6 +1620,7 @@ struct FieldhouseNativePreviewView: View {
         let reviewHellfire = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-hellfire")
         var displayState = initialState
         if reviewRound { displayState.officialPostseasonField = .previewRound(for: initialLeague) }
+        if reviewScorecard { Self.seedPostseasonScorecardPreview(&displayState, league: initialLeague) }
         _state = State(initialValue: displayState)
         _lastVerifiedState = State(initialValue: displayState)
         _standings = State(initialValue: [])
@@ -1603,6 +1646,7 @@ struct FieldhouseNativePreviewView: View {
         var initialState = FieldhouseSeasonState()
         initialState.selectLeague(league)
         let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
+            || ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-scorecard")
         let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
         let reviewTrophies = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-trophies")
         if reviewMode {
@@ -1616,7 +1660,21 @@ struct FieldhouseNativePreviewView: View {
             )
         }
         if reviewTrophies { initialState.seasonHasStarted = false }
+        if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-scorecard") {
+            seedPostseasonScorecardPreview(&initialState, league: league)
+        }
         return initialState
+    }
+
+    private static func seedPostseasonScorecardPreview(_ state: inout FieldhouseSeasonState, league: FieldhouseLeague) {
+        state.officialPostseasonField = .previewRound(for: league)
+        state.bracketSubmitted = true
+        state.bracketLocked = true
+        state.postseasonBracketCorrectPicks = 27
+        state.postseasonBracketRawPoints = 39
+        state.postseasonBracketAdjustedPoints = 39
+        state.postseasonFreshRoundPoints = 8
+        state.postseasonTotalPoints = 47
     }
 
     var body: some View {
@@ -1700,7 +1758,8 @@ struct FieldhouseNativePreviewView: View {
                 userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,
                 leagueID: FieldhousePreviewIdentity.leagueID(for: initialLeague)
             )
-            state = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
+            state = (ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
+                || ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-scorecard"))
                 ? initialState
                 : (stateStore.load(scope: initialScope) ?? initialState)
             refreshLifecycle(at: Date())
@@ -1757,8 +1816,8 @@ struct FieldhouseNativePreviewView: View {
                 userID: liveContext.userID,
                 preferredLeagueID: liveContext.membership.leagueId
             )
+            let hydrated = FieldhouseStateHydrator.hydrate(snapshot: verified, userID: liveContext.userID, cached: state)
             if let certified = verified.latestScorecard, certified.weekNumber >= state.scoringWindow {
-                let hydrated = FieldhouseStateHydrator.hydrate(snapshot: verified, userID: liveContext.userID, cached: state)
                 state.scoringWindow = hydrated.scoringWindow
                 state.scoringGames = hydrated.scoringGames
                 state.scoringResults = hydrated.scoringResults
@@ -1770,8 +1829,22 @@ struct FieldhouseNativePreviewView: View {
                 state.scoringUsedHellfire = hydrated.scoringUsedHellfire
                 state.lastCertifiedWindow = hydrated.lastCertifiedWindow
                 state.lastCertifiedPoints = hydrated.lastCertifiedPoints
-                standings = verified.standings
             }
+            state.officialPostseasonField = hydrated.officialPostseasonField
+            state.postseasonBracketPicks = hydrated.postseasonBracketPicks
+            state.bracketSubmitted = hydrated.bracketSubmitted
+            state.bracketLocked = hydrated.bracketLocked
+            state.bracketHellfireUsed = hydrated.bracketHellfireUsed
+            state.postseasonRoundPicks = hydrated.postseasonRoundPicks
+            state.postseasonRoundSubmitted = hydrated.postseasonRoundSubmitted
+            state.postseasonBracketCorrectPicks = hydrated.postseasonBracketCorrectPicks
+            state.postseasonBracketRawPoints = hydrated.postseasonBracketRawPoints
+            state.postseasonBracketAdjustedPoints = hydrated.postseasonBracketAdjustedPoints
+            state.postseasonFreshRoundPoints = hydrated.postseasonFreshRoundPoints
+            state.postseasonTotalPoints = hydrated.postseasonTotalPoints
+            state.postseasonLeaderboardTotals = hydrated.postseasonLeaderboardTotals
+            state.postseasonScoreUpdatedAt = hydrated.postseasonScoreUpdatedAt
+            standings = verified.standings
             refreshLifecycle(at: Date())
         } catch {
             // Keep the last trustworthy board and retry on the next tick.
@@ -2056,6 +2129,7 @@ private struct FieldhouseHomePage: View {
     @State private var showingCardBuilder = false
     @State private var showingCommissionerCommand = false
     @State private var showingAnnouncements = false
+    @State private var showingTournamentScorecard = false
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHomeMasthead(state: state)
@@ -2077,14 +2151,25 @@ private struct FieldhouseHomePage: View {
                 }.buttonStyle(.plain)
             }
             playerCommand
-            Button { desk = .picks } label: {
-                FieldhouseAction(
-                    kicker: state.scoringIsComplete ? "FINAL HORN · WEEK \(state.scoringWindow)" : "ON THE FLOOR · WEEK \(state.scoringWindow)",
-                    title: state.scoringIsComplete ? "\(state.scoringPoints) POINTS · CERTIFIED" : "\(state.scoringFinalGames) FINAL · \(state.scoringLiveGames) LIVE",
-                    detail: state.scoringIsComplete ? "Your final receipt and prop result are ready." : "\(state.scoringPoints) points and moving. Tap to open the live board and your scorecard.",
-                    icon: state.scoringIsComplete ? "checkmark.seal.fill" : "basketball.fill"
-                )
-            }.buttonStyle(.plain)
+            if state.postseasonScorecardIsActive {
+                Button { showingTournamentScorecard = true } label: {
+                    FieldhouseAction(
+                        kicker: "TOURNAMENT SCORECARD · LIVE",
+                        title: "\(state.postseasonTotalPoints) POSTSEASON POINTS",
+                        detail: "Bracket \(state.postseasonBracketAdjustedPoints) · round picks \(state.postseasonFreshRoundPoints). Tap for the permanent receipt.",
+                        icon: "chart.line.uptrend.xyaxis"
+                    )
+                }.buttonStyle(.plain)
+            } else {
+                Button { desk = .picks } label: {
+                    FieldhouseAction(
+                        kicker: state.scoringIsComplete ? "FINAL HORN · WEEK \(state.scoringWindow)" : "ON THE FLOOR · WEEK \(state.scoringWindow)",
+                        title: state.scoringIsComplete ? "\(state.scoringPoints) POINTS · CERTIFIED" : "\(state.scoringFinalGames) FINAL · \(state.scoringLiveGames) LIVE",
+                        detail: state.scoringIsComplete ? "Your final receipt and prop result are ready." : "\(state.scoringPoints) points and moving. Tap to open the live board and your scorecard.",
+                        icon: state.scoringIsComplete ? "checkmark.seal.fill" : "basketball.fill"
+                    )
+                }.buttonStyle(.plain)
+            }
             if let certifiedWindow = state.lastCertifiedWindow, let certifiedPoints = state.lastCertifiedPoints {
                 FieldhouseAction(kicker: "LAST CERTIFIED SCORECARD", title: "Week \(certifiedWindow) · \(certifiedPoints) points", detail: "Permanent weekly receipt.", icon: "clipboard.fill")
             }
@@ -2117,6 +2202,9 @@ private struct FieldhouseHomePage: View {
         .sheet(isPresented: $showingAnnouncements) {
             NavigationStack { AnnouncementsView() }
                 .preferredColorScheme(.dark)
+        }
+        .fullScreenCover(isPresented: $showingTournamentScorecard) {
+            FieldhouseTournamentScorecardView(state: state)
         }
         .onAppear {
             if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-trophies") {
@@ -2166,6 +2254,73 @@ private struct FieldhouseHomePage: View {
         .opacity(!state.cardIsPublished && !state.canBuildCard ? 0.72 : 1)
     }
 
+}
+
+private struct FieldhouseTournamentScorecardView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
+    let state: FieldhouseSeasonState
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                FieldhouseBackdrop(leagueOverride: state.league).ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 14) {
+                        FieldhouseHero(
+                            kicker: "PERMANENT TOURNAMENT RECEIPT",
+                            title: "\(state.postseasonTotalPoints) POINTS",
+                            detail: "One authoritative total for your homepage, standings, regional race, and championship result.",
+                            icon: "checklist.checked"
+                        )
+                        HStack(spacing: 9) {
+                            FieldhouseMetric(value: "\(state.postseasonBracketAdjustedPoints)", label: "BRACKET")
+                            FieldhouseMetric(value: "\(state.postseasonFreshRoundPoints)", label: "ROUND PICKS")
+                            FieldhouseMetric(value: "\(state.postseasonBracketCorrectPicks)", label: "BRACKET HITS")
+                        }
+                        VStack(alignment: .leading, spacing: 11) {
+                            scoreRow("Initial bracket", value: state.postseasonBracketRawPoints)
+                            if state.bracketHellfireUsed {
+                                scoreRow("Hellfire-adjusted bracket", value: state.postseasonBracketAdjustedPoints, color: .orange)
+                                Text(state.officialPostseasonField?.status == "final"
+                                     ? "Hellfire is final: 1.5× at 60% correct or better; 0.5× below 60%."
+                                     : "Hellfire remains provisional until the championship ends, when the 60% threshold can be calculated.")
+                                    .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+                            }
+                            scoreRow("Fresh round picks", value: state.postseasonFreshRoundPoints)
+                            Divider().overlay(accent.opacity(0.4))
+                            scoreRow("Tournament total", value: state.postseasonTotalPoints, color: accent, prominent: true)
+                        }
+                        .padding(16)
+                        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.38)))
+                        Text("Scores refresh as official tournament games become final. No separate homepage or standings math is permitted.")
+                            .font(.caption.weight(.bold)).foregroundStyle(.white.opacity(0.54))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(16).padding(.bottom, 24)
+                }
+            }
+            .navigationTitle("Tournament Scorecard")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: { Label("BACK", systemImage: "chevron.left") }
+                        .font(.caption.weight(.black)).foregroundStyle(accent)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func scoreRow(_ title: String, value: Int, color: Color = .white, prominent: Bool = false) -> some View {
+        HStack {
+            Text(title).font(prominent ? .headline.weight(.black) : .subheadline.weight(.bold))
+            Spacer()
+            Text("+\(value)").font(prominent ? .title2.weight(.black) : .headline.weight(.black)).foregroundStyle(color)
+        }
+    }
 }
 
 private struct FieldhouseCommissionerCommand: View {
@@ -2982,9 +3137,17 @@ private struct FieldhouseStandingsPage: View {
         return name.isEmpty ? "Riley V." : name
     }
     private var players: [String] { [playerName, "Full Court Mess", "Bracket Buster", "The Sixth Man", "Baseline Bandit", "March Sadness", "Bank Shot", "Coach's Favorite", "Paint Patrol", "Buzzer Beater", "Zone Defense", "Heat Check", "One Shining Mistake", "Fast Break", "The Transfer Portal", "Double Bonus", "Shot Clock", "Backboard Damage", "Cinderella Story", "Technical Foul", "Bubble Trouble", "Air Ball", "Traveling", "Bench Mob", "Wooden Spoon"] }
+    private var usesPostseasonScores: Bool { state.postseasonScorecardIsActive }
+    private func displayedPoints(for standing: Standing) -> Int {
+        usesPostseasonScores ? state.postseasonPoints(for: standing.userId) : standing.totalPoints
+    }
     private var visibleStandings: [Standing] {
         let sorted = authenticatedStandings.sorted { lhs, rhs in
-            lhs.totalPoints == rhs.totalPoints ? lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending : lhs.totalPoints > rhs.totalPoints
+            let lhsPoints = displayedPoints(for: lhs)
+            let rhsPoints = displayedPoints(for: rhs)
+            return lhsPoints == rhsPoints
+                ? lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                : lhsPoints > rhsPoints
         }
         guard !showingOverall else { return sorted }
         return sorted.filter { ($0.fieldhouseRegion ?? "").caseInsensitiveCompare(state.selectedRegion.rawValue) == .orderedSame }
@@ -3015,8 +3178,15 @@ private struct FieldhouseStandingsPage: View {
             } else {
                 ScrollView {
                     VStack(spacing: 13) {
-            FieldhouseHero(kicker: "FIELDHOUSE STANDINGS", title: "REGIONAL SEED LINES", detail: "Live points, regional position, and both postseason cuts in the same format used across War Room.", icon: "list.number")
-            regionalCutSummary
+            FieldhouseHero(
+                kicker: usesPostseasonScores ? "FIELDHOUSE POSTSEASON" : "FIELDHOUSE STANDINGS",
+                title: usesPostseasonScores ? "TOURNAMENT SCOREBOARD" : "REGIONAL SEED LINES",
+                detail: usesPostseasonScores
+                    ? "Bracket and fresh-round points from the same live total shown on every player’s homepage."
+                    : "Live points, regional position, and both postseason cuts in the same format used across War Room.",
+                icon: usesPostseasonScores ? "chart.line.uptrend.xyaxis" : "list.number"
+            )
+            if usesPostseasonScores { postseasonRaceSummary } else { regionalCutSummary }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     standingsChip("OVERALL", selected: showingOverall) { showingOverall = true }
@@ -3030,7 +3200,14 @@ private struct FieldhouseStandingsPage: View {
             VStack(spacing: 8) {
                 if authenticatedStandings.isEmpty {
                     ForEach(Array(players.enumerated()), id: \.offset) { index, player in
-                        standingRow(rank: index + 1, player: player, points: index == 0 ? 87 + state.scoringPoints : 87 - (index * 2), isCurrentUser: index == 0)
+                        standingRow(
+                            rank: index + 1,
+                            player: player,
+                            points: usesPostseasonScores
+                                ? (index == 0 ? state.postseasonTotalPoints : max(0, state.postseasonTotalPoints - index))
+                                : (index == 0 ? 87 + state.scoringPoints : 87 - (index * 2)),
+                            isCurrentUser: index == 0
+                        )
                         cutLines(after: index)
                     }
                 } else {
@@ -3041,7 +3218,7 @@ private struct FieldhouseStandingsPage: View {
                 }
             }
             Text("EAST + WEST + SOUTH + MIDWEST  →  CENTER COURT").font(.caption.weight(.black)).tracking(1).foregroundStyle(accent).padding(14).frame(maxWidth: .infinity).background(accent.opacity(0.1), in: Capsule())
-            VStack(alignment: .leading, spacing: 12) {
+            if !usesPostseasonScores { VStack(alignment: .leading, spacing: 12) {
                 Text("CHAMPIONSHIP WEEK · POWER FOUR").font(.caption2.weight(.black)).tracking(1.6).foregroundStyle(accent)
                 Text("FOUR TROPHIES BEFORE THE BRACKET").font(.title2.weight(.black)).fontWidth(.condensed)
                 ForEach(["ACC CHAMPIONSHIP", "BIG 12 CHAMPIONSHIP", "BIG TEN CHAMPIONSHIP", "SEC CHAMPIONSHIP"], id: \.self) { title in
@@ -3056,7 +3233,7 @@ private struct FieldhouseStandingsPage: View {
                 }
             }
             .padding(16).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.32)))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.32))) }
             Button { showingPostseason = true } label: {
                 FieldhouseBracketPreview(state: $state)
             }.buttonStyle(.plain)
@@ -3090,6 +3267,29 @@ private struct FieldhouseStandingsPage: View {
                 cutMetric("BOTTOM", regionalCounts.toilet, "TOILET BOWL", .purple)
             }
             Text("The cut recalculates from the number of players assigned to this region.")
+                .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+        }
+        .padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.36)))
+    }
+
+    private var postseasonRaceSummary: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("ROAD TO CENTER COURT").font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(accent)
+                    Text(showingOverall ? "OVERALL TOURNAMENT RACE" : "\(state.selectedRegion.rawValue.uppercased()) REGION RACE")
+                        .font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.52))
+                }
+                Spacer()
+                Text("\(state.postseasonTotalPoints) PTS").font(.title3.weight(.black)).foregroundStyle(accent)
+            }
+            HStack(spacing: 8) {
+                cutMetric("BRACKET", state.postseasonBracketAdjustedPoints, "WEIGHTED", .yellow)
+                cutMetric("ROUNDS", state.postseasonFreshRoundPoints, "1 EACH", .white)
+                cutMetric("TOTAL", state.postseasonTotalPoints, "LIVE", accent)
+            }
+            Text("Every number comes from the same authoritative postseason scoreboard used by the homepage and final trophies.")
                 .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
         }
         .padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16))
@@ -3132,8 +3332,10 @@ private struct FieldhouseStandingsPage: View {
     }
 
     @ViewBuilder private func cutLines(after index: Int) -> some View {
-        if !showingOverall && index == championshipCutIndex { cutLine("CHAMPIONSHIP CUT", color: .yellow) }
-        if !showingOverall && index == toiletCutIndex { cutLine("TOILET BOWL CUT", color: .purple) }
+        if !usesPostseasonScores {
+            if !showingOverall && index == championshipCutIndex { cutLine("CHAMPIONSHIP CUT", color: .yellow) }
+            if !showingOverall && index == toiletCutIndex { cutLine("TOILET BOWL CUT", color: .purple) }
+        }
     }
 
     private func authenticatedStandingRow(rank: Int, standing: Standing) -> some View {
@@ -3149,7 +3351,7 @@ private struct FieldhouseStandingsPage: View {
                     .font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.44))
             }
             Spacer()
-            Text("\(standing.totalPoints)").font(.title2.weight(.black)).foregroundStyle(accent)
+            Text("\(displayedPoints(for: standing))").font(.title2.weight(.black)).foregroundStyle(accent)
         }
         .padding(12).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(standing.userId == auth.user?.id ? accent : accent.opacity(0.18), lineWidth: standing.userId == auth.user?.id ? 2 : 1))
@@ -3752,7 +3954,15 @@ private struct FieldhouseProfilePage: View {
             currentCampaign
 
             dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
-            dossierButton(.scorecard, "Week 1 · \(state.scoringPoints) points", "SEASON TOTAL · \(state.scoringPoints)", "checklist.checked", .green)
+            dossierButton(
+                .scorecard,
+                state.postseasonScorecardIsActive ? "Tournament · \(state.postseasonTotalPoints) points" : "Week 1 · \(state.scoringPoints) points",
+                state.postseasonScorecardIsActive
+                    ? "BRACKET \(state.postseasonBracketAdjustedPoints) · ROUNDS \(state.postseasonFreshRoundPoints)"
+                    : "SEASON TOTAL · \(state.scoringPoints)",
+                "checklist.checked",
+                .green
+            )
 
             dossierLabel("CAREER INTEL", detail: "THE NUMBERS HAVE TESTIFIED UNDER OATH")
             HStack(spacing: 8) {
@@ -3972,8 +4182,14 @@ private struct FieldhouseProfileDestinationView: View {
     @ViewBuilder private var content: some View {
         switch destination {
         case .scorecard:
-            detailCard("WEEK \(state.scoringWindow)", "\(state.scoringPoints) points · \(state.scoringFinalGames) final · \(state.scoringLiveGames) live")
-            detailCard("PROP", state.scoringPropResult == nil ? "Pending final game data" : "Scored autonomously from the completed board")
+            if state.postseasonScorecardIsActive {
+                detailCard("TOURNAMENT TOTAL", "\(state.postseasonTotalPoints) points")
+                detailCard("INITIAL BRACKET", "\(state.postseasonBracketAdjustedPoints) points · \(state.postseasonBracketCorrectPicks) correct predictions")
+                detailCard("FRESH ROUND PICKS", "\(state.postseasonFreshRoundPoints) points")
+            } else {
+                detailCard("WEEK \(state.scoringWindow)", "\(state.scoringPoints) points · \(state.scoringFinalGames) final · \(state.scoringLiveGames) live")
+                detailCard("PROP", state.scoringPropResult == nil ? "Pending final game data" : "Scored autonomously from the completed board")
+            }
         case .rivalry:
             detailCard("REGIONAL POSITION", "Rank \(state.rank) of \(state.regionPlayerCount) in the Midwest Region")
             detailCard("HEAD-TO-HEAD", "\(playerName) is 6–4 against the field this season")
@@ -4009,7 +4225,7 @@ private struct FieldhouseProfileDestinationView: View {
     private var kicker: String { destination == .signOut ? "ACCOUNT CONTROL" : "PLAYER DOSSIER" }
     private var title: String {
         switch destination {
-        case .scorecard: "Season Scorecard"
+        case .scorecard: state.postseasonScorecardIsActive ? "Tournament Scorecard" : "Season Scorecard"
         case .rivalry: "Rivalry Report"
         case .cheevoVault: "Cheevo Vault"
         case .crystalBall: "Crystal Ball Receipt"

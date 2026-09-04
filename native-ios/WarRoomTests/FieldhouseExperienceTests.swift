@@ -81,6 +81,13 @@ final class FieldhouseExperienceTests: XCTestCase {
             standings: [
                 Standing(id: UUID(), userId: userID, totalPoints: 23, weeklyPoints: [23], weeksPlayed: 1, displayNameOverride: "Riley V.", division: "East", fieldhouseRegion: "Midwest", profiles: nil, atsCorrect: 2, atsTotal: 2, currentStreak: 1, bestWeek: 23, worstWeek: 23, perfectWeeks: 0, bestBetHits: 1, bestBetTotal: 1, propHits: 1, propTotal: 1, isBot: false),
                 Standing(id: UUID(), userId: UUID(), totalPoints: 17, weeklyPoints: [17], weeksPlayed: 1, displayNameOverride: "Baseline Bandit", division: "East", fieldhouseRegion: "East", profiles: nil, atsCorrect: 1, atsTotal: 2, currentStreak: 1, bestWeek: 17, worstWeek: 17, perfectWeeks: 0, bestBetHits: 0, bestBetTotal: 1, propHits: 1, propTotal: 1, isBot: false)
+            ],
+            postseasonTotals: [
+                FieldhousePostseasonTotalRecord(
+                    tournamentId: UUID(), leagueId: leagueID, userId: userID,
+                    bracketCorrectPicks: 27, bracketRawPoints: 39, bracketAdjustedPoints: 39,
+                    roundPoints: 8, totalPoints: 47, updatedAt: "2027-03-22T03:00:00Z"
+                )
             ]
         )
 
@@ -115,6 +122,12 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.playerCount, 2)
         XCTAssertEqual(state.regionPlayerCount, 1)
         XCTAssertEqual(state.rank, 1)
+        XCTAssertEqual(state.postseasonBracketCorrectPicks, 27)
+        XCTAssertEqual(state.postseasonBracketRawPoints, 39)
+        XCTAssertEqual(state.postseasonBracketAdjustedPoints, 39)
+        XCTAssertEqual(state.postseasonFreshRoundPoints, 8)
+        XCTAssertEqual(state.postseasonTotalPoints, 47)
+        XCTAssertEqual(state.postseasonPoints(for: userID), 47)
     }
 
     func testFreshRoundUsesOfficialWinnersToOpenNextRound() {
@@ -131,6 +144,17 @@ final class FieldhouseExperienceTests: XCTestCase {
         let matchups = FieldhouseBracketEngine.roundMatchups(key: "r32", field: field)
         XCTAssertEqual(matchups.first?.teams.map(\.id), ["a", "d"])
         XCTAssertEqual(FieldhouseBracketEngine.liveRoundKey(field: field, now: ISO8601DateFormatter().date(from: "2027-03-19T00:00:00Z")!), "r32")
+    }
+
+    func testTournamentScorecardActivatesOnlyAfterAPlayerFilesPostseasonPicks() {
+        var state = FieldhouseSeasonState()
+        state.officialPostseasonField = .previewRound(for: .ncaam)
+        state.postseasonTotalPoints = 47
+
+        XCTAssertFalse(state.postseasonScorecardIsActive)
+
+        state.bracketSubmitted = true
+        XCTAssertTrue(state.postseasonScorecardIsActive)
     }
 
     func testCardWritePlanTranslatesTeamFavoriteToSharedHomeAwayContract() throws {
