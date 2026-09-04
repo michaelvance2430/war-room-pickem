@@ -709,6 +709,8 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var regularHellfiresUsed = 0
     var bracketHellfireUsed = false
     var bracketLocked = false
+    var postseasonBracketPicks: [String: String] = [:]
+    var bracketSubmitted = false
     var selectedRegion: FieldhouseRegion = .midwest
     var favoriteTeam: String?
     var crystalBallChampion: String?
@@ -980,9 +982,10 @@ struct FieldhouseNativePreviewView: View {
         let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
         let reviewLocker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-locker")
         let reviewProfile = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-profile")
+        let reviewBracket = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
         let reviewHellfire = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-hellfire")
         _state = State(initialValue: initialState)
-        _desk = State(initialValue: reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home)))
+        _desk = State(initialValue: reviewBracket ? .standings : (reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home))))
         _strikePresentation = State(initialValue: reviewHellfire ? StrikePresentation(resourceName: initialLeague == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1") : nil)
         _showingEntrance = State(initialValue: !reviewMode)
     }
@@ -2080,7 +2083,7 @@ private struct FieldhouseStandingsPage: View {
     @Binding var state: FieldhouseSeasonState
     private var sportID: String { state.league == .ncaaw ? "ncaaw" : "ncaam" }
     @State private var showingOverall = false
-    @State private var showingPostseason = false
+    @State private var showingPostseason = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
     @State private var postseasonStrikePresentation: StrikePresentation?
     @State private var profile: Profile?
     @AppStorage("fieldhouse.preview.equippedTitleId") private var previewEquippedTitleId: String?
@@ -2269,13 +2272,45 @@ private struct FieldhouseBracketsPage: View {
     @Binding var strikePresentation: StrikePresentation?
     @State private var confirmingBracketHellfire = false
     @State private var showingHistory = false
+    @State private var showingBracketPicker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
     var body: some View {
+        Group {
+            if showingBracketPicker {
+                FieldhouseBracketPickerView(
+                    league: state.league,
+                    picks: $state.postseasonBracketPicks,
+                    submitted: $state.bracketSubmitted,
+                    locked: state.bracketLocked,
+                    hellfireUsed: state.bracketHellfireUsed,
+                    close: { showingBracketPicker = false }
+                )
+            } else {
+                overview
+            }
+        }
+        .alert("Launch Bracket Hellfire?", isPresented: $confirmingBracketHellfire) {
+            Button("CANCEL", role: .cancel) {}
+            Button("LAUNCH AND LOCK", role: .destructive) { deployBracketHellfire() }
+        } message: {
+            Text("This cannot be undone. The machine makes all 75 decisions in the 76-team bracket, locks it permanently, and allows no edits or rerolls. At least 60% correct earns 1.5× raw bracket points. Below 60% cuts raw bracket points in half.")
+        }
+    }
+
+    private var overview: some View {
         VStack(spacing: 13) {
             Button { confirmingBracketHellfire = true } label: {
                 FieldhouseAction(kicker: "BRACKET HELLFIRE · 1/1", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch the AI Crazy Pick", detail: state.bracketHellfireUsed ? "All 75 decisions are sealed. No reroll." : "One-way door. AI fills an erratic 76-team bracket and seals all 75 decisions. Hit 60% for 1.5×; miss it and raw points are cut in half.", icon: "wand.and.stars")
             }.buttonStyle(.plain).disabled(state.bracketHellfireUsed)
             FieldhouseHero(kicker: "MARCH COMMAND · 76 TEAMS · 75 DECISIONS", title: "ROAD TO CENTER COURT", detail: "Twelve Opening Round games feed the familiar field of 64. Every winner advances through the real bracket path.", icon: "point.3.connected.trianglepath.dotted")
             postseasonPaths
+            Button { showingBracketPicker = true } label: {
+                FieldhouseAction(
+                    kicker: state.bracketLocked ? "PERMANENT BRACKET RECEIPT" : state.bracketSubmitted ? "BRACKET FILED · EDITABLE UNTIL TIP" : "SELECTION SUNDAY · PICKS OPEN",
+                    title: state.bracketLocked ? "View My Locked Bracket" : state.bracketSubmitted ? "Review or Change My Bracket" : "Fill Out My 76-Team Bracket",
+                    detail: "Buy-In games, four regions, Final Four, and the championship. \(FieldhouseBracketEngine.progress(picks: state.postseasonBracketPicks, league: state.league))/75 decisions complete.",
+                    icon: "rectangle.split.3x3.fill"
+                )
+            }.buttonStyle(.plain)
             FieldhouseRegionalRacePreview(selectedRegion: state.selectedRegion)
             HStack(spacing: 8) {
                 bracketModeButton("CURRENT BRACKET", history: false)
@@ -2287,12 +2322,6 @@ private struct FieldhouseBracketsPage: View {
                 FieldhouseNationalBracketMap()
             }
             Text("REGULAR SEASON HELLFIRE: 2/2 · BRACKET HELLFIRE: 1 TOTAL · NO EDITS · NO REROLLS").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.48))
-        }
-        .alert("Launch Bracket Hellfire?", isPresented: $confirmingBracketHellfire) {
-            Button("CANCEL", role: .cancel) {}
-            Button("LAUNCH AND LOCK", role: .destructive) { deployBracketHellfire() }
-        } message: {
-            Text("This cannot be undone. The machine makes all 75 decisions in the 76-team bracket, locks it permanently, and allows no edits or rerolls. At least 60% correct earns 1.5× raw bracket points. Below 60% cuts raw bracket points in half.")
         }
     }
 
@@ -2332,6 +2361,8 @@ private struct FieldhouseBracketsPage: View {
 
     private func deployBracketHellfire() {
         guard !state.bracketHellfireUsed else { return }
+        state.postseasonBracketPicks = FieldhouseBracketEngine.hellfirePicks(league: state.league)
+        state.bracketSubmitted = true
         state.bracketHellfireUsed = true
         state.bracketLocked = true
         strikePresentation = StrikePresentation(resourceName: state.league == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1")

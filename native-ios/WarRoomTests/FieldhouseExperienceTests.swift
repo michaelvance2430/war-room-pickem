@@ -507,6 +507,37 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(Set(FieldhouseRegion.allCases.map(\.regionalTrophyName)).count, 4)
     }
 
+    func testBracketDecisionMapContainsAllSeventyFiveGames() {
+        XCTAssertEqual(FieldhouseBracketEngine.allDecisionIDs.count, 75)
+        XCTAssertEqual(Set(FieldhouseBracketEngine.allDecisionIDs).count, 75)
+        XCTAssertEqual(FieldhouseBracketEngine.openingGames().count, 12)
+    }
+
+    func testHellfireProducesACompleteImmutableBracketPayload() {
+        let picks = FieldhouseBracketEngine.hellfirePicks(league: .ncaam)
+        XCTAssertEqual(FieldhouseBracketEngine.progress(picks: picks, league: .ncaam), 75)
+        XCTAssertNotNil(FieldhouseBracketEngine.nationalChampion(picks: picks))
+        for region in FieldhouseRegion.allCases {
+            XCTAssertNotNil(FieldhouseBracketEngine.regionalChampion(region, picks: picks, league: .ncaam))
+        }
+    }
+
+    func testChangingAnEarlyPickClearsInvalidDownstreamPath() {
+        var picks = FieldhouseBracketEngine.hellfirePicks(league: .ncaam)
+        let opening = FieldhouseBracketEngine.openingGames().first!
+        let previous = picks[opening.id]
+        let replacement = opening.teams.first(where: { $0.id != previous })!
+        FieldhouseBracketEngine.choose(replacement, in: opening, picks: &picks, league: .ncaam)
+        XCTAssertEqual(picks[opening.id], replacement.id)
+        XCTAssertLessThan(FieldhouseBracketEngine.progress(picks: picks, league: .ncaam), 75)
+    }
+
+    func testWomenBracketUsesTheSameSeventyFiveDecisionStructure() {
+        let picks = FieldhouseBracketEngine.hellfirePicks(league: .ncaaw)
+        XCTAssertEqual(FieldhouseBracketEngine.progress(picks: picks, league: .ncaaw), 75)
+        XCTAssertEqual(Set(picks.keys), Set(FieldhouseBracketEngine.allDecisionIDs))
+    }
+
     func testPreviewLiveBoardPointsAreDerivedFromGameResults() {
         let state = FieldhouseSeasonState()
         XCTAssertEqual(state.scoringFinalGames, 6)

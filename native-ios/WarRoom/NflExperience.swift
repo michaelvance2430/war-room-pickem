@@ -84,21 +84,59 @@ struct NflHomeBackdrop: View {
     let phase: NflSeasonPhase
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(red: 0.015, green: 0.04, blue: 0.11), Color(red: 0.005, green: 0.01, blue: 0.025), Color(red: 0.14, green: 0.008, blue: 0.028)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            GeometryReader { proxy in
-                Path { path in
-                    let band: CGFloat = 76
+        GeometryReader { proxy in
+            ZStack {
+                Color.black
+                Image("LockerTunnel")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+                    .saturation(0.72)
+                    .contrast(1.16)
+
+                // The tunnel is the physical NFL identity. Broadcast blue and
+                // fourth-quarter red grade it without burying the artwork.
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.005, green: 0.025, blue: 0.075).opacity(0.34),
+                        .black.opacity(0.20),
+                        Color(red: 0.12, green: 0.005, blue: 0.025).opacity(0.36)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                LinearGradient(
+                    colors: [.black.opacity(0.04), .black.opacity(0.24), .black.opacity(0.72)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                RadialGradient(colors: [Color.cyan.opacity(0.14), .clear], center: .topLeading, startRadius: 10, endRadius: 340)
+                RadialGradient(colors: [accent.opacity(0.18), .clear], center: .topTrailing, startRadius: 20, endRadius: 400)
+
+                // Faint broadcast-yardage treatment keeps NFL distinct from
+                // the college-football situation-room skin.
+                fieldOverlay
+                    .opacity(0.82)
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
+        }
+        .ignoresSafeArea()
+    }
+
+    private var fieldOverlay: some View {
+        GeometryReader { proxy in
+            ZStack {
+                GeometryReader { proxy in
+                    Path { path in
+                        let band: CGFloat = 76
                     stride(from: -proxy.size.height, through: proxy.size.width, by: band).forEach { x in
                         path.move(to: CGPoint(x: x, y: 0))
                         path.addLine(to: CGPoint(x: x + proxy.size.height * 0.33, y: proxy.size.height))
                     }
-                }
-                .stroke(.white.opacity(0.028), lineWidth: 1)
+                    }
+                    .stroke(.white.opacity(0.028), lineWidth: 1)
                 Path { path in
                     let center = proxy.size.width / 2
                     path.move(to: CGPoint(x: center, y: 0))
@@ -106,12 +144,10 @@ struct NflHomeBackdrop: View {
                     for y in stride(from: 80.0, through: proxy.size.height, by: 138.0) {
                         path.move(to: CGPoint(x: center - 9, y: y)); path.addLine(to: CGPoint(x: center + 9, y: y))
                     }
-                }.stroke(.white.opacity(0.045), lineWidth: 1)
+                    }.stroke(.white.opacity(0.045), lineWidth: 1)
+                }
             }
-            RadialGradient(colors: [Color.cyan.opacity(0.16), .clear], center: .topLeading, startRadius: 10, endRadius: 330)
-            RadialGradient(colors: [accent.opacity(0.22), .clear], center: .topTrailing, startRadius: 20, endRadius: 390)
         }
-        .ignoresSafeArea()
     }
 
     private var accent: Color { phase == .regularSeason ? .blue : .red }
