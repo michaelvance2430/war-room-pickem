@@ -4239,9 +4239,12 @@ private struct ChampionshipTrophyPickerView: View {
     @State private var pendingTrophy: TrophyDesign?
     @State private var saving = false
     @State private var errorMessage: String?
+    private var identity: SportIdentity { SportIdentity(membership.leagues.sportId) }
+    private var accent: Color { identity.isFieldhouse ? identity.accent : (identity.isNFL ? .cyan : .yellow) }
+    private var cardRadius: CGFloat { identity.isNFL ? 7 : (identity.isFieldhouse ? 14 : 20) }
 
     private var designs: [TrophyDesign] {
-        if membership.leagues.sportId.lowercased() == "nfl" {
+        if identity.isNFL {
             return [
                 TrophyDesign(id: "nfl_sunday_scepter", name: "Sunday Scepter", image: "NflSundayScepterArtifact", line: "Eighteen Sundays of evidence, forged into one merciless signal."),
                 TrophyDesign(id: "nfl_gridiron_crown", name: "Gridiron Crown", image: "NflGridironCrownArtifact", line: "Goalposts bent into a crown for the room’s final authority."),
@@ -4250,6 +4253,12 @@ private struct ChampionshipTrophyPickerView: View {
                 TrophyDesign(id: "nfl_iron_end_zone", name: "Iron End Zone", image: "NflIronEndZoneArtifact", line: "The final territory, defended all season and claimed once."),
                 TrophyDesign(id: "nfl_final_whistle", name: "The Final Whistle", image: "NflFinalWhistleArtifact", line: "When this sounds, the arguments become permanent records."),
             ]
+        }
+        if identity.isFieldhouse {
+            let league: FieldhouseLeague = identity.isNCAAW ? .ncaaw : .ncaam
+            return FieldhouseTrophyCatalog.options(for: league).map {
+                TrophyDesign(id: $0.id, name: $0.name, image: $0.asset, line: $0.detail)
+            }
         }
         return [
             TrophyDesign(id: "command_cup", name: "The Command Cup", image: "ChampionshipArtifact", line: "Traditional authority. Excessive brass. Zero civilian oversight."),
@@ -4268,11 +4277,15 @@ private struct ChampionshipTrophyPickerView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            LinearGradient(colors: membership.leagues.sportId.lowercased() == "nfl" ? [.blue.opacity(0.22), .black, .red.opacity(0.16)] : [.yellow.opacity(0.13), .black, .red.opacity(0.08)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            if identity.isFieldhouse {
+                FieldhouseBackdrop(leagueOverride: identity.isNCAAW ? .ncaaw : .ncaam).ignoresSafeArea()
+            } else {
+                LinearGradient(colors: identity.isNFL ? [.blue.opacity(0.22), .black, .red.opacity(0.16)] : [.yellow.opacity(0.13), .black, .red.opacity(0.08)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(membership.leagues.sportId.lowercased() == "nfl" ? "PRO FOOTBALL · CHAMPIONSHIP HARDWARE" : "COMMISSIONER HARDWARE VAULT").font(.caption2.weight(.black)).tracking(2).foregroundStyle(membership.leagues.sportId.lowercased() == "nfl" ? .cyan : .yellow)
-                    Text(selectedId == nil ? (membership.leagues.sportId.lowercased() == "nfl" ? "CHOOSE THE FINAL ARTIFACT" : "CHOOSE THE THRONE") : "THE VAULT IS SEALED").font(.system(size: 34, weight: .black)).fontWidth(.condensed)
+                    Text(vaultKicker).font(.caption2.weight(.black)).tracking(2).foregroundStyle(accent)
+                    Text(selectedId == nil ? selectionTitle : "THE VAULT IS SEALED").font(.system(size: 34, weight: .black)).fontWidth(.condensed)
                     Text(selectedId == nil ? "One design becomes this season’s permanent championship identity. Pick like people will complain about it—because they will." : "This season’s artifact is locked. Future champions inherit the exact hardware selected here.")
                         .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
 
@@ -4281,8 +4294,8 @@ private struct ChampionshipTrophyPickerView: View {
                         Text(heroDesign.name.uppercased()).font(.title2.weight(.black)).multilineTextAlignment(.center)
                         Text(heroDesign.line).font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.58)).multilineTextAlignment(.center)
                     }
-                    .padding(16).background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: membership.leagues.sportId.lowercased() == "nfl" ? 7 : 20))
-                    .overlay(RoundedRectangle(cornerRadius: membership.leagues.sportId.lowercased() == "nfl" ? 7 : 20).stroke((membership.leagues.sportId.lowercased() == "nfl" ? Color.cyan : Color.yellow).opacity(0.55), lineWidth: 2))
+                    .padding(16).background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: cardRadius))
+                    .overlay(RoundedRectangle(cornerRadius: cardRadius).stroke(accent.opacity(0.55), lineWidth: 2))
 
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 11), GridItem(.flexible(), spacing: 11)], spacing: 11) {
                         ForEach(designs) { design in
@@ -4297,11 +4310,11 @@ private struct ChampionshipTrophyPickerView: View {
                                     }.padding(.horizontal, 8).padding(.bottom, 10)
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 255, alignment: .top)
-                                .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: membership.leagues.sportId.lowercased() == "nfl" ? 7 : 18))
-                                .overlay(RoundedRectangle(cornerRadius: membership.leagues.sportId.lowercased() == "nfl" ? 7 : 18).stroke(selectedId == design.id ? (membership.leagues.sportId.lowercased() == "nfl" ? .cyan : .green) : (membership.leagues.sportId.lowercased() == "nfl" ? .blue.opacity(0.55) : .yellow.opacity(0.30)), lineWidth: selectedId == design.id ? 3 : 1))
+                                .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: cardRadius))
+                                .overlay(RoundedRectangle(cornerRadius: cardRadius).stroke(selectedId == design.id ? accent : accent.opacity(0.30), lineWidth: selectedId == design.id ? 3 : 1))
                                 .overlay(alignment: .topTrailing) {
                                     if selectedId == design.id {
-                                        Text("SELECTED").font(.system(size: 7, weight: .black)).tracking(1).foregroundStyle(membership.leagues.sportId.lowercased() == "nfl" ? .white : .black).padding(.horizontal, 8).padding(.vertical, 5).background(membership.leagues.sportId.lowercased() == "nfl" ? Color.blue : Color.green, in: Capsule()).padding(8)
+                                        Text("SELECTED").font(.system(size: 7, weight: .black)).tracking(1).foregroundStyle(identity.isNFL ? .white : .black).padding(.horizontal, 8).padding(.vertical, 5).background(identity.isNFL ? Color.blue : accent, in: Capsule()).padding(8)
                                     }
                                 }
                             }
@@ -4326,6 +4339,18 @@ private struct ChampionshipTrophyPickerView: View {
         } message: {
             Text("This becomes the season’s permanent championship design. The winner gets this exact artifact beside their name and in their profile forever.")
         }
+    }
+
+    private var vaultKicker: String {
+        if identity.isNFL { return "PRO FOOTBALL · CHAMPIONSHIP HARDWARE" }
+        if identity.isFieldhouse { return "FIELDHOUSE · \(identity.isNCAAW ? "NCAAW" : "NCAAM") HARDWARE" }
+        return "COMMISSIONER HARDWARE VAULT"
+    }
+
+    private var selectionTitle: String {
+        if identity.isNFL { return "CHOOSE THE FINAL ARTIFACT" }
+        if identity.isFieldhouse { return "CHOOSE THE FINAL NET" }
+        return "CHOOSE THE THRONE"
     }
 
     private func save(_ trophy: TrophyDesign) async {

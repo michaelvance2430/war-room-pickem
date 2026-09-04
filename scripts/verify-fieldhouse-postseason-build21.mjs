@@ -80,6 +80,8 @@ assert.match(client, /if auth\.user != nil && auth\.token != nil \{\s*YouView\(o
 assert.match(content, /case "m-iron-rim": return "FieldhouseMTheIronRim"/);
 assert.match(content, /case "w-pure-game": return "FieldhouseWThePureGame"/);
 assert.match(content, /case "fieldhouse-regional-east", "fieldhouse_region_east": return "FieldhouseRegionalEast"/);
+assert.match(content, /FieldhouseTrophyCatalog\.options\(for: league\)\.map/);
+assert.ok(content.includes(`return "FIELDHOUSE · \\(identity.isNCAAW ? "NCAAW" : "NCAAM") HARDWARE"`));
 assert.match(client, /guard !state\.isAuthenticatedSession else \{ return \}/);
 assert.match(content, /FieldhouseAuthenticatedContainer\(notificationDestination: \$fieldhouseNotificationDestination\)/);
 assert.match(content, /fieldhouseNotificationDestination = route/);
