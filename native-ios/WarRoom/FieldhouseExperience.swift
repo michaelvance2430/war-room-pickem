@@ -742,6 +742,14 @@ struct FieldhouseGame: Identifiable, Equatable, Codable {
         return calendar.date(bySettingHour: tipHour, minute: tipMinute, second: 0, of: day)!
     }
 
+    func displayTip(in window: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = FieldhouseSeasonCalendar.eastern
+        formatter.dateFormat = "EEE MMM d · h:mm a z"
+        return formatter.string(from: tipDate(in: window)).uppercased()
+    }
+
     var favoriteTeam: String? {
         let pieces = spread.split(separator: " ")
         guard pieces.count > 1, Double(pieces.last ?? "") != nil else { return nil }
@@ -780,7 +788,7 @@ extension FieldhouseGame {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.timeZone = FieldhouseSeasonCalendar.eastern
-            formatter.dateFormat = "EEE h:mm a z"
+            formatter.dateFormat = "EEE MMM d · h:mm a z"
             return formatter.string(from: date).uppercased()
         } ?? "TIP TIME PENDING"
         let storedFavorite = cardGame.favorite.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2089,7 +2097,7 @@ private struct FieldhouseCardBuilder: View {
                                         Image(systemName: selected ? "checkmark.circle.fill" : "circle").font(.title3).foregroundStyle(selected ? accent : .white.opacity(0.38))
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text("\(game.away) at \(game.home)").font(.subheadline.weight(.black)).multilineTextAlignment(.leading)
-                                            Text("\(game.spread) · \(game.tip)").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.48))
+                                            Text("\(game.spread) · \(game.displayTip(in: window))").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.48))
                                         }
                                         Spacer()
                                     }
@@ -2404,7 +2412,7 @@ private struct FieldhousePicksPage: View {
                         .foregroundStyle(isFinal ? .green : accent)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("\(game.away) at \(game.home)").font(.caption.weight(.black))
-                        Text("\(game.spread) · \(resultStatus(result))")
+                        Text("\(game.spread) · \(game.displayTip(in: state.scoringWindow))")
                             .font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.48))
                         if let coverWinner {
                             Text("COVERING · \(coverWinner.uppercased())")
@@ -2418,7 +2426,7 @@ private struct FieldhousePicksPage: View {
                             Text("ROOM PICKS · \(14 + index) \(game.away.uppercased()) · \(11 + index) \(game.home.uppercased())")
                                 .font(.system(size: 7, weight: .black)).foregroundStyle(.cyan)
                         } else {
-                            Text("ROOM PICKS SEALED UNTIL \(game.tip)")
+                            Text("ROOM PICKS SEALED UNTIL \(game.displayTip(in: state.scoringWindow))")
                                 .font(.system(size: 7, weight: .black)).foregroundStyle(.white.opacity(0.38))
                         }
                     }
@@ -2485,6 +2493,8 @@ private struct FieldhousePicksPage: View {
                     Image(systemName: "lock.fill").foregroundStyle(accent)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(game.away) at \(game.home)").font(.caption.weight(.black))
+                        Text(game.displayTip(in: state.window))
+                            .font(.system(size: 9, weight: .black)).foregroundStyle(accent)
                         Text("YOUR PICK · \(state.sideSelections[index] ?? "—") · CONF \(state.confidenceSelections[index] ?? 0)")
                             .font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.58))
                     }
@@ -2521,7 +2531,7 @@ private struct FieldhousePicksPage: View {
         let selected = state.sideSelections[index]
         return VStack(alignment: .leading, spacing: 11) {
             HStack {
-                Text("COURT \(index + 1) · FIRST TIP \(matchup.tip)").font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(accent)
+                Text("COURT \(index + 1) · FIRST TIP \(matchup.displayTip(in: state.window))").font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(accent)
                 Spacer()
                 Button {
                     state.bestBetGame = state.bestBetGame == index ? nil : index
