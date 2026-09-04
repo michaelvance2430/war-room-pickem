@@ -47,6 +47,25 @@ struct FieldhouseOfficialField: Equatable, Codable {
     let games: [FieldhouseOfficialGame]
 }
 
+extension FieldhouseOfficialField {
+    static func previewRound(for league: FieldhouseLeague) -> Self {
+        let names = Array(FieldhouseTeamCatalog.teams(for: league).prefix(16))
+        let teams = names.enumerated().map {
+            FieldhouseOfficialTeam(teamID: "preview-\($0.offset + 1)", displayName: $0.element, region: "East", seed: $0.offset + 1)
+        }
+        let pairs = FieldhouseBracketEngine.regionSeedPairs
+        let games = pairs.enumerated().map { index, seeds in
+            FieldhouseOfficialGame(
+                gameID: "preview-east-r64-\(index)", roundKey: "r64", roundOrder: 1, ordinal: index,
+                region: "East", firstTeamID: "preview-\(seeds.0)", secondTeamID: "preview-\(seeds.1)",
+                firstSourceGameID: nil, secondSourceGameID: nil,
+                startsAt: "2027-03-18T16:00:00Z", winnerTeamID: nil
+            )
+        }
+        return .init(tournamentID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000076")!, sportID: league.favoriteSportID, seasonKey: 2027, status: "published", firstTipAt: "2027-03-18T16:00:00Z", teams: teams, games: games)
+    }
+}
+
 struct FieldhouseBracketMatchup: Identifiable, Equatable {
     let id: String
     let label: String

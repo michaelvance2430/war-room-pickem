@@ -1569,16 +1569,19 @@ struct FieldhouseNativePreviewView: View {
         self.authenticatedScope = nil
         self.liveContext = nil
         let initialState = Self.makePreviewState(for: initialLeague)
-        let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
+        let reviewRound = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-round")
+        let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review") || reviewRound
         let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
         let reviewLocker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-locker")
         let reviewProfile = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-profile")
         let reviewBracket = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
         let reviewHellfire = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-hellfire")
-        _state = State(initialValue: initialState)
-        _lastVerifiedState = State(initialValue: initialState)
+        var displayState = initialState
+        if reviewRound { displayState.officialPostseasonField = .previewRound(for: initialLeague) }
+        _state = State(initialValue: displayState)
+        _lastVerifiedState = State(initialValue: displayState)
         _standings = State(initialValue: [])
-        _desk = State(initialValue: reviewBracket ? .standings : (reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home))))
+        _desk = State(initialValue: (reviewBracket || reviewRound) ? .standings : (reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home))))
         _strikePresentation = State(initialValue: reviewHellfire ? StrikePresentation(resourceName: initialLeague == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1") : nil)
         _showingEntrance = State(initialValue: !reviewMode)
     }
@@ -1689,7 +1692,10 @@ struct FieldhouseNativePreviewView: View {
                 refreshLifecycle(at: Date())
                 return
             }
-            let initialState = Self.makePreviewState(for: initialLeague)
+            var initialState = Self.makePreviewState(for: initialLeague)
+            if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-round") {
+                initialState.officialPostseasonField = .previewRound(for: initialLeague)
+            }
             let initialScope = FieldhouseStateScope(
                 userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,
                 leagueID: FieldhousePreviewIdentity.leagueID(for: initialLeague)
@@ -3198,7 +3204,7 @@ private struct FieldhouseBracketsPage: View {
     @State private var confirmingBracketHellfire = false
     @State private var showingHistory = false
     @State private var showingBracketPicker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
-    @State private var showingRoundPicker = false
+    @State private var showingRoundPicker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-round")
     @State private var showingFieldImporter = false
     @State private var pendingFieldData: Data?
     @State private var confirmingFieldPublish = false
