@@ -493,6 +493,12 @@ struct FieldhouseFieldImportResponse: Decodable, Sendable {
     let games: Int
 }
 
+struct FieldhouseScheduleSyncResponse: Decodable, Sendable {
+    let ok: Bool
+    let tournamentId: UUID
+    let updatedGames: Int
+}
+
 struct FieldhouseBracketEntryRecord: Decodable, Sendable {
     let picks: [String: String]
     let submittedAt: String?
@@ -1795,6 +1801,20 @@ enum SupabaseAPI {
             "p_field": field, "p_publish": publish
         ])
         return try await send(request, as: FieldhouseFieldImportResponse.self)
+    }
+
+    static func syncFieldhouseOfficialSchedule(token: String, sportId: String, seasonKey: Int, fieldData: Data) async throws -> FieldhouseScheduleSyncResponse {
+        let decoded = try JSONSerialization.jsonObject(with: fieldData)
+        guard let field = decoded as? [String: Any], let games = field["games"] as? [[String: Any]], games.count == 75 else {
+            throw RequestError(message: "Schedule sync requires the complete generated 75-game field file.")
+        }
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/sync_fieldhouse_official_schedule"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "p_sport_id": sportId.lowercased(), "p_season_key": seasonKey, "p_games": games
+        ])
+        return try await send(request, as: FieldhouseScheduleSyncResponse.self)
     }
 
     static func footballScores(token: String, leagueId: UUID, sportId: String, daysFrom: Int = 3) async throws -> FootballScoreFeed {

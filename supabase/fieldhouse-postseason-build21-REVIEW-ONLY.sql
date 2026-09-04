@@ -439,10 +439,12 @@ begin
   select count(*) into v_bad_count from (
     select region
     from public.fieldhouse_tournament_teams where tournament_id=v_tournament_id
-    group by region having count(*) <> 19
+    group by region having count(*) < 16
   ) bad;
-  if v_team_count <> 76 or v_bad_count <> 0 then
-    raise exception 'Each official region requires 19 teams, including three Buy-In extras';
+  if v_team_count <> 76
+     or (select count(distinct region) from public.fieldhouse_tournament_teams where tournament_id=v_tournament_id) <> 4
+     or v_bad_count <> 0 then
+    raise exception 'The field requires four regions with at least 16 teams each';
   end if;
 
   insert into public.fieldhouse_tournament_games(
@@ -470,6 +472,84 @@ begin
   ) bad;
   if v_game_count <> 75 or v_bad_count <> 0 then raise exception 'Invalid tournament round counts'; end if;
 
+  -- Expansion does not guarantee three Opening Round games per region. Validate
+  -- the actual bracket invariant instead: 12 Opening Round games feed exactly
+  -- 12 of the 64 regional slots, while every region still exposes seeds 1-16.
+  select count(*) into v_bad_count
+  from public.fieldhouse_tournament_games g
+  join public.fieldhouse_tournament_teams a
+    on a.tournament_id=g.tournament_id and a.team_id=g.first_team_id
+  join public.fieldhouse_tournament_teams b
+    on b.tournament_id=g.tournament_id and b.team_id=g.second_team_id
+  where g.tournament_id=v_tournament_id and g.round_key='opening'
+    and (g.region is null or a.region<>g.region or b.region<>g.region or a.seed<>b.seed);
+  if v_bad_count <> 0 then
+    raise exception 'Each Opening Round game must pair teams from one region and seed';
+  end if;
+
+  select count(*) into v_bad_count from (
+    with opening_refs as (
+      select first_source_game_id source_game_id
+      from public.fieldhouse_tournament_games
+      where tournament_id=v_tournament_id and round_key='r64' and first_source_game_id is not null
+      union all
+      select second_source_game_id
+      from public.fieldhouse_tournament_games
+      where tournament_id=v_tournament_id and round_key='r64' and second_source_game_id is not null
+    )
+    select opening.game_id
+    from public.fieldhouse_tournament_games opening
+    left join opening_refs refs on refs.source_game_id=opening.game_id
+    where opening.tournament_id=v_tournament_id and opening.round_key='opening'
+    group by opening.game_id
+    having count(refs.source_game_id)<>1
+  ) bad;
+  if v_bad_count <> 0 then raise exception 'Every Opening Round game must feed exactly one First Round slot'; end if;
+
+  select count(*) into v_bad_count from (
+    with regional_slots as (
+      select g.region,
+        case when side.team_id is not null then team.seed else opening_team.seed end seed
+      from public.fieldhouse_tournament_games g
+      cross join lateral (values
+        (g.first_team_id,g.first_source_game_id),
+        (g.second_team_id,g.second_source_game_id)
+      ) side(team_id,source_game_id)
+      left join public.fieldhouse_tournament_teams team
+        on team.tournament_id=g.tournament_id and team.team_id=side.team_id
+      left join public.fieldhouse_tournament_games opening
+        on opening.tournament_id=g.tournament_id and opening.game_id=side.source_game_id
+      left join public.fieldhouse_tournament_teams opening_team
+        on opening_team.tournament_id=opening.tournament_id and opening_team.team_id=opening.first_team_id
+      where g.tournament_id=v_tournament_id and g.round_key='r64'
+        and (
+          (team.team_id is not null and team.region<>g.region)
+          or (opening.game_id is not null and (opening.round_key<>'opening' or opening.region<>g.region))
+        ) is not true
+    )
+    select region from regional_slots
+    group by region
+    having count(*)<>16 or count(distinct seed)<>16 or min(seed)<>1 or max(seed)<>16
+  ) bad;
+  if v_bad_count <> 0 then raise exception 'Every region must expose exactly one First Round slot for seeds 1 through 16'; end if;
+
+  select count(*) into v_bad_count from (
+    with used_teams as (
+      select first_team_id team_id from public.fieldhouse_tournament_games
+      where tournament_id=v_tournament_id and round_key in ('opening','r64') and first_team_id is not null
+      union all
+      select second_team_id from public.fieldhouse_tournament_games
+      where tournament_id=v_tournament_id and round_key in ('opening','r64') and second_team_id is not null
+    )
+    select team.team_id
+    from public.fieldhouse_tournament_teams team
+    left join used_teams used on used.team_id=team.team_id
+    where team.tournament_id=v_tournament_id
+    group by team.team_id
+    having count(used.team_id)<>1
+  ) bad;
+  if v_bad_count <> 0 then raise exception 'Every official team must occupy exactly one bracket entry path'; end if;
+
   select count(*) into v_bad_count
   from public.fieldhouse_tournament_games g
   where g.tournament_id=v_tournament_id and (
@@ -481,14 +561,43 @@ begin
     )) or
     (g.first_source_game_id is not null and not exists(
       select 1 from public.fieldhouse_tournament_games prior
-      where prior.tournament_id=g.tournament_id and prior.game_id=g.first_source_game_id and prior.round_order<g.round_order
+      where prior.tournament_id=g.tournament_id and prior.game_id=g.first_source_game_id and prior.round_order=g.round_order-1
     )) or
     (g.second_source_game_id is not null and not exists(
       select 1 from public.fieldhouse_tournament_games prior
-      where prior.tournament_id=g.tournament_id and prior.game_id=g.second_source_game_id and prior.round_order<g.round_order
+      where prior.tournament_id=g.tournament_id and prior.game_id=g.second_source_game_id and prior.round_order=g.round_order-1
     ))
   );
   if v_bad_count <> 0 then raise exception 'Field contains an invalid team or bracket source'; end if;
+
+  select count(*) into v_bad_count from (
+    with source_refs as (
+      select first_source_game_id source_game_id
+      from public.fieldhouse_tournament_games
+      where tournament_id=v_tournament_id and first_source_game_id is not null
+      union all
+      select second_source_game_id
+      from public.fieldhouse_tournament_games
+      where tournament_id=v_tournament_id and second_source_game_id is not null
+    )
+    select game.game_id
+    from public.fieldhouse_tournament_games game
+    left join source_refs refs on refs.source_game_id=game.game_id
+    where game.tournament_id=v_tournament_id
+    group by game.game_id,game.round_key
+    having count(refs.source_game_id)<>case when game.round_key='title' then 0 else 1 end
+  ) bad;
+  if v_bad_count <> 0 then raise exception 'Every bracket game must feed exactly one game in the next round'; end if;
+
+  select count(*) into v_bad_count
+  from public.fieldhouse_tournament_games game
+  join public.fieldhouse_tournament_games source
+    on source.tournament_id=game.tournament_id
+    and source.game_id in (game.first_source_game_id,game.second_source_game_id)
+  where game.tournament_id=v_tournament_id
+    and game.round_key in ('r32','s16','e8')
+    and source.region is distinct from game.region;
+  if v_bad_count <> 0 then raise exception 'Regional bracket paths cannot cross before the Final Four'; end if;
 
   update public.fieldhouse_tournaments set
     status=case when p_publish then 'published' else 'draft' end,
@@ -496,9 +605,10 @@ begin
     published_at=case when p_publish then now() else null end,
     updated_at=now()
   where id=v_tournament_id;
-  if p_publish and not exists(
-    select 1 from public.fieldhouse_tournament_games where tournament_id=v_tournament_id and starts_at is not null
-  ) then raise exception 'Published field requires at least one official tip time'; end if;
+  if p_publish and exists(
+    select 1 from public.fieldhouse_tournament_games
+    where tournament_id=v_tournament_id and round_key in ('opening','r64') and starts_at is null
+  ) then raise exception 'Published field requires every Opening and First Round tip time'; end if;
   if p_publish then
     perform private.queue_fieldhouse_round_notifications(v_tournament_id,'opening');
   end if;
@@ -508,6 +618,93 @@ end;
 $$;
 revoke all on function public.import_fieldhouse_official_field(text,integer,jsonb,boolean) from public,anon,authenticated;
 grant execute on function public.import_fieldhouse_official_field(text,integer,jsonb,boolean) to authenticated;
+
+-- Broadcast times and provider event IDs are not all final on Selection Sunday.
+-- This owner-only path updates schedule metadata without replacing the bracket
+-- graph or touching any player's permanent bracket and round receipts.
+create or replace function public.sync_fieldhouse_official_schedule(
+  p_sport_id text,
+  p_season_key integer,
+  p_games jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_tournament_id uuid;
+  v_input_count integer;
+  v_updated integer;
+  schedule_round record;
+begin
+  if v_uid <> '09544d2b-6eca-4131-a321-c000586c9029'::uuid then
+    raise exception 'War Room owner access required';
+  end if;
+  if p_sport_id not in ('ncaam','ncaaw') then raise exception 'Unsupported Fieldhouse sport'; end if;
+  if jsonb_typeof(p_games)<>'array' or jsonb_array_length(p_games)<>75 then
+    raise exception 'Schedule sync requires the complete 75-game file';
+  end if;
+  select id into v_tournament_id from public.fieldhouse_tournaments
+  where sport_id=p_sport_id and season_key=p_season_key and status<>'final';
+  if not found then raise exception 'Editable Fieldhouse tournament not found'; end if;
+
+  select count(distinct x->>'id') into v_input_count from jsonb_array_elements(p_games) x;
+  if v_input_count<>75 or (
+    select count(*) from jsonb_array_elements(p_games) x
+    join public.fieldhouse_tournament_games g
+      on g.tournament_id=v_tournament_id and g.game_id=x->>'id'
+  )<>75 then raise exception 'Schedule game IDs do not match the official field'; end if;
+
+  if exists(
+    select 1 from jsonb_array_elements(p_games) x
+    join public.fieldhouse_tournament_games g
+      on g.tournament_id=v_tournament_id and g.game_id=x->>'id'
+    where nullif(x->>'startsAt','') is not null
+      and g.starts_at is distinct from (x->>'startsAt')::timestamptz
+      and (
+        g.completed_at is not null
+        or (g.starts_at is not null and g.starts_at<=clock_timestamp())
+        or (x->>'startsAt')::timestamptz<=clock_timestamp()
+      )
+  ) then raise exception 'A started or completed game time cannot be changed'; end if;
+
+  update public.fieldhouse_tournament_games g set
+    starts_at=coalesce(nullif(x.value->>'startsAt','')::timestamptz,g.starts_at),
+    odds_event_id=coalesce(nullif(x.value->>'oddsEventId',''),g.odds_event_id)
+  from jsonb_array_elements(p_games) x(value)
+  where g.tournament_id=v_tournament_id and g.game_id=x.value->>'id'
+    and (
+      (nullif(x.value->>'startsAt','') is not null and g.starts_at is distinct from (x.value->>'startsAt')::timestamptz)
+      or (nullif(x.value->>'oddsEventId','') is not null and g.odds_event_id is distinct from x.value->>'oddsEventId')
+    );
+  get diagnostics v_updated=row_count;
+
+  update public.fieldhouse_tournaments set
+    first_tip_at=(select min(starts_at) from public.fieldhouse_tournament_games where tournament_id=v_tournament_id),
+    updated_at=now()
+  where id=v_tournament_id;
+
+  -- If a one-hour alert already exists and is still pending, keep it aligned
+  -- with the corrected official round clock. Unopened rounds queue later using
+  -- the newest schedule when the prior round finishes.
+  for schedule_round in
+    select round_key,min(starts_at) first_tip
+    from public.fieldhouse_tournament_games
+    where tournament_id=v_tournament_id and starts_at is not null
+    group by round_key
+  loop
+    update private.push_notification_outbox set deliver_at=schedule_round.first_tip-interval '1 hour'
+    where event_key like 'fieldhouse-round-lock-1h:'||v_tournament_id||':'||schedule_round.round_key||':%'
+      and status in ('pending','failed') and schedule_round.first_tip-interval '1 hour'>clock_timestamp();
+  end loop;
+
+  return jsonb_build_object('ok',true,'tournamentId',v_tournament_id,'updatedGames',v_updated);
+end;
+$$;
+revoke all on function public.sync_fieldhouse_official_schedule(text,integer,jsonb) from public,anon,authenticated;
+grant execute on function public.sync_fieldhouse_official_schedule(text,integer,jsonb) to authenticated;
 
 create or replace function public.save_fieldhouse_round_picks(
   p_league_id uuid,

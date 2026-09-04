@@ -446,6 +446,18 @@ enum FieldhouseAuthenticatedRepository {
             fieldData: data, publish: publish
         )
     }
+
+    static func syncOfficialSchedule(token: String, userID: UUID, membership: LeagueMembership, data: Data) async throws {
+        guard AppIdentity.isCreator(userID) else {
+            throw FieldhouseRepositoryError(message: "War Room owner access required.")
+        }
+        let league = FieldhouseLeague(summary: membership.leagues)
+        _ = try await SupabaseAPI.syncFieldhouseOfficialSchedule(
+            token: token, sportId: league.favoriteSportID,
+            seasonKey: FieldhouseSeasonCalendar.postseasonSeasonKey,
+            fieldData: data
+        )
+    }
 }
 
 struct FieldhouseCardWritePlan {
@@ -509,6 +521,7 @@ private struct FieldhouseLiveContext {
 private enum FieldhousePersistenceEvent {
     case setup, publishCard, picks, trophy, favoriteTeam, bracket, postseasonRound
     case importOfficialField(Data, publish: Bool)
+    case syncOfficialSchedule(Data)
 }
 
 private struct FieldhousePersistenceActionKey: EnvironmentKey {
@@ -1953,6 +1966,13 @@ struct FieldhouseNativePreviewView: View {
                         membership: liveContext.membership,
                         data: data,
                         publish: publish
+                    )
+                case .syncOfficialSchedule(let data):
+                    try await FieldhouseAuthenticatedRepository.syncOfficialSchedule(
+                        token: liveContext.token,
+                        userID: liveContext.userID,
+                        membership: liveContext.membership,
+                        data: data
                     )
                 }
 
@@ -3503,8 +3523,11 @@ private struct FieldhouseBracketsPage: View {
     @State private var showingBracketPicker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
     @State private var showingRoundPicker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-round")
     @State private var showingFieldImporter = false
+    @State private var showingScheduleImporter = false
     @State private var pendingFieldData: Data?
+    @State private var pendingScheduleData: Data?
     @State private var confirmingFieldPublish = false
+    @State private var confirmingScheduleSync = false
     var body: some View {
         Group {
             if showingRoundPicker, let field = state.officialPostseasonField, let round = state.activePostseasonRound {
@@ -3553,6 +3576,13 @@ private struct FieldhouseBracketsPage: View {
             pendingFieldData = try? Data(contentsOf: url)
             confirmingFieldPublish = pendingFieldData != nil
         }
+        .fileImporter(isPresented: $showingScheduleImporter, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            pendingScheduleData = try? Data(contentsOf: url)
+            confirmingScheduleSync = pendingScheduleData != nil
+        }
         .alert("Publish this official 76-team field?", isPresented: $confirmingFieldPublish) {
             Button("CANCEL", role: .cancel) { pendingFieldData = nil }
             Button("IMPORT DRAFT") {
@@ -3564,7 +3594,16 @@ private struct FieldhouseBracketsPage: View {
                 pendingFieldData = nil
             }
         } message: {
-            Text("War Room validates exactly 76 teams, 75 connected games, four 19-team regions, and official tip times. Publishing opens this same field in every \(state.league.rawValue) league.")
+            Text("War Room validates exactly 76 teams, 75 connected games, four 16-slot regions, 12 Opening Round feeders, and official tip times. Publishing opens this same field in every \(state.league.rawValue) league.")
+        }
+        .alert("Sync the official game schedule?", isPresented: $confirmingScheduleSync) {
+            Button("CANCEL", role: .cancel) { pendingScheduleData = nil }
+            Button("SYNC TIMES + EVENT IDS") {
+                if let data = pendingScheduleData { persist(.syncOfficialSchedule(data)) }
+                pendingScheduleData = nil
+            }
+        } message: {
+            Text("Only official tip times and Odds API event IDs are updated. The bracket graph and every player's permanent picks remain untouched.")
         }
     }
 
@@ -3581,9 +3620,14 @@ private struct FieldhouseBracketsPage: View {
             }.buttonStyle(.plain).disabled(state.bracketHellfireUsed || (state.officialPostseasonField == nil && state.isAuthenticatedSession))
             FieldhouseHero(kicker: "MARCH COMMAND · 76 TEAMS · 75 DECISIONS", title: "ROAD TO CENTER COURT", detail: "Twelve Opening Round games feed the familiar field of 64. Every winner advances through the real bracket path.", icon: "point.3.connected.trianglepath.dotted")
             if state.isCreator {
-                Button { showingFieldImporter = true } label: {
-                    FieldhouseAction(kicker: "OWNER CONTROL · SELECTION SUNDAY", title: "Import Official Field", detail: "Load one validated JSON bracket for every \(state.league.rawValue) league. Draft first or publish when verified.", icon: "doc.badge.plus")
-                }.buttonStyle(.plain)
+                VStack(spacing: 10) {
+                    Button { showingFieldImporter = true } label: {
+                        FieldhouseAction(kicker: "OWNER CONTROL · SELECTION SUNDAY", title: "Import Official Field", detail: "Load one validated JSON bracket for every \(state.league.rawValue) league. Draft first or publish when verified.", icon: "doc.badge.plus")
+                    }.buttonStyle(.plain)
+                    Button { showingScheduleImporter = true } label: {
+                        FieldhouseAction(kicker: "OWNER CONTROL · OFFICIAL SCHEDULE", title: "Sync Times + Event IDs", detail: "Update broadcast changes and provider links without replacing the bracket or player receipts.", icon: "clock.arrow.2.circlepath")
+                    }.buttonStyle(.plain)
+                }
             }
             postseasonPaths
             if let round = state.activePostseasonRound, let field = state.officialPostseasonField {
