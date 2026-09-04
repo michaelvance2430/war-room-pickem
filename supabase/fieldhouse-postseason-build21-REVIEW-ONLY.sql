@@ -1014,6 +1014,18 @@ begin
   select * into g from public.fieldhouse_tournament_games
   where tournament_id=p_tournament_id and game_id=p_game_id for update;
   if not found then raise exception 'Tournament game not found'; end if;
+  if g.winner_team_id is not null then
+    if g.winner_team_id=p_winner_team_id
+      and g.away_score=p_away_score
+      and g.home_score=p_home_score then
+      v_score:=public.score_fieldhouse_postseason(p_tournament_id);
+      if g.round_key='title' then
+        v_awards:=public.finalize_fieldhouse_postseason_awards(p_tournament_id);
+      end if;
+      return v_score||jsonb_build_object('awards',v_awards,'alreadyRecorded',true);
+    end if;
+    raise exception 'Tournament result is already final';
+  end if;
   v_first:=g.first_team_id;
   if v_first is null then select winner_team_id into v_first from public.fieldhouse_tournament_games
     where tournament_id=p_tournament_id and game_id=g.first_source_game_id; end if;

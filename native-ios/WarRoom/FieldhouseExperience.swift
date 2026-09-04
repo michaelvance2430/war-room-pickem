@@ -2423,12 +2423,16 @@ private struct FieldhouseTournamentScorecardView: View {
 private struct FieldhouseCommissionerCommand: View {
     @Environment(\.fieldhousePersist) private var persist
     @Environment(\.fieldhouseLeague) private var themedLeague
+    @Environment(\.fieldhouseStandings) private var standings
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
+    private var activeStandings: [Standing] { standings.filter { !$0.isBot } }
+    private var lateEntryScore: Int {
+        FieldhouseLateEntryRule.entryScore(existingScores: activeStandings.map(\.totalPoints))
+    }
     @Binding var state: FieldhouseSeasonState
     @Environment(\.dismiss) private var dismiss
     @State private var showingCardBuilder = false
     @State private var pendingTrophy: FieldhouseTrophyOption?
-    private let demoScores = [87, 82, 79, 76, 74, 72, 69, 66, 63, 61, 58, 55, 53, 49, 45, 42, 39, 35, 31, 28, 24, 19, 16, 12, 8]
     var body: some View {
         NavigationStack {
             ZStack {
@@ -2449,7 +2453,13 @@ private struct FieldhouseCommissionerCommand: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(state.cardIsPublished)
-                        commandRow("PLAYERS", detail: "25 active · late entry seed \(FieldhouseLateEntryRule.entryScore(existingScores: demoScores)) points", icon: "person.2.fill", status: FieldhouseLateEntryRule.acceptsEntries(during: state.phase) ? "OPEN" : "CLOSED", color: .green)
+                        commandRow(
+                            "PLAYERS",
+                            detail: "\(activeStandings.count) active · late entry seed \(lateEntryScore) points",
+                            icon: "person.2.fill",
+                            status: FieldhouseLateEntryRule.acceptsEntries(during: state.phase) ? "OPEN" : "CLOSED",
+                            color: FieldhouseLateEntryRule.acceptsEntries(during: state.phase) ? .green : .red
+                        )
                         commandRow("WEEK \(state.scoringWindow) · ON THE FLOOR", detail: "\(state.scoringFinalGames) final · \(state.scoringLiveGames) live", icon: "basketball.fill", status: "SCORING", color: .green)
                         commandRow("REGION ASSIGNMENTS", detail: "East · West · South · Midwest", icon: "square.grid.2x2.fill", status: state.canRebalanceRegions ? "EDIT" : "LOCKED", color: state.canRebalanceRegions ? accent : .red)
                         commandRow("SEASON PHASE", detail: "Transitions control entry eligibility and regional seeding", icon: "calendar.badge.clock", status: state.phase.rawValue, color: accent)

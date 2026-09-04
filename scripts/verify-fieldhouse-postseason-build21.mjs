@@ -37,6 +37,8 @@ assert.match(sql, /when s\.correct_picks::numeric\/75>=0\.60 then round\(s\.raw_
 assert.match(sql, /else round\(s\.raw_points\*0\.5\)::integer/);
 assert.match(sql, /fieldhouse_round_entries.*one point per correct official winner/is);
 assert.match(sql, /create or replace function public\.record_fieldhouse_tournament_result/);
+assert.match(sql, /raise exception 'Tournament result is already final'/);
+assert.match(sql, /'alreadyRecorded',true/);
 assert.match(sql, /create or replace function public\.finalize_fieldhouse_postseason_awards/);
 assert.match(sql, /total_points integer generated always as \(bracket_adjusted_points \+ round_points\) stored/);
 assert.match(sql, /League members read Fieldhouse postseason totals/);
@@ -76,6 +78,9 @@ assert.match(worker, /hasLiveWindow \? 50 : 900/);
 assert.match(worker, /official-tip-missing/);
 assert.match(client, /TOURNAMENT SCORECARD · LIVE/);
 assert.match(client, /state\.postseasonPoints\(for: standing\.userId\)/);
+assert.match(client, /activeStandings\.map\(\\\.totalPoints\)/);
+assert.match(client, /detail: "\\\(activeStandings\.count\) active/);
+assert.doesNotMatch(client, /demoScores|25 active/);
 assert.match(client, /if auth\.user != nil && auth\.token != nil \{\s*YouView\(onBack:/);
 assert.match(content, /case "m-iron-rim": return "FieldhouseMTheIronRim"/);
 assert.match(content, /case "w-pure-game": return "FieldhouseWThePureGame"/);
