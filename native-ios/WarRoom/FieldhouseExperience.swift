@@ -304,6 +304,75 @@ enum FieldhouseAuthenticatedRepository {
             isChaos: plan.usedHellfire
         )
     }
+
+    static func publishCard(
+        token: String,
+        membership: LeagueMembership,
+        state: FieldhouseSeasonState
+    ) async throws {
+        let plan = try FieldhouseCardWritePlan(state: state)
+        try await SupabaseAPI.publishWeekCard(
+            token: token,
+            leagueId: membership.leagueId,
+            weekNumber: membership.leagues.currentWeek,
+            games: plan.games,
+            propQuestion: plan.prop.question,
+            propA: "YES",
+            propB: "NO",
+            propPoints: 3
+        )
+    }
+
+    static func saveFavoriteTeam(token: String, userID: UUID, membership: LeagueMembership, favoriteTeam: String) async throws {
+        try await SupabaseAPI.saveFavoriteTeam(
+            token: token, userId: userID,
+            sportId: FieldhouseLeague(summary: membership.leagues).favoriteSportID,
+            teamId: favoriteTeam
+        )
+    }
+
+    static func selectTrophy(token: String, membership: LeagueMembership, trophyID: String) async throws {
+        try await SupabaseAPI.selectChampionshipTrophy(
+            token: token, leagueId: membership.leagueId, trophyId: trophyID
+        )
+    }
+}
+
+struct FieldhouseCardWritePlan {
+    let games: [[String: Any]]
+    let prop: FieldhousePropKind
+
+    init(state: FieldhouseSeasonState) throws {
+        guard state.isCommissioner,
+              state.cardIsPublished,
+              state.publishedGames.count == FieldhouseGameCatalog.weeklyCardSize,
+              let prop = state.publishedProp else {
+            throw FieldhouseRepositoryError(message: "Choose exactly ten games and an automatic prop before publishing the card.")
+        }
+        let formatter = ISO8601DateFormatter()
+        self.games = try state.publishedGames.enumerated().map { index, game in
+            guard let favorite = game.favoriteTeam,
+                  let spread = game.favoriteSpread,
+                  spread < 0,
+                  favorite == game.away || favorite == game.home else {
+                throw FieldhouseRepositoryError(message: "Every Fieldhouse game needs a valid favorite and half-point spread.")
+            }
+            let favoriteSide = favorite == game.away ? "away" : "home"
+            return [
+                "sort_order": index,
+                "away_team": game.away,
+                "home_team": game.home,
+                "spread": spread,
+                "favorite": favoriteSide,
+                "start_time": formatter.string(from: game.tipDate(in: state.window)),
+                "bookmaker": "Fieldhouse",
+                "away_rank": NSNull(),
+                "home_rank": NSNull(),
+                "is_rivalry": false
+            ]
+        }
+        self.prop = prop
+    }
 }
 
 enum FieldhouseReleaseGate {
@@ -320,13 +389,34 @@ enum FieldhouseReleaseGate {
     }
 }
 
+private struct FieldhouseLiveContext {
+    let token: String
+    let userID: UUID
+    let membership: LeagueMembership
+}
+
+private enum FieldhousePersistenceEvent {
+    case setup, publishCard, picks, trophy, favoriteTeam
+}
+
+private struct FieldhousePersistenceActionKey: EnvironmentKey {
+    static let defaultValue: (FieldhousePersistenceEvent) -> Void = { _ in }
+}
+
+private extension EnvironmentValues {
+    var fieldhousePersist: (FieldhousePersistenceEvent) -> Void {
+        get { self[FieldhousePersistenceActionKey.self] }
+        set { self[FieldhousePersistenceActionKey.self] = newValue }
+    }
+}
+
 struct FieldhouseAuthenticatedContainer: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var phase: Phase = .loading
 
     private enum Phase {
         case loading
-        case ready(FieldhouseSeasonState, FieldhouseStateScope)
+        case ready(FieldhouseSeasonState, FieldhouseStateScope, FieldhouseLiveContext)
         case failed(String)
     }
 
@@ -339,8 +429,8 @@ struct FieldhouseAuthenticatedContainer: View {
                     ProgressView("Opening the Fieldhouse…")
                         .tint(.orange)
                 }
-            case .ready(let state, let scope):
-                FieldhouseNativePreviewView(authenticatedState: state, scope: scope)
+            case .ready(let state, let scope, let context):
+                FieldhouseNativePreviewView(authenticatedState: state, scope: scope, liveContext: context)
             case .failed(let message):
                 ZStack {
                     FieldhouseBackdrop().ignoresSafeArea()
@@ -375,7 +465,8 @@ struct FieldhouseAuthenticatedContainer: View {
             let cached = FieldhouseStateStore().load(scope: scope)
             phase = .ready(
                 FieldhouseStateHydrator.hydrate(snapshot: snapshot, userID: user.id, cached: cached),
-                scope
+                scope,
+                FieldhouseLiveContext(token: token, userID: user.id, membership: snapshot.membership)
             )
         } catch {
             phase = .failed(error.localizedDescription)
@@ -668,8 +759,14 @@ extension FieldhouseGame {
             formatter.dateFormat = "EEE h:mm a z"
             return formatter.string(from: date).uppercased()
         } ?? "TIP TIME PENDING"
-        let favorite = cardGame.favorite.trimmingCharacters(in: .whitespacesAndNewlines)
-        let line = cardGame.spread > 0 ? -cardGame.spread : cardGame.spread
+        let storedFavorite = cardGame.favorite.trimmingCharacters(in: .whitespacesAndNewlines)
+        let favorite: String
+        switch storedFavorite.lowercased() {
+        case "away": favorite = cardGame.awayTeam
+        case "home": favorite = cardGame.homeTeam
+        default: favorite = storedFavorite
+        }
+        let line = -abs(cardGame.spread)
 
         self.init(
             id: cardGame.id.uuidString.lowercased(),
@@ -1218,11 +1315,14 @@ struct FieldhouseNativePreviewView: View {
     @State private var strikePresentation: StrikePresentation?
     @State private var showingEntrance = true
     @State private var showingSetup = false
+    @State private var persistenceError: String?
+    @State private var lastVerifiedState: FieldhouseSeasonState
     @Environment(\.scenePhase) private var scenePhase
     private let stateStore = FieldhouseStateStore()
     private let initialLeague: FieldhouseLeague
     private let authenticatedState: FieldhouseSeasonState?
     private let authenticatedScope: FieldhouseStateScope?
+    private let liveContext: FieldhouseLiveContext?
     private var stateScope: FieldhouseStateScope {
         authenticatedScope ?? FieldhouseStateScope(
             userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,
@@ -1234,6 +1334,7 @@ struct FieldhouseNativePreviewView: View {
         self.initialLeague = initialLeague
         self.authenticatedState = nil
         self.authenticatedScope = nil
+        self.liveContext = nil
         let initialState = Self.makePreviewState(for: initialLeague)
         let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
         let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
@@ -1242,16 +1343,19 @@ struct FieldhouseNativePreviewView: View {
         let reviewBracket = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
         let reviewHellfire = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-hellfire")
         _state = State(initialValue: initialState)
+        _lastVerifiedState = State(initialValue: initialState)
         _desk = State(initialValue: reviewBracket ? .standings : (reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home))))
         _strikePresentation = State(initialValue: reviewHellfire ? StrikePresentation(resourceName: initialLeague == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1") : nil)
         _showingEntrance = State(initialValue: !reviewMode)
     }
 
-    init(authenticatedState: FieldhouseSeasonState, scope: FieldhouseStateScope) {
+    fileprivate init(authenticatedState: FieldhouseSeasonState, scope: FieldhouseStateScope, liveContext: FieldhouseLiveContext) {
         self.initialLeague = authenticatedState.league
         self.authenticatedState = authenticatedState
         self.authenticatedScope = scope
+        self.liveContext = liveContext
         _state = State(initialValue: authenticatedState)
+        _lastVerifiedState = State(initialValue: authenticatedState)
         _desk = State(initialValue: .home)
         _strikePresentation = State(initialValue: nil)
         _showingEntrance = State(initialValue: true)
@@ -1320,6 +1424,7 @@ struct FieldhouseNativePreviewView: View {
             }
         }
         .environment(\.fieldhouseLeague, state.league)
+        .environment(\.fieldhousePersist, { event in persist(event) })
         .accentColor(FieldhouseTheme.accent(for: state.league))
         .preferredColorScheme(.dark)
         .fullScreenCover(item: $strikePresentation) { presentation in
@@ -1333,6 +1438,14 @@ struct FieldhouseNativePreviewView: View {
         }
         .fullScreenCover(isPresented: $showingSetup) {
             FieldhouseSeasonSetupView(state: $state) { showingSetup = false }
+        }
+        .alert("Couldn’t save that change", isPresented: Binding(
+            get: { persistenceError != nil },
+            set: { if !$0 { persistenceError = nil } }
+        )) {
+            Button("OK", role: .cancel) { persistenceError = nil }
+        } message: {
+            Text(persistenceError ?? "Try again.")
         }
         .onAppear {
             if let authenticatedState {
@@ -1362,9 +1475,45 @@ struct FieldhouseNativePreviewView: View {
         state.enforcePickDeadline(at: date)
         _ = state.advanceToNextWindow(at: date)
     }
+
+    private func persist(_ event: FieldhousePersistenceEvent) {
+        guard let liveContext else { return }
+        let pendingState = state
+        Task { @MainActor in
+            do {
+                switch event {
+                case .setup:
+                    guard let favorite = pendingState.favoriteTeam, let champion = pendingState.crystalBallChampion else {
+                        throw FieldhouseRepositoryError(message: "Favorite team and Crystal Ball champion are both required.")
+                    }
+                    try await FieldhouseAuthenticatedRepository.saveSetup(token: liveContext.token, userID: liveContext.userID, membership: liveContext.membership, favoriteTeam: favorite, crystalBallChampion: champion)
+                case .publishCard:
+                    try await FieldhouseAuthenticatedRepository.publishCard(token: liveContext.token, membership: liveContext.membership, state: pendingState)
+                case .picks:
+                    _ = try await FieldhouseAuthenticatedRepository.savePicks(token: liveContext.token, membership: liveContext.membership, state: pendingState)
+                case .trophy:
+                    let trophyID = pendingState.championshipTrophyID
+                    guard !trophyID.isEmpty else { throw FieldhouseRepositoryError(message: "Choose a trophy before saving.") }
+                    try await FieldhouseAuthenticatedRepository.selectTrophy(token: liveContext.token, membership: liveContext.membership, trophyID: trophyID)
+                case .favoriteTeam:
+                    guard let favorite = pendingState.favoriteTeam else { throw FieldhouseRepositoryError(message: "Choose a favorite team before saving.") }
+                    try await FieldhouseAuthenticatedRepository.saveFavoriteTeam(token: liveContext.token, userID: liveContext.userID, membership: liveContext.membership, favoriteTeam: favorite)
+                }
+
+                let verified = try await FieldhouseAuthenticatedRepository.load(token: liveContext.token, userID: liveContext.userID, preferredLeagueID: liveContext.membership.leagueId)
+                let hydrated = FieldhouseStateHydrator.hydrate(snapshot: verified, userID: liveContext.userID, cached: pendingState)
+                state = hydrated
+                lastVerifiedState = hydrated
+            } catch {
+                state = lastVerifiedState
+                persistenceError = error.localizedDescription
+            }
+        }
+    }
 }
 
 private struct FieldhouseSeasonSetupView: View {
+    @Environment(\.fieldhousePersist) private var persist
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
@@ -1427,6 +1576,7 @@ private struct FieldhouseSeasonSetupView: View {
                         step = 1
                     } else {
                         state.crystalBallChampion = pendingTeam
+                        persist(.setup)
                         finish()
                     }
                 } label: {
@@ -1563,6 +1713,7 @@ private struct FieldhouseEntranceView: View {
 }
 
 private struct FieldhouseHomePage: View {
+    @Environment(\.fieldhousePersist) private var persist
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
@@ -1620,6 +1771,7 @@ private struct FieldhouseHomePage: View {
         .sheet(isPresented: $showingCardBuilder) {
             FieldhouseCardBuilder(window: state.window) { games, prop in
                 if state.publishCard(games: games, prop: prop) {
+                    persist(.publishCard)
                     showingCardBuilder = false
                     scheduleCardNotifications()
                 }
@@ -1683,6 +1835,7 @@ private struct FieldhouseHomePage: View {
 }
 
 private struct FieldhouseCommissionerCommand: View {
+    @Environment(\.fieldhousePersist) private var persist
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
@@ -1728,6 +1881,7 @@ private struct FieldhouseCommissionerCommand: View {
                 .sheet(isPresented: $showingCardBuilder) {
                     FieldhouseCardBuilder(window: state.window) { games, prop in
                         if state.publishCard(games: games, prop: prop) {
+                            persist(.publishCard)
                             showingCardBuilder = false
                             scheduleCardNotifications()
                         }
@@ -1742,7 +1896,7 @@ private struct FieldhouseCommissionerCommand: View {
                     presenting: pendingTrophy
                 ) { trophy in
                     Button("CONFIRM TROPHY") {
-                        _ = state.selectChampionshipTrophy(trophy.id)
+                        if state.selectChampionshipTrophy(trophy.id) { persist(.trophy) }
                         pendingTrophy = nil
                     }
                     Button("CANCEL", role: .cancel) { pendingTrophy = nil }
@@ -2008,6 +2162,7 @@ private enum FieldhousePicksLane: String {
 }
 
 private struct FieldhousePicksPage: View {
+    @Environment(\.fieldhousePersist) private var persist
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
@@ -2049,7 +2204,7 @@ private struct FieldhousePicksPage: View {
         }
         .alert("Lock these picks?", isPresented: $confirmingLock) {
             Button("NOT YET", role: .cancel) {}
-            Button("LOCK PICKS") { _ = state.lockPicks(at: Date()) }
+            Button("LOCK PICKS") { if state.lockPicks(at: Date()) { persist(.picks) } }
         } message: {
             Text("Your card is complete. You can reopen and change it only before the first tip.")
         }
@@ -2343,6 +2498,7 @@ private struct FieldhousePicksPage: View {
 
     private func deployHellfire() {
         guard state.deployRegularSeasonHellfire(at: now) else { return }
+        persist(.picks)
         strikePresentation = fieldhouseHellfirePresentation
     }
 
@@ -2957,6 +3113,7 @@ private struct FieldhouseLockerProfileSheet: View {
     }
 }
 private struct FieldhouseProfilePage: View {
+    @Environment(\.fieldhousePersist) private var persist
     @EnvironmentObject private var auth: AuthStore
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
@@ -3004,7 +3161,12 @@ private struct FieldhouseProfilePage: View {
                     ScrollView {
                         LazyVStack(spacing: 7) {
                             ForEach(teams, id: \.self) { team in
-                                Button { state.favoriteTeam = team; editingFavorite = false; searchText = "" } label: {
+                                Button {
+                                    state.favoriteTeam = team
+                                    persist(.favoriteTeam)
+                                    editingFavorite = false
+                                    searchText = ""
+                                } label: {
                                     HStack {
                                         Text(team).font(.subheadline.weight(.bold)); Spacer()
                                         if state.favoriteTeam == team { Image(systemName: "checkmark.circle.fill").foregroundStyle(accent) }

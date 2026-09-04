@@ -52,8 +52,8 @@ final class FieldhouseExperienceTests: XCTestCase {
             )
         )
         let games = [
-            CardGame(id: firstGameID, sortOrder: 0, awayTeam: "UConn Huskies", homeTeam: "South Carolina Gamecocks", spread: -4.5, favorite: "South Carolina Gamecocks", startTime: "2026-11-05T00:30:00Z", awayRank: 2, homeRank: 1, isRivalry: false),
-            CardGame(id: secondGameID, sortOrder: 1, awayTeam: "Iowa Hawkeyes", homeTeam: "UCLA Bruins", spread: -2.5, favorite: "UCLA Bruins", startTime: "2026-11-06T01:00:00Z", awayRank: 8, homeRank: 4, isRivalry: false)
+            CardGame(id: firstGameID, sortOrder: 0, awayTeam: "UConn Huskies", homeTeam: "South Carolina Gamecocks", spread: -4.5, favorite: "home", startTime: "2026-11-05T00:30:00Z", awayRank: 2, homeRank: 1, isRivalry: false),
+            CardGame(id: secondGameID, sortOrder: 1, awayTeam: "Iowa Hawkeyes", homeTeam: "UCLA Bruins", spread: -2.5, favorite: "home", startTime: "2026-11-06T01:00:00Z", awayRank: 8, homeRank: 4, isRivalry: false)
         ]
         let snapshot = FieldhouseAuthenticatedSnapshot(
             membership: membership,
@@ -79,12 +79,34 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.crystalBallChampion, "South Carolina Gamecocks")
         XCTAssertEqual(state.publishedGames.map(\.id), [firstGameID, secondGameID].map { $0.uuidString.lowercased() })
         XCTAssertEqual(state.publishedGames[0].tip, "WED 7:30 PM EST")
+        XCTAssertEqual(state.publishedGames[0].favoriteTeam, "South Carolina Gamecocks")
+        XCTAssertEqual(state.publishedGames[0].favoriteSpread, -4.5)
         XCTAssertEqual(state.sideSelections, [0: "UConn Huskies", 1: "UCLA Bruins"])
         XCTAssertEqual(state.confidenceSelections, [0: 10, 1: 9])
         XCTAssertEqual(state.bestBetGame, 0)
         XCTAssertEqual(state.propAnswer, "YES")
         XCTAssertTrue(state.picksLocked)
         XCTAssertTrue(state.hellfireDeployedOnCurrentCard)
+    }
+
+    func testCardWritePlanTranslatesTeamFavoriteToSharedHomeAwayContract() throws {
+        var state = FieldhouseSeasonState()
+        state.isCommissioner = true
+        let games = Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize))
+        XCTAssertTrue(state.publishCard(games: games, prop: .teamScores90))
+
+        let plan = try FieldhouseCardWritePlan(state: state)
+
+        XCTAssertEqual(plan.games.count, FieldhouseGameCatalog.weeklyCardSize)
+        XCTAssertEqual(plan.prop, .teamScores90)
+        for (index, payload) in plan.games.enumerated() {
+            let game = games[index]
+            XCTAssertEqual(payload["sort_order"] as? Int, index)
+            XCTAssertEqual(payload["away_team"] as? String, game.away)
+            XCTAssertEqual(payload["home_team"] as? String, game.home)
+            XCTAssertEqual(payload["favorite"] as? String, game.favoriteTeam == game.away ? "away" : "home")
+            XCTAssertNotNil(payload["start_time"] as? String)
+        }
     }
 
     func testAuthenticatedSnapshotWithoutACardClearsOnlyLeagueCardState() {
