@@ -492,10 +492,14 @@ struct FieldhousePickWritePlan {
 
         let picks = try state.publishedGames.enumerated().map { index, game -> PickSubmission in
             guard let gameID = UUID(uuidString: game.id),
-                  let side = state.sideSelections[index],
+                  let selectedTeam = state.sideSelections[index],
                   let confidence = state.confidenceSelections[index] else {
                 throw FieldhouseRepositoryError(message: "This card contains a game that cannot be saved. Pull a fresh card and try again.")
             }
+            let side: String
+            if selectedTeam == game.away { side = "away" }
+            else if selectedTeam == game.home { side = "home" }
+            else { throw FieldhouseRepositoryError(message: "One of your selected teams is not on the published card. Reopen that matchup and choose again.") }
             return PickSubmission(gameId: gameID, side: side, confidence: confidence)
         }
         self.picks = picks
@@ -1255,7 +1259,12 @@ enum FieldhouseStateHydrator {
         })
         state.sideSelections = Dictionary(uniqueKeysWithValues: (snapshot.pick?.pickGames ?? []).compactMap {
             guard let index = gameIndex[$0.cardGameId] else { return nil }
-            return (index, $0.side)
+            let game = orderedGames[index]
+            switch $0.side.lowercased() {
+            case "away": return (index, game.awayTeam)
+            case "home": return (index, game.homeTeam)
+            default: return nil
+            }
         })
         state.confidenceSelections = Dictionary(uniqueKeysWithValues: (snapshot.pick?.pickGames ?? []).compactMap {
             guard let index = gameIndex[$0.cardGameId] else { return nil }

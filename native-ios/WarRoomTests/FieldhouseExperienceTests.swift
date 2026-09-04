@@ -59,8 +59,8 @@ final class FieldhouseExperienceTests: XCTestCase {
             membership: membership,
             card: WeekCard(id: UUID(), weekNumber: 1, lockTime: "2026-11-05T00:30:00Z", propQuestion: FieldhousePropKind.teamScores90.question, propOptionA: "YES", propOptionB: "NO", propPoints: 3, cardGames: games),
             pick: PlayerPick(id: UUID(), propChoice: "YES", lockedAt: "2026-11-04T20:00:00Z", totalPoints: nil, isChaos: true, pickGames: [
-                PickedGame(cardGameId: firstGameID, side: "UConn Huskies", confidence: 10, isBestBet: true),
-                PickedGame(cardGameId: secondGameID, side: "UCLA Bruins", confidence: 9, isBestBet: false)
+                PickedGame(cardGameId: firstGameID, side: "away", confidence: 10, isBestBet: true),
+                PickedGame(cardGameId: secondGameID, side: "home", confidence: 9, isBestBet: false)
             ]),
             favoriteTeam: FavoriteTeam(sportId: "ncaaw", teamId: "iowa-hawkeyes"),
             crystalBall: CrystalBallPick(teamName: "South Carolina Gamecocks")
@@ -160,6 +160,7 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(plan.propChoice, "NO")
         XCTAssertTrue(plan.usedHellfire)
         XCTAssertEqual(plan.picks.map(\.confidence), Array(1...10))
+        XCTAssertEqual(plan.picks.map(\.side), Array(repeating: "home", count: 10))
     }
 
     func testAuthenticatedPickWritePlanRejectsPreviewOnlyGameIDs() {
