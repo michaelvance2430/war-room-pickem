@@ -208,6 +208,7 @@ struct FieldhouseAuthenticatedSnapshot {
     let favoriteTeam: FavoriteTeam?
     let crystalBall: CrystalBallPick?
     var latestScorecard: RegularSeasonScorecard? = nil
+    var standings: [Standing] = []
 }
 
 private struct FieldhouseRepositoryError: LocalizedError {
@@ -262,6 +263,7 @@ enum FieldhouseAuthenticatedRepository {
             leagueId: membership.leagueId,
             userId: userID
         )
+        async let standings = SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
 
         let loadedScorecards = try await scorecards
         return try await FieldhouseAuthenticatedSnapshot(
@@ -270,7 +272,8 @@ enum FieldhouseAuthenticatedRepository {
             pick: pick,
             favoriteTeam: favorite,
             crystalBall: crystal,
-            latestScorecard: loadedScorecards.first
+            latestScorecard: loadedScorecards.first,
+            standings: standings
         )
     }
 
@@ -401,6 +404,7 @@ private struct FieldhouseLiveContext {
     let token: String
     let userID: UUID
     let membership: LeagueMembership
+    let standings: [Standing]
 }
 
 private enum FieldhousePersistenceEvent {
@@ -411,10 +415,18 @@ private struct FieldhousePersistenceActionKey: EnvironmentKey {
     static let defaultValue: (FieldhousePersistenceEvent) -> Void = { _ in }
 }
 
+private struct FieldhouseStandingsKey: EnvironmentKey {
+    static let defaultValue: [Standing] = []
+}
+
 private extension EnvironmentValues {
     var fieldhousePersist: (FieldhousePersistenceEvent) -> Void {
         get { self[FieldhousePersistenceActionKey.self] }
         set { self[FieldhousePersistenceActionKey.self] = newValue }
+    }
+    var fieldhouseStandings: [Standing] {
+        get { self[FieldhouseStandingsKey.self] }
+        set { self[FieldhouseStandingsKey.self] = newValue }
     }
 }
 
@@ -474,7 +486,7 @@ struct FieldhouseAuthenticatedContainer: View {
             phase = .ready(
                 FieldhouseStateHydrator.hydrate(snapshot: snapshot, userID: user.id, cached: cached),
                 scope,
-                FieldhouseLiveContext(token: token, userID: user.id, membership: snapshot.membership)
+                FieldhouseLiveContext(token: token, userID: user.id, membership: snapshot.membership, standings: snapshot.standings)
             )
         } catch {
             phase = .failed(error.localizedDescription)
@@ -1233,6 +1245,13 @@ enum FieldhouseStateHydrator {
 
         state.window = max(1, snapshot.membership.leagues.currentWeek)
         state.isCommissioner = snapshot.membership.isCommissioner(userId: userID)
+        if !snapshot.standings.isEmpty {
+            state.playerCount = snapshot.standings.count
+            let userDivision = snapshot.standings.first(where: { $0.userId == userID })?.division ?? snapshot.membership.division
+            let regional = snapshot.standings.filter { $0.division == userDivision }
+            state.regionPlayerCount = max(1, regional.count)
+            if let index = regional.firstIndex(where: { $0.userId == userID }) { state.rank = index + 1 }
+        }
         state.seasonHasStarted = snapshot.membership.leagues.currentWeek > 1 || now >= FieldhouseSeasonCalendar.openingTip
         state.favoriteTeam = snapshot.favoriteTeam.flatMap {
             FieldhouseTeamCatalog.displayName(forStoredID: $0.teamId, league: league)
@@ -1367,6 +1386,7 @@ struct FieldhouseNativePreviewView: View {
     @State private var showingSetup = false
     @State private var persistenceError: String?
     @State private var lastVerifiedState: FieldhouseSeasonState
+    @State private var standings: [Standing]
     @Environment(\.scenePhase) private var scenePhase
     private let stateStore = FieldhouseStateStore()
     private let initialLeague: FieldhouseLeague
@@ -1394,6 +1414,7 @@ struct FieldhouseNativePreviewView: View {
         let reviewHellfire = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-hellfire")
         _state = State(initialValue: initialState)
         _lastVerifiedState = State(initialValue: initialState)
+        _standings = State(initialValue: [])
         _desk = State(initialValue: reviewBracket ? .standings : (reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home))))
         _strikePresentation = State(initialValue: reviewHellfire ? StrikePresentation(resourceName: initialLeague == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1") : nil)
         _showingEntrance = State(initialValue: !reviewMode)
@@ -1406,6 +1427,7 @@ struct FieldhouseNativePreviewView: View {
         self.liveContext = liveContext
         _state = State(initialValue: authenticatedState)
         _lastVerifiedState = State(initialValue: authenticatedState)
+        _standings = State(initialValue: liveContext.standings)
         _desk = State(initialValue: .home)
         _strikePresentation = State(initialValue: nil)
         _showingEntrance = State(initialValue: true)
@@ -1475,6 +1497,7 @@ struct FieldhouseNativePreviewView: View {
         }
         .environment(\.fieldhouseLeague, state.league)
         .environment(\.fieldhousePersist, { event in persist(event) })
+        .environment(\.fieldhouseStandings, standings)
         .accentColor(FieldhouseTheme.accent(for: state.league))
         .preferredColorScheme(.dark)
         .fullScreenCover(item: $strikePresentation) { presentation in
@@ -1553,6 +1576,7 @@ struct FieldhouseNativePreviewView: View {
                 let verified = try await FieldhouseAuthenticatedRepository.load(token: liveContext.token, userID: liveContext.userID, preferredLeagueID: liveContext.membership.leagueId)
                 let hydrated = FieldhouseStateHydrator.hydrate(snapshot: verified, userID: liveContext.userID, cached: pendingState)
                 state = hydrated
+                standings = verified.standings
                 lastVerifiedState = hydrated
             } catch {
                 state = lastVerifiedState
@@ -2559,6 +2583,7 @@ private struct FieldhousePicksPage: View {
 
 private struct FieldhouseStandingsPage: View {
     @EnvironmentObject private var auth: AuthStore
+    @Environment(\.fieldhouseStandings) private var authenticatedStandings
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
@@ -2575,14 +2600,24 @@ private struct FieldhouseStandingsPage: View {
         return name.isEmpty ? "Riley V." : name
     }
     private var players: [String] { [playerName, "Full Court Mess", "Bracket Buster", "The Sixth Man", "Baseline Bandit", "March Sadness", "Bank Shot", "Coach's Favorite", "Paint Patrol", "Buzzer Beater", "Zone Defense", "Heat Check", "One Shining Mistake", "Fast Break", "The Transfer Portal", "Double Bonus", "Shot Clock", "Backboard Damage", "Cinderella Story", "Technical Foul", "Bubble Trouble", "Air Ball", "Traveling", "Bench Mob", "Wooden Spoon"] }
+    private var visibleStandings: [Standing] {
+        let sorted = authenticatedStandings.sorted { lhs, rhs in
+            lhs.totalPoints == rhs.totalPoints ? lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending : lhs.totalPoints > rhs.totalPoints
+        }
+        guard !showingOverall else { return sorted }
+        return sorted.filter { ($0.division ?? "").caseInsensitiveCompare(state.selectedRegion.rawValue) == .orderedSame }
+    }
+    private var displayedPlayerCount: Int {
+        authenticatedStandings.isEmpty ? state.regionPlayerCount : visibleStandings.count
+    }
     private var regionalCounts: (championship: Int, activeNoBrass: Int, toilet: Int) {
-        WarRoomPostseasonRule.regionalCounts(playerCount: state.regionPlayerCount)
+        WarRoomPostseasonRule.regionalCounts(playerCount: displayedPlayerCount)
     }
     private var championshipCutIndex: Int? {
         regionalCounts.championship > 0 ? regionalCounts.championship - 1 : nil
     }
     private var toiletCutIndex: Int? {
-        regionalCounts.toilet > 0 ? state.regionPlayerCount - regionalCounts.toilet - 1 : nil
+        regionalCounts.toilet > 0 ? displayedPlayerCount - regionalCounts.toilet - 1 : nil
     }
     var body: some View {
         Group {
@@ -2611,10 +2646,16 @@ private struct FieldhouseStandingsPage: View {
                 }
             }
             VStack(spacing: 8) {
-                ForEach(Array(players.enumerated()), id: \.offset) { index, player in
-                    standingRow(rank: index + 1, player: player, points: index == 0 ? 87 + state.scoringPoints : 87 - (index * 2), isCurrentUser: index == 0)
-                    if !showingOverall && index == championshipCutIndex { cutLine("CHAMPIONSHIP CUT", color: .yellow) }
-                    if !showingOverall && index == toiletCutIndex { cutLine("TOILET BOWL CUT", color: .purple) }
+                if authenticatedStandings.isEmpty {
+                    ForEach(Array(players.enumerated()), id: \.offset) { index, player in
+                        standingRow(rank: index + 1, player: player, points: index == 0 ? 87 + state.scoringPoints : 87 - (index * 2), isCurrentUser: index == 0)
+                        cutLines(after: index)
+                    }
+                } else {
+                    ForEach(Array(visibleStandings.enumerated()), id: \.element.id) { index, standing in
+                        authenticatedStandingRow(rank: index + 1, standing: standing)
+                        cutLines(after: index)
+                    }
                 }
             }
             Text("EAST + WEST + SOUTH + MIDWEST  →  CENTER COURT").font(.caption.weight(.black)).tracking(1).foregroundStyle(accent).padding(14).frame(maxWidth: .infinity).background(accent.opacity(0.1), in: Capsule())
@@ -2655,7 +2696,7 @@ private struct FieldhouseStandingsPage: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("REGIONAL CUT").font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(accent)
-                    Text("\(state.regionPlayerCount) PLAYERS · \(state.selectedRegion.rawValue) REGION")
+                    Text("\(displayedPlayerCount) PLAYERS · \(showingOverall ? "OVERALL" : "\(state.selectedRegion.rawValue) REGION")")
                         .font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.52))
                 }
                 Spacer()
@@ -2706,6 +2747,30 @@ private struct FieldhouseStandingsPage: View {
             }
             Spacer(); Text("\(points)").font(.title2.weight(.black)).foregroundStyle(accent)
         }.padding(12).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(accent.opacity(0.18)))
+    }
+
+    @ViewBuilder private func cutLines(after index: Int) -> some View {
+        if !showingOverall && index == championshipCutIndex { cutLine("CHAMPIONSHIP CUT", color: .yellow) }
+        if !showingOverall && index == toiletCutIndex { cutLine("TOILET BOWL CUT", color: .purple) }
+    }
+
+    private func authenticatedStandingRow(rank: Int, standing: Standing) -> some View {
+        let profile = standing.profiles
+        let earnedTitle = ProfileCosmetics.titleName(for: profile?.equippedTitleId)
+        let displayName = earnedTitle.map { "\(SportIdentity(sportID).cheevoTitle(code: profile?.equippedTitleId ?? "", fallback: $0)) \(standing.name)" } ?? standing.name
+        return HStack(spacing: 12) {
+            Text("\(rank)").font(.title3.weight(.black)).foregroundStyle(rank <= 4 ? .yellow : .white.opacity(0.58)).frame(width: 30)
+            ProfileAvatar(urlString: profile?.avatarURL, name: standing.name, size: 42, borderId: profile?.equippedBorderId, accent: accent)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(displayName).font(.headline.weight(.black))
+                Text(showingOverall ? "FIELDHOUSE OVERALL" : "\(standing.division?.uppercased() ?? "UNASSIGNED") REGION")
+                    .font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.44))
+            }
+            Spacer()
+            Text("\(standing.totalPoints)").font(.title2.weight(.black)).foregroundStyle(accent)
+        }
+        .padding(12).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(standing.userId == auth.user?.id ? accent : accent.opacity(0.18), lineWidth: standing.userId == auth.user?.id ? 2 : 1))
     }
 
     private func cutLine(_ title: String, color: Color) -> some View {

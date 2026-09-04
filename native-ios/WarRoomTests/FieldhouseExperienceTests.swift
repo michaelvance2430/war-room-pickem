@@ -76,7 +76,11 @@ final class FieldhouseExperienceTests: XCTestCase {
                 ]),
                 seasonTotalBefore: 0,
                 seasonTotalAfter: 23
-            )
+            ),
+            standings: [
+                Standing(id: UUID(), userId: userID, totalPoints: 23, weeklyPoints: [23], weeksPlayed: 1, displayNameOverride: "Riley V.", division: "East", profiles: nil, atsCorrect: 2, atsTotal: 2, currentStreak: 1, bestWeek: 23, worstWeek: 23, perfectWeeks: 0, bestBetHits: 1, bestBetTotal: 1, propHits: 1, propTotal: 1, isBot: false),
+                Standing(id: UUID(), userId: UUID(), totalPoints: 17, weeklyPoints: [17], weeksPlayed: 1, displayNameOverride: "Baseline Bandit", division: "East", profiles: nil, atsCorrect: 1, atsTotal: 2, currentStreak: 1, bestWeek: 17, worstWeek: 17, perfectWeeks: 0, bestBetHits: 0, bestBetTotal: 1, propHits: 1, propTotal: 1, isBot: false)
+            ]
         )
 
         let state = FieldhouseStateHydrator.hydrate(
@@ -106,6 +110,9 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.scoringSelections, [0: "UConn Huskies", 1: "UCLA Bruins"])
         XCTAssertEqual(state.lastCertifiedWindow, 0)
         XCTAssertEqual(state.lastCertifiedPoints, 23)
+        XCTAssertEqual(state.playerCount, 2)
+        XCTAssertEqual(state.regionPlayerCount, 2)
+        XCTAssertEqual(state.rank, 1)
     }
 
     func testCardWritePlanTranslatesTeamFavoriteToSharedHomeAwayContract() throws {
