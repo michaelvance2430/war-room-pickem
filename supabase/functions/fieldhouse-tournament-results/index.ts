@@ -15,7 +15,7 @@ type Game = {
   game_id: string; round_key: string; odds_event_id: string | null;
   first_team_id: string | null; second_team_id: string | null;
   first_source_game_id: string | null; second_source_game_id: string | null;
-  winner_team_id: string | null;
+  starts_at: string | null; winner_team_id: string | null;
 };
 type Tournament = { id: string; sport_id: "ncaam" | "ncaaw"; status: string; fieldhouse_tournament_games: Game[]; fieldhouse_tournament_teams: Team[] };
 
@@ -24,16 +24,37 @@ Deno.serve(async (request: Request) => {
   try {
     const db = createClient(required("SUPABASE_URL"), required("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false, autoRefreshToken: false } });
     const { data, error } = await db.from("fieldhouse_tournaments").select(
-      "id,sport_id,status,fieldhouse_tournament_teams(team_id,display_name),fieldhouse_tournament_games(game_id,round_key,odds_event_id,first_team_id,second_team_id,first_source_game_id,second_source_game_id,winner_team_id)"
+      "id,sport_id,status,fieldhouse_tournament_teams(team_id,display_name),fieldhouse_tournament_games(game_id,round_key,odds_event_id,starts_at,first_team_id,second_team_id,first_source_game_id,second_source_game_id,winner_team_id)"
     ).in("status", ["published", "in_progress"]);
     if (error) throw error;
 
     let settled = 0;
     const waiting: string[] = [];
     for (const tournament of (data || []) as Tournament[]) {
+      const games = new Map(tournament.fieldhouse_tournament_games.map((game) => [game.game_id, game]));
+      const now = Date.now();
+      const readyPending = tournament.fieldhouse_tournament_games.filter((game) => {
+        if (game.winner_team_id || !game.starts_at) return false;
+        const firstID = game.first_team_id || (game.first_source_game_id ? games.get(game.first_source_game_id)?.winner_team_id : null);
+        const secondID = game.second_team_id || (game.second_source_game_id ? games.get(game.second_source_game_id)?.winner_team_id : null);
+        return Boolean(firstID && secondID);
+      });
+      const pollingGames = readyPending.filter((game) => {
+        const tip = Date.parse(game.starts_at || "");
+        return Number.isFinite(tip) && tip <= now + 2 * 60_000 && tip >= now - 24 * 60 * 60_000;
+      });
+      const staleGames = readyPending.filter((game) => {
+        const tip = Date.parse(game.starts_at || "");
+        return Number.isFinite(tip) && tip < now - 24 * 60 * 60_000;
+      });
+      if (staleGames.length) waiting.push(...staleGames.map((game) => `${tournament.id}:${game.game_id}:manual-review-over-24h`));
+      if (!pollingGames.length) continue;
+
+      const hasLiveWindow = pollingGames.some((game) => Date.parse(game.starts_at || "") >= now - 5 * 60 * 60_000);
+      const minimumRefreshSeconds = hasLiveWindow ? 50 : 900;
       const { data: cached } = await db.from("live_football_score_cache").select("events").eq("sport", tournament.sport_id).maybeSingle();
       let events = Array.isArray(cached?.events) ? cached.events : [];
-      const { data: claimed } = await db.rpc("claim_live_football_score_refresh", { p_sport: tournament.sport_id, p_min_age_seconds: 50 });
+      const { data: claimed } = await db.rpc("claim_live_football_score_refresh", { p_sport: tournament.sport_id, p_min_age_seconds: minimumRefreshSeconds });
       if (claimed) {
         const url = new URL(`https://api.the-odds-api.com/v4/sports/${sportKey(tournament.sport_id)}/scores`);
         url.searchParams.set("apiKey", required("ODDS_API_KEY"));
@@ -49,9 +70,8 @@ Deno.serve(async (request: Request) => {
         await db.from("live_football_score_cache").update({ events, fetched_at: new Date().toISOString(), provider_remaining: remaining, provider_used: used, provider_last_cost: last, last_http_status: provider.status, last_error: null }).eq("sport", tournament.sport_id);
       }
       const teams = new Map(tournament.fieldhouse_tournament_teams.map((team) => [team.team_id, team]));
-      const games = new Map(tournament.fieldhouse_tournament_games.map((game) => [game.game_id, game]));
 
-      for (const game of tournament.fieldhouse_tournament_games.filter((row) => !row.winner_team_id)) {
+      for (const game of pollingGames) {
         const firstID = game.first_team_id || (game.first_source_game_id ? games.get(game.first_source_game_id)?.winner_team_id : null);
         const secondID = game.second_team_id || (game.second_source_game_id ? games.get(game.second_source_game_id)?.winner_team_id : null);
         if (!firstID || !secondID) continue;

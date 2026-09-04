@@ -93,6 +93,17 @@ alter table public.live_football_score_cache
   add constraint live_football_score_cache_sport_check
   check (sport in ('cfb','nfl','ncaam','ncaaw'));
 
+alter table public.platform_odds_api_usage
+  drop constraint if exists platform_odds_api_usage_sport_check;
+alter table public.platform_odds_api_usage
+  add constraint platform_odds_api_usage_sport_check
+  check (sport is null or sport in ('cfb','nfl','ncaam','ncaaw'));
+alter table public.platform_odds_api_usage
+  drop constraint if exists platform_odds_api_usage_action_check;
+alter table public.platform_odds_api_usage
+  add constraint platform_odds_api_usage_action_check
+  check (action in ('pull_odds','score_sync','tournament_score_sync'));
+
 create or replace function public.claim_live_football_score_refresh(
   p_sport text,
   p_min_age_seconds int default 25
