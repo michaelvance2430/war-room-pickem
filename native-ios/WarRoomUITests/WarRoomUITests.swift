@@ -34,6 +34,25 @@ final class WarRoomUITests: XCTestCase {
     }
 
     @MainActor
+    func testFieldhouseBracketBottomNavigationReturnsToSectionTop() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--fieldhouse-preview", "--fieldhouse-review", "--fieldhouse-review-bracket"]
+        app.launch()
+
+        let bottomEast = app.buttons["fieldhouse.bracket.bottom.region-east"]
+        for _ in 0..<14 where !bottomEast.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(bottomEast.isHittable, "The repeated bracket navigation should be reachable below the Buy-In games.")
+
+        bottomEast.tap()
+
+        let eastTop = app.otherElements["fieldhouse.bracket.section.region-east.top"]
+        XCTAssertTrue(eastTop.waitForExistence(timeout: 2))
+        XCTAssertTrue(eastTop.isHittable, "Changing sections from the bottom rail must reset the bracket to the new section's top.")
+    }
+
+    @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {

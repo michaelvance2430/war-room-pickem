@@ -1028,13 +1028,16 @@ struct FieldhouseNativePreviewView: View {
                                 .padding(14).padding(.bottom, 30)
                         }
                     }
+                } else if desk == .standings {
+                    FieldhouseStandingsPage(state: $state)
+                        .padding(14).padding(.bottom, 30)
                 } else {
                     ScrollView {
                         Group {
                             switch desk {
                             case .home: FieldhouseHomePage(state: $state, desk: $desk)
                             case .picks: EmptyView()
-                            case .standings: FieldhouseStandingsPage(state: $state)
+                            case .standings: EmptyView()
                             case .locker: EmptyView()
                             case .profile: EmptyView()
                             }
@@ -2115,7 +2118,8 @@ private struct FieldhouseStandingsPage: View {
                     FieldhouseBracketsPage(state: $state, strikePresentation: $postseasonStrikePresentation)
                 }
             } else {
-                VStack(spacing: 13) {
+                ScrollView {
+                    VStack(spacing: 13) {
             FieldhouseHero(kicker: "FIELDHOUSE STANDINGS", title: "REGIONAL SEED LINES", detail: "Live points, regional position, and both postseason cuts in the same format used across War Room.", icon: "list.number")
             regionalCutSummary
             ScrollView(.horizontal, showsIndicators: false) {
@@ -2155,6 +2159,7 @@ private struct FieldhouseStandingsPage: View {
             Button { showingPostseason = true } label: {
                 FieldhouseBracketPreview(state: $state)
             }.buttonStyle(.plain)
+                    }
                 }
             }
         }

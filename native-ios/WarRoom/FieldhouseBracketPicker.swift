@@ -230,7 +230,7 @@ struct FieldhouseBracketPickerView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 13) {
-                        sectionRail
+                        sectionRail(position: "top")
                             .id("bracket-section-top")
                         sectionIntro
                         ForEach(FieldhouseBracketEngine.matchups(for: section, league: league, picks: picks), id: \.round) { group in
@@ -244,7 +244,7 @@ struct FieldhouseBracketPickerView: View {
                                 .font(.system(size: 9, weight: .black))
                                 .tracking(1.5)
                                 .foregroundStyle(.white.opacity(0.52))
-                            sectionRail
+                            sectionRail(position: "bottom")
                         }
                         .padding(.top, 4)
                         Button { showingReview = true } label: {
@@ -291,7 +291,7 @@ struct FieldhouseBracketPickerView: View {
         .zIndex(10)
     }
 
-    private var sectionRail: some View {
+    private func sectionRail(position: String) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 7) {
                 ForEach([FieldhouseBracketSection.buyIn] + FieldhouseRegion.allCases.map(FieldhouseBracketSection.region) + [.finalFour]) { item in
@@ -310,7 +310,9 @@ struct FieldhouseBracketPickerView: View {
                                 Capsule().stroke(.white.opacity(0.92), lineWidth: 2)
                             }
                         }
-                    }.buttonStyle(.plain)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("fieldhouse.bracket.\(position).\(item.id)")
                 }
             }
         }
@@ -334,7 +336,12 @@ struct FieldhouseBracketPickerView: View {
                 Text(section == .buyIn ? "Twelve winners claim the final positions in the field of 64." : section == .finalFour ? "Four regional champions. Three final decisions." : "Finish this region to name your regional champion.")
                     .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
             }
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(15).background(accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.32)))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).padding(15)
+        .background(accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 15))
+        .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.32)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("fieldhouse.bracket.section.\(section.id).top")
     }
 
     private func matchupCard(_ matchup: FieldhouseBracketMatchup) -> some View {
