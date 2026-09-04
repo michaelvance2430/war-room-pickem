@@ -470,6 +470,43 @@ final class FieldhouseExperienceTests: XCTestCase {
         )
     }
 
+    func testExpandedTournamentContainsSeventyFiveBracketDecisions() {
+        XCTAssertEqual(FieldhousePostseasonRound.allCases.map(\.gameCount).reduce(0, +), 75)
+        XCTAssertEqual(FieldhousePostseasonRound.openingRound.gameCount, 12)
+        XCTAssertEqual(FieldhousePostseasonRound.roundOf64.gameCount, 32)
+        XCTAssertEqual(FieldhousePostseasonRound.championship.gameCount, 1)
+    }
+
+    func testBracketAndRoundPicksBothBuildThePostseasonTrophyScore() {
+        let score = FieldhousePostseasonScore(bracketPredictionPoints: 42, roundPickPoints: 31)
+        XCTAssertEqual(score.trophyPoints, 73)
+    }
+
+    func testRegionalRaceOnlyEliminatesAPlayerWhenAComebackIsImpossible() {
+        XCTAssertTrue(FieldhouseRegionalRaceRule.isMathematicallyAlive(score: 74, leaderScore: 94, remainingAvailablePoints: 20))
+        XCTAssertFalse(FieldhouseRegionalRaceRule.isMathematicallyAlive(score: 73, leaderScore: 94, remainingAvailablePoints: 20))
+    }
+
+    func testBuyInOrdersPlayersInsideTheirRegionAndUsesRegularSeasonRankAsTiebreaker() {
+        struct Entry { let name: String; let buyIn: Int; let regularRank: Int }
+        let entries = [
+            Entry(name: "A", buyIn: 8, regularRank: 3),
+            Entry(name: "B", buyIn: 10, regularRank: 4),
+            Entry(name: "C", buyIn: 8, regularRank: 1)
+        ]
+        let ordered = FieldhouseRegionalRaceRule.orderedSeeds(
+            entries,
+            buyInPoints: { $0.buyIn },
+            regularSeasonRank: { $0.regularRank }
+        )
+        XCTAssertEqual(ordered.map(\.name), ["B", "C", "A"])
+    }
+
+    func testEveryPostseasonRegionHasDistinctHardware() {
+        XCTAssertEqual(Set(FieldhouseRegion.allCases.map(\.regionalTrophyAsset)).count, 4)
+        XCTAssertEqual(Set(FieldhouseRegion.allCases.map(\.regionalTrophyName)).count, 4)
+    }
+
     func testPreviewLiveBoardPointsAreDerivedFromGameResults() {
         let state = FieldhouseSeasonState()
         XCTAssertEqual(state.scoringFinalGames, 6)

@@ -311,6 +311,73 @@ enum FieldhouseRegion: String, CaseIterable, Identifiable, Codable {
     case south = "SOUTH"
     case midwest = "MIDWEST"
     var id: String { rawValue }
+
+    var regionalTrophyAsset: String {
+        switch self {
+        case .east: "FieldhouseRegionalEast"
+        case .west: "FieldhouseRegionalWest"
+        case .south: "FieldhouseRegionalSouth"
+        case .midwest: "FieldhouseRegionalMidwest"
+        }
+    }
+
+    var regionalTrophyName: String {
+        switch self {
+        case .east: "The First Light"
+        case .west: "The Last Horizon"
+        case .south: "The Magnolia Rim"
+        case .midwest: "The Steel Standard"
+        }
+    }
+}
+
+enum FieldhousePostseasonRound: String, CaseIterable, Identifiable, Codable {
+    case openingRound = "BUY-IN"
+    case roundOf64 = "ROUND OF 64"
+    case roundOf32 = "ROUND OF 32"
+    case sweet16 = "SWEET 16"
+    case elite8 = "ELITE EIGHT"
+    case finalFour = "FINAL FOUR"
+    case championship = "CHAMPIONSHIP"
+
+    var id: String { rawValue }
+    var gameCount: Int {
+        switch self {
+        case .openingRound: 12
+        case .roundOf64: 32
+        case .roundOf32: 16
+        case .sweet16: 8
+        case .elite8: 4
+        case .finalFour: 2
+        case .championship: 1
+        }
+    }
+}
+
+struct FieldhousePostseasonScore: Equatable {
+    let bracketPredictionPoints: Int
+    let roundPickPoints: Int
+
+    var trophyPoints: Int { bracketPredictionPoints + roundPickPoints }
+}
+
+enum FieldhouseRegionalRaceRule {
+    static func isMathematicallyAlive(score: Int, leaderScore: Int, remainingAvailablePoints: Int) -> Bool {
+        score + max(0, remainingAvailablePoints) >= leaderScore
+    }
+
+    static func orderedSeeds<T>(
+        _ entries: [T],
+        buyInPoints: (T) -> Int,
+        regularSeasonRank: (T) -> Int
+    ) -> [T] {
+        entries.sorted {
+            let leftPoints = buyInPoints($0)
+            let rightPoints = buyInPoints($1)
+            if leftPoints != rightPoints { return leftPoints > rightPoints }
+            return regularSeasonRank($0) < regularSeasonRank($1)
+        }
+    }
 }
 
 enum FieldhouseTeamCatalog {
@@ -2013,6 +2080,8 @@ private struct FieldhouseStandingsPage: View {
     @Binding var state: FieldhouseSeasonState
     private var sportID: String { state.league == .ncaaw ? "ncaaw" : "ncaam" }
     @State private var showingOverall = false
+    @State private var showingPostseason = false
+    @State private var postseasonStrikePresentation: StrikePresentation?
     @State private var profile: Profile?
     @AppStorage("fieldhouse.preview.equippedTitleId") private var previewEquippedTitleId: String?
     private let previewFallbackUserID = UUID(uuidString: "09544d2b-6eca-4131-a321-c000586c9029")!
@@ -2032,7 +2101,18 @@ private struct FieldhouseStandingsPage: View {
         regionalCounts.toilet > 0 ? state.regionPlayerCount - regionalCounts.toilet - 1 : nil
     }
     var body: some View {
-        VStack(spacing: 13) {
+        Group {
+            if showingPostseason {
+                VStack(spacing: 13) {
+                    Button { showingPostseason = false } label: {
+                        Label("BACK TO REGIONAL STANDINGS", systemImage: "chevron.left")
+                            .font(.caption.weight(.black)).foregroundStyle(accent)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
+                    }.buttonStyle(.plain)
+                    FieldhouseBracketsPage(state: $state, strikePresentation: $postseasonStrikePresentation)
+                }
+            } else {
+                VStack(spacing: 13) {
             FieldhouseHero(kicker: "FIELDHOUSE STANDINGS", title: "REGIONAL SEED LINES", detail: "Live points, regional position, and both postseason cuts in the same format used across War Room.", icon: "list.number")
             regionalCutSummary
             ScrollView(.horizontal, showsIndicators: false) {
@@ -2069,7 +2149,14 @@ private struct FieldhouseStandingsPage: View {
             }
             .padding(16).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.32)))
-            FieldhouseBracketPreview(state: $state)
+            Button { showingPostseason = true } label: {
+                FieldhouseBracketPreview(state: $state)
+            }.buttonStyle(.plain)
+                }
+            }
+        }
+        .fullScreenCover(item: $postseasonStrikePresentation) { presentation in
+            WeaponStrikeVideoView(presentation: presentation) { postseasonStrikePresentation = nil }
         }
         .task(id: profileUserID) {
             guard let token = auth.token else { profile = nil; return }
@@ -2188,6 +2275,8 @@ private struct FieldhouseBracketsPage: View {
                 FieldhouseAction(kicker: "BRACKET HELLFIRE · 1/1", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch the AI Crazy Pick", detail: state.bracketHellfireUsed ? "All 75 decisions are sealed. No reroll." : "One-way door. AI fills an erratic 76-team bracket and seals all 75 decisions. Hit 60% for 1.5×; miss it and raw points are cut in half.", icon: "wand.and.stars")
             }.buttonStyle(.plain).disabled(state.bracketHellfireUsed)
             FieldhouseHero(kicker: "MARCH COMMAND · 76 TEAMS · 75 DECISIONS", title: "ROAD TO CENTER COURT", detail: "Twelve Opening Round games feed the familiar field of 64. Every winner advances through the real bracket path.", icon: "point.3.connected.trianglepath.dotted")
+            postseasonPaths
+            FieldhouseRegionalRacePreview(selectedRegion: state.selectedRegion)
             HStack(spacing: 8) {
                 bracketModeButton("CURRENT BRACKET", history: false)
                 bracketModeButton("HISTORY", history: true)
@@ -2207,6 +2296,31 @@ private struct FieldhouseBracketsPage: View {
         }
     }
 
+    private var postseasonPaths: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("TWO PATHS · ONE POSTSEASON SCORE").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(accent)
+            HStack(spacing: 9) {
+                postseasonPath(icon: "rectangle.split.3x3.fill", title: "MY BRACKET", detail: "Predict all 75 games once. Locks before the Buy-In.")
+                postseasonPath(icon: "basketball.fill", title: "ROUND PICKS", detail: "A fresh spread card opens and scores every round.")
+            }
+            Text("Both paths earn trophy points. Cheevos remain career rewards and never alter the regional race.")
+                .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+        }
+        .padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.36)))
+    }
+
+    private func postseasonPath(icon: String, title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Image(systemName: icon).font(.title2).foregroundStyle(accent)
+            Text(title).font(.caption.weight(.black)).foregroundStyle(.white)
+            Text(detail).font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.58)).fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading).padding(12)
+        .background(accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(accent.opacity(0.25)))
+    }
+
     private func bracketModeButton(_ title: String, history: Bool) -> some View {
         Button { showingHistory = history } label: {
             Text(title).font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 11)
@@ -2221,6 +2335,62 @@ private struct FieldhouseBracketsPage: View {
         state.bracketHellfireUsed = true
         state.bracketLocked = true
         strikePresentation = StrikePresentation(resourceName: state.league == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1")
+    }
+}
+
+private struct FieldhouseRegionalRacePreview: View {
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
+    let selectedRegion: FieldhouseRegion
+
+    private let previewScores: [(String, Int, Int)] = [
+        ("RILEY V.", 94, 0),
+        ("FULL COURT MESS", 89, 5),
+        ("BRACKET BUSTER", 82, 12),
+        ("THE SIXTH MAN", 74, 20)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(selectedRegion.regionalTrophyAsset)
+                    .resizable().scaledToFit().frame(width: 88, height: 88)
+                    .accessibilityLabel("\(selectedRegion.rawValue.capitalized) postseason regional championship trophy")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(selectedRegion.rawValue) POSTSEASON RACE").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(accent)
+                    Text(selectedRegion.regionalTrophyName.uppercased()).font(.title3.weight(.black)).fontWidth(.condensed)
+                    Text("Regular season earns entry. Highest cumulative postseason score through the Elite Eight earns this trophy.")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+                }
+            }
+
+            ForEach(Array(previewScores.enumerated()), id: \.offset) { index, entry in
+                HStack(spacing: 10) {
+                    Text("\(index + 1)").font(.headline.weight(.black)).foregroundStyle(index == 0 ? .yellow : .white.opacity(0.55)).frame(width: 22)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(entry.0).font(.caption.weight(.black))
+                        Text(entry.2 == 0 ? "POSTSEASON LEADER" : "\(entry.2) BACK · STILL ALIVE")
+                            .font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(entry.2 == 0 ? .yellow : accent)
+                    }
+                    Spacer()
+                    Text("\(entry.1)").font(.title3.weight(.black)).foregroundStyle(accent)
+                }
+                .padding(10).background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 11))
+            }
+
+            HStack(spacing: 6) {
+                ForEach(FieldhouseRegion.allCases) { region in
+                    VStack(spacing: 4) {
+                        Image(region.regionalTrophyAsset).resizable().scaledToFit().frame(height: 44)
+                        Text(region.rawValue).font(.system(size: 7, weight: .black)).foregroundStyle(region == selectedRegion ? accent : .white.opacity(0.45))
+                    }.frame(maxWidth: .infinity)
+                }
+            }
+            Text("FOUR POSTSEASON REGIONAL CHAMPIONS ADVANCE TO CENTER COURT")
+                .font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.yellow).frame(maxWidth: .infinity)
+        }
+        .padding(15).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.42)))
     }
 }
 
