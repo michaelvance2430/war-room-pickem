@@ -632,6 +632,7 @@ struct FieldhouseRoundPickerView: View {
     let roundKey: String
     @Binding var picks: [String: String]
     let submitted: Bool
+    let locked: Bool
     let save: () -> Void
     let close: () -> Void
 
@@ -648,7 +649,7 @@ struct FieldhouseRoundPickerView: View {
                         .frame(width: 40, height: 40).background(.white.opacity(0.10), in: Circle())
                 }.buttonStyle(.plain)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("FRESH ROUND PICKS").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(accent)
+                    Text(locked ? "LIVE ROUND BOARD" : "FRESH ROUND PICKS").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(accent)
                     Text(FieldhouseBracketEngine.roundTitle(roundKey)).font(.headline.weight(.black)).fontWidth(.condensed)
                 }
                 Spacer()
@@ -658,33 +659,39 @@ struct FieldhouseRoundPickerView: View {
 
             ScrollView {
                 VStack(spacing: 12) {
-                    Text("Pick every straight-up winner for this round. These picks are separate from your Selection Sunday bracket and score one point each.")
+                    Text(locked
+                         ? "Picks are sealed. Official scores and winners update on this board as games become final."
+                         : "Pick every straight-up winner for this round. These picks are separate from your Selection Sunday bracket and score one point each.")
                         .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.65))
                     ForEach(games) { game in
                         VStack(alignment: .leading, spacing: 9) {
                             Text(game.label).font(.caption2.weight(.black)).tracking(1.2).foregroundStyle(accent)
                             ForEach(game.teams) { team in
                                 Button {
+                                    guard !locked else { return }
                                     picks[game.id] = picks[game.id] == team.id ? nil : team.id
                                 } label: {
                                     HStack {
                                         Text("#\(team.seed)").font(.caption.weight(.black)).foregroundStyle(accent)
-                                        Text(team.name).font(.subheadline.weight(.black)).foregroundStyle(.white)
+                                        Text(team.name).font(.subheadline.weight(.black)).foregroundStyle(teamColor(team, game: game))
                                         Spacer()
-                                        Image(systemName: picks[game.id] == team.id ? "checkmark.circle.fill" : "circle")
-                                            .foregroundStyle(picks[game.id] == team.id ? accent : .white.opacity(0.35))
+                                        if let score = score(team, game: game) {
+                                            Text("\(score)").font(.headline.weight(.black)).monospacedDigit().foregroundStyle(teamColor(team, game: game))
+                                        }
+                                        Image(systemName: statusIcon(team, game: game))
+                                            .foregroundStyle(statusColor(team, game: game))
                                     }.padding(12).background(picks[game.id] == team.id ? accent.opacity(0.14) : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 11))
-                                }.buttonStyle(.plain)
+                                }.buttonStyle(.plain).disabled(locked)
                             }
                         }.padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
                             .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.30)))
                     }
                     Button { confirming = true } label: {
-                        Text(submitted ? "UPDATE ROUND PICKS" : "FILE ROUND PICKS")
+                        Text(locked ? "ROUND PICKS LOCKED" : (submitted ? "UPDATE ROUND PICKS" : "FILE ROUND PICKS"))
                             .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(15)
                             .foregroundStyle(complete ? .black : .white.opacity(0.55))
                             .background(complete ? accent : .white.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
-                    }.buttonStyle(.plain).disabled(!complete)
+                    }.buttonStyle(.plain).disabled(!complete || locked)
                 }.padding(14).padding(.bottom, 28)
             }
         }
@@ -695,5 +702,37 @@ struct FieldhouseRoundPickerView: View {
         } message: {
             Text("Every game in this round locks together at the first official tip. You may update this card until then.")
         }
+    }
+
+    private func officialGame(_ matchup: FieldhouseBracketMatchup) -> FieldhouseOfficialGame? {
+        field.games.first(where: { $0.gameID == matchup.id })
+    }
+
+    private func score(_ team: FieldhouseBracketTeam, game: FieldhouseBracketMatchup) -> Int? {
+        guard let official = officialGame(game) else { return nil }
+        if game.first?.id == team.id { return official.firstScore }
+        if game.second?.id == team.id { return official.secondScore }
+        return nil
+    }
+
+    private func teamColor(_ team: FieldhouseBracketTeam, game: FieldhouseBracketMatchup) -> Color {
+        guard let winner = officialGame(game)?.winnerTeamID else { return .white }
+        return winner == team.id ? .green : .white.opacity(0.48)
+    }
+
+    private func statusIcon(_ team: FieldhouseBracketTeam, game: FieldhouseBracketMatchup) -> String {
+        guard let winner = officialGame(game)?.winnerTeamID else {
+            return picks[game.id] == team.id ? "checkmark.circle.fill" : "circle"
+        }
+        if winner == team.id { return "checkmark.seal.fill" }
+        return picks[game.id] == team.id ? "xmark.circle.fill" : "circle"
+    }
+
+    private func statusColor(_ team: FieldhouseBracketTeam, game: FieldhouseBracketMatchup) -> Color {
+        guard let winner = officialGame(game)?.winnerTeamID else {
+            return picks[game.id] == team.id ? accent : .white.opacity(0.35)
+        }
+        if winner == team.id { return .green }
+        return picks[game.id] == team.id ? .red : .white.opacity(0.22)
     }
 }

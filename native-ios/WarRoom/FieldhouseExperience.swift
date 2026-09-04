@@ -1299,6 +1299,7 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var bracketSubmitted = false
     var postseasonRoundPicks: [String: [String: String]] = [:]
     var postseasonRoundSubmitted: Set<String> = []
+    var postseasonRoundLocked: Set<String> = []
     var postseasonBracketCorrectPicks = 0
     var postseasonBracketRawPoints = 0
     var postseasonBracketAdjustedPoints = 0
@@ -1380,6 +1381,16 @@ struct FieldhouseSeasonState: Codable, Equatable {
     }
     var activePostseasonRound: String? {
         officialPostseasonField.flatMap { FieldhouseBracketEngine.liveRoundKey(field: $0) }
+    }
+    func postseasonRoundIsLocked(_ roundKey: String, at now: Date = Date()) -> Bool {
+        if postseasonRoundLocked.contains(roundKey) { return true }
+        guard let field = officialPostseasonField else { return false }
+        let formatter = ISO8601DateFormatter()
+        let firstTip = field.games
+            .filter { $0.roundKey == roundKey }
+            .compactMap { $0.startsAt.flatMap(formatter.date(from:)) }
+            .min()
+        return firstTip.map { now >= $0 } ?? false
     }
     func postseasonLockLabel(at now: Date) -> String {
         guard let field = officialPostseasonField,
@@ -1627,6 +1638,7 @@ enum FieldhouseStateHydrator {
         state.bracketHellfireUsed = snapshot.bracketEntry?.hellfireUsed == true
         state.postseasonRoundPicks = Dictionary(uniqueKeysWithValues: snapshot.roundEntries.map { ($0.roundKey, $0.picks) })
         state.postseasonRoundSubmitted = Set(snapshot.roundEntries.compactMap { $0.submittedAt == nil ? nil : $0.roundKey })
+        state.postseasonRoundLocked = Set(snapshot.roundEntries.compactMap { $0.lockedAt == nil ? nil : $0.roundKey })
         state.postseasonLeaderboardTotals = Dictionary(uniqueKeysWithValues: snapshot.postseasonTotals.map { ($0.userId, $0.totalPoints) })
         state.postseasonEligibilityPath = snapshot.postseasonQualifier?.path
         state.postseasonEligibilityRank = snapshot.postseasonQualifier?.regularRank
@@ -2067,6 +2079,7 @@ struct FieldhouseNativePreviewView: View {
             state.bracketHellfireUsed = hydrated.bracketHellfireUsed
             state.postseasonRoundPicks = hydrated.postseasonRoundPicks
             state.postseasonRoundSubmitted = hydrated.postseasonRoundSubmitted
+            state.postseasonRoundLocked = hydrated.postseasonRoundLocked
             state.postseasonBracketCorrectPicks = hydrated.postseasonBracketCorrectPicks
             state.postseasonBracketRawPoints = hydrated.postseasonBracketRawPoints
             state.postseasonBracketAdjustedPoints = hydrated.postseasonBracketAdjustedPoints
@@ -3968,6 +3981,7 @@ private struct FieldhouseBracketsPage: View {
                         set: { state.postseasonRoundPicks[round] = $0 }
                     ),
                     submitted: state.postseasonRoundSubmitted.contains(round),
+                    locked: state.postseasonRoundIsLocked(round),
                     save: {
                         state.postseasonRoundSubmitted.insert(round)
                         persist(.postseasonRound)

@@ -10,6 +10,7 @@ const fieldhouseOdds = readFileSync(new URL("../supabase/functions/fieldhouse-od
 const atomicScoring = readFileSync(new URL("../supabase/atomic-week-scoring.sql", import.meta.url), "utf8");
 const api = readFileSync(new URL("../native-ios/WarRoom/SupabaseAPI.swift", import.meta.url), "utf8");
 const client = readFileSync(new URL("../native-ios/WarRoom/FieldhouseExperience.swift", import.meta.url), "utf8");
+const bracketPicker = readFileSync(new URL("../native-ios/WarRoom/FieldhouseBracketPicker.swift", import.meta.url), "utf8");
 const content = readFileSync(new URL("../native-ios/WarRoom/ContentView.swift", import.meta.url), "utf8");
 
 for (const table of [
@@ -128,6 +129,9 @@ assert.match(api, /winner_team_id,first_score,second_score/);
 assert.match(client, /CERTIFIED ROUND RECEIPT/);
 assert.match(client, /ORIGINAL BRACKET/);
 assert.match(client, /FRESH ROUND/);
+assert.match(client, /func postseasonRoundIsLocked\(_ roundKey: String/);
+assert.match(client, /locked: state\.postseasonRoundIsLocked\(round\)/);
+assert.match(bracketPicker, /LIVE ROUND BOARD/);
 assert.match(client, /POINTS \+ CHEEVOS · NO BRASS/);
 assert.match(client, /postseasonRoundReceipt\(for:/);
 assert.match(client, /case "title": 32/);

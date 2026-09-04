@@ -173,6 +173,19 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertTrue(state.postseasonLockLabel(at: now).hasPrefix("FIRST ROUND LOCKS IN"))
     }
 
+    func testFreshRoundBecomesReadOnlyBoardAtFirstTip() {
+        var state = FieldhouseSeasonState()
+        state.officialPostseasonField = .previewRound(for: .ncaam)
+        let beforeTip = ISO8601DateFormatter().date(from: "2027-03-18T15:59:59Z")!
+        let atTip = ISO8601DateFormatter().date(from: "2027-03-18T16:00:00Z")!
+
+        XCTAssertFalse(state.postseasonRoundIsLocked("r64", at: beforeTip))
+        XCTAssertTrue(state.postseasonRoundIsLocked("r64", at: atTip))
+
+        state.postseasonRoundLocked.insert("r64")
+        XCTAssertTrue(state.postseasonRoundIsLocked("r64", at: beforeTip))
+    }
+
     func testCardWritePlanTranslatesTeamFavoriteToSharedHomeAwayContract() throws {
         var state = FieldhouseSeasonState()
         state.isCommissioner = true
