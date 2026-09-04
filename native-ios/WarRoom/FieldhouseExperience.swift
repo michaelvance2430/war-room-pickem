@@ -2223,7 +2223,7 @@ private struct FieldhouseLeagueSwitcher: View {
                         }.padding(14).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
                     }.buttonStyle(.plain)
                 }
-                ForEach([FieldhouseLeague.activeBuild]) { option in
+                ForEach(FieldhouseLeague.allCases) { option in
                     Button { league = option; dismiss() } label: {
                         HStack {
                             Image(systemName: "basketball.fill").foregroundStyle(accent).frame(width: 30)
