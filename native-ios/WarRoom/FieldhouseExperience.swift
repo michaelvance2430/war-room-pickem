@@ -1997,29 +1997,6 @@ struct FieldhouseNativePreviewView: View {
         resetLiveProjectionIfWeekChanged()
         do {
             let token = try await auth.validAccessToken()
-            let feed = try await SupabaseAPI.footballScores(
-                token: token,
-                leagueId: liveContext.membership.leagueId,
-                sportId: liveContext.membership.leagues.sportId,
-                daysFrom: 3
-            )
-            var refreshed: [String: FieldhouseGameResult] = [:]
-            for game in state.scoringGames {
-                guard let event = feed.events.first(where: {
-                    normalizedFieldhouseTeam($0.homeTeam) == normalizedFieldhouseTeam(game.home)
-                        && normalizedFieldhouseTeam($0.awayTeam) == normalizedFieldhouseTeam(game.away)
-                }),
-                let home = fieldhouseScoreValue(game.home, event: event),
-                let away = fieldhouseScoreValue(game.away, event: event) else { continue }
-                refreshed[game.id] = FieldhouseGameResult(
-                    gameID: game.id,
-                    awayScore: away,
-                    homeScore: home,
-                    phase: event.completed ? .final : .live(period: "LIVE")
-                )
-            }
-            state.scoringResults.merge(refreshed) { _, new in new }
-
             let verified = try await FieldhouseAuthenticatedRepository.load(
                 token: token,
                 userID: liveContext.userID,
@@ -2056,6 +2033,46 @@ struct FieldhouseNativePreviewView: View {
             state.postseasonEligibilityPath = hydrated.postseasonEligibilityPath
             state.postseasonEligibilityRank = hydrated.postseasonEligibilityRank
             standings = verified.standings
+
+            // Tournament results and totals are already settled by the
+            // autonomous server worker. Read that permanent authority first
+            // and never make the UI depend on a second provider call.
+            if state.officialPostseasonField != nil {
+                clearLiveProjection()
+                refreshLifecycle(at: Date())
+                return
+            }
+
+            let feed: FootballScoreFeed
+            do {
+                feed = try await SupabaseAPI.footballScores(
+                    token: token,
+                    leagueId: liveContext.membership.leagueId,
+                    sportId: liveContext.membership.leagues.sportId,
+                    daysFrom: 3
+                )
+            } catch {
+                if liveProjectionActive { liveProjectionStale = true }
+                refreshLifecycle(at: Date())
+                return
+            }
+            var refreshed: [String: FieldhouseGameResult] = [:]
+            for game in state.scoringGames {
+                guard let event = feed.events.first(where: {
+                    normalizedFieldhouseTeam($0.homeTeam) == normalizedFieldhouseTeam(game.home)
+                        && normalizedFieldhouseTeam($0.awayTeam) == normalizedFieldhouseTeam(game.away)
+                }),
+                let home = fieldhouseScoreValue(game.home, event: event),
+                let away = fieldhouseScoreValue(game.away, event: event) else { continue }
+                refreshed[game.id] = FieldhouseGameResult(
+                    gameID: game.id,
+                    awayScore: away,
+                    homeScore: home,
+                    phase: event.completed ? .final : .live(period: "LIVE")
+                )
+            }
+            state.scoringResults.merge(refreshed) { _, new in new }
+
             let projectionWeek = state.scoringWindow
             do {
                 let board = try await SupabaseAPI.fieldhouseLiveBoard(

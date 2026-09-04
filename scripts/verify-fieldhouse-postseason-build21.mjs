@@ -98,6 +98,7 @@ assert.match(liveStandings, /grant execute on function public\.get_fieldhouse_li
 assert.match(api, /static func fieldhouseLiveBoard/);
 assert.match(api, /static func fieldhousePostseasonQualifier/);
 assert.match(client, /FieldhouseLiveStandingsEngine\.projectedTotals/);
+assert.match(client, /if state\.officialPostseasonField != nil \{\s*clearLiveProjection\(\)\s*refreshLifecycle\(at: Date\(\)\)\s*return\s*\}/);
 assert.match(client, /LIVE PROJECTION/);
 assert.match(client, /liveProjectionWeek != state\.scoringWindow/);
 assert.match(client, /resetLiveProjectionIfWeekChanged\(\)/);
