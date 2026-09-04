@@ -90,13 +90,10 @@ Deno.serve(async (request: Request) => {
         if (!Number.isFinite(firstScore) || !Number.isFinite(secondScore) || firstScore === secondScore) {
           waiting.push(`${tournament.id}:${game.game_id}:invalid-final`); continue;
         }
-        const awayName = String(event.away_team || ""), homeName = String(event.home_team || "");
-        const awayScore = norm(awayName) === norm(first.display_name) ? firstScore : secondScore;
-        const homeScore = norm(homeName) === norm(first.display_name) ? firstScore : secondScore;
         const winnerTeamID = firstScore > secondScore ? firstID : secondID;
         const { error: settleError } = await db.rpc("record_fieldhouse_tournament_result", {
           p_tournament_id: tournament.id, p_game_id: game.game_id, p_winner_team_id: winnerTeamID,
-          p_away_score: awayScore, p_home_score: homeScore,
+          p_first_score: firstScore, p_second_score: secondScore,
           p_completed_at: event.last_update || new Date().toISOString(),
         });
         if (settleError) waiting.push(`${tournament.id}:${game.game_id}:${settleError.message}`);

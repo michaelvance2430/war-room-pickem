@@ -43,14 +43,18 @@ create table if not exists public.fieldhouse_tournament_games (
   odds_event_id text,
   starts_at timestamptz,
   winner_team_id text,
-  away_score integer,
-  home_score integer,
+  first_score integer,
+  second_score integer,
   completed_at timestamptz,
   primary key (tournament_id, game_id),
   unique (tournament_id, round_key, ordinal),
   check ((first_team_id is not null) <> (first_source_game_id is not null)),
   check ((second_team_id is not null) <> (second_source_game_id is not null)),
-  check ((winner_team_id is null) = (completed_at is null))
+  check ((winner_team_id is null) = (completed_at is null)),
+  check ((winner_team_id is null) = (first_score is null)),
+  check ((winner_team_id is null) = (second_score is null)),
+  check (first_score is null or first_score >= 0),
+  check (second_score is null or second_score >= 0)
 );
 
 create table if not exists public.fieldhouse_bracket_entries (
@@ -1152,8 +1156,8 @@ create or replace function public.record_fieldhouse_tournament_result(
   p_tournament_id uuid,
   p_game_id text,
   p_winner_team_id text,
-  p_away_score integer,
-  p_home_score integer,
+  p_first_score integer,
+  p_second_score integer,
   p_completed_at timestamptz
 )
 returns jsonb language plpgsql security definer set search_path=public as $$
@@ -1170,8 +1174,8 @@ begin
   if not found then raise exception 'Tournament game not found'; end if;
   if g.winner_team_id is not null then
     if g.winner_team_id=p_winner_team_id
-      and g.away_score=p_away_score
-      and g.home_score=p_home_score then
+      and g.first_score=p_first_score
+      and g.second_score=p_second_score then
       v_score:=public.score_fieldhouse_postseason(p_tournament_id);
       if g.round_key='title' then
         v_awards:=public.finalize_fieldhouse_postseason_awards(p_tournament_id);
@@ -1187,10 +1191,13 @@ begin
   if v_second is null then select winner_team_id into v_second from public.fieldhouse_tournament_games
     where tournament_id=p_tournament_id and game_id=g.second_source_game_id; end if;
   if p_winner_team_id not in (v_first,v_second) then raise exception 'Winner is not an official participant'; end if;
-  if p_away_score<0 or p_home_score<0 or p_away_score=p_home_score then raise exception 'Invalid final basketball score'; end if;
+  if p_first_score is null or p_second_score is null
+     or p_first_score<0 or p_second_score<0 or p_first_score=p_second_score then
+    raise exception 'Invalid final basketball score';
+  end if;
   if p_completed_at is null then raise exception 'Completed time required'; end if;
   update public.fieldhouse_tournament_games set winner_team_id=p_winner_team_id,
-    away_score=p_away_score,home_score=p_home_score,completed_at=p_completed_at
+    first_score=p_first_score,second_score=p_second_score,completed_at=p_completed_at
   where tournament_id=p_tournament_id and game_id=p_game_id;
   update public.fieldhouse_tournaments set
     status=case when p_game_id=(select game_id from public.fieldhouse_tournament_games where tournament_id=p_tournament_id and round_key='title') then 'final' else 'in_progress' end,

@@ -1152,7 +1152,25 @@ enum FieldhousePostseasonScoreEngine {
     }
 }
 
-struct FieldhousePostseasonRoundReceipt: Equatable {
+struct FieldhousePostseasonGameReceipt: Equatable, Identifiable {
+    let gameID: String
+    let label: String
+    let startsAt: String?
+    let firstTeam: FieldhouseBracketTeam
+    let secondTeam: FieldhouseBracketTeam
+    let firstScore: Int?
+    let secondScore: Int?
+    let winnerTeamID: String?
+    let bracketPickName: String?
+    let bracketPoints: Int
+    let freshPickName: String?
+    let freshPoints: Int
+
+    var id: String { gameID }
+    var isFinal: Bool { winnerTeamID != nil && firstScore != nil && secondScore != nil }
+}
+
+struct FieldhousePostseasonRoundReceipt: Equatable, Identifiable {
     let roundKey: String
     let gameCount: Int
     let finalGames: Int
@@ -1160,6 +1178,9 @@ struct FieldhousePostseasonRoundReceipt: Equatable {
     let bracketPoints: Int
     let freshHits: Int
     let freshCardFiled: Bool
+    let games: [FieldhousePostseasonGameReceipt]
+
+    var id: String { roundKey }
 }
 
 enum FieldhouseGameCatalog {
@@ -1317,6 +1338,8 @@ struct FieldhouseSeasonState: Codable, Equatable {
         let games = field.games.filter { $0.roundKey == roundKey }
         guard !games.isEmpty else { return nil }
         let freshPicks = postseasonRoundPicks[roundKey] ?? [:]
+        let matchups = Dictionary(uniqueKeysWithValues: FieldhouseBracketEngine.roundMatchups(key: roundKey, field: field).map { ($0.id, $0) })
+        let weight = FieldhousePostseasonScoreEngine.bracketWeight(for: roundKey)
         let finalGames = games.filter { $0.winnerTeamID != nil }
         let bracketHits = finalGames.filter { game in
             postseasonBracketPicks[game.gameID] == game.winnerTeamID
@@ -1331,7 +1354,28 @@ struct FieldhouseSeasonState: Codable, Equatable {
             bracketHits: bracketHits,
             bracketPoints: bracketHits * FieldhousePostseasonScoreEngine.bracketWeight(for: roundKey),
             freshHits: freshHits,
-            freshCardFiled: postseasonRoundSubmitted.contains(roundKey)
+            freshCardFiled: postseasonRoundSubmitted.contains(roundKey),
+            games: games.sorted { $0.ordinal < $1.ordinal }.compactMap { game in
+                guard let matchup = matchups[game.gameID],
+                      let first = matchup.first,
+                      let second = matchup.second else { return nil }
+                let bracketPick = postseasonBracketPicks[game.gameID]
+                let freshPick = freshPicks[game.gameID]
+                return FieldhousePostseasonGameReceipt(
+                    gameID: game.gameID,
+                    label: matchup.label,
+                    startsAt: game.startsAt,
+                    firstTeam: first,
+                    secondTeam: second,
+                    firstScore: game.firstScore,
+                    secondScore: game.secondScore,
+                    winnerTeamID: game.winnerTeamID,
+                    bracketPickName: bracketPick.flatMap { id in field.teams.first(where: { $0.teamID == id })?.displayName },
+                    bracketPoints: game.winnerTeamID != nil && bracketPick == game.winnerTeamID ? weight : 0,
+                    freshPickName: freshPick.flatMap { id in field.teams.first(where: { $0.teamID == id })?.displayName },
+                    freshPoints: game.winnerTeamID != nil && freshPick == game.winnerTeamID ? 1 : 0
+                )
+            }
         )
     }
     var activePostseasonRound: String? {
@@ -2632,28 +2676,35 @@ private struct FieldhouseTournamentScorecardView: View {
     }
 
     private func roundReceipt(_ receipt: FieldhousePostseasonRoundReceipt) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack {
-                Text(FieldhouseBracketEngine.roundTitle(receipt.roundKey))
-                    .font(.subheadline.weight(.black)).foregroundStyle(.white)
-                Spacer()
-                Text("\(receipt.finalGames)/\(receipt.gameCount) FINAL")
-                    .font(.system(size: 8, weight: .black)).tracking(1)
-                    .foregroundStyle(receipt.finalGames == receipt.gameCount ? accent : .white.opacity(0.48))
+        NavigationLink {
+            FieldhouseTournamentRoundReceiptView(receipt: receipt)
+        } label: {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack {
+                    Text(FieldhouseBracketEngine.roundTitle(receipt.roundKey))
+                        .font(.subheadline.weight(.black)).foregroundStyle(.white)
+                    Spacer()
+                    Text("\(receipt.finalGames)/\(receipt.gameCount) FINAL")
+                        .font(.system(size: 8, weight: .black)).tracking(1)
+                        .foregroundStyle(receipt.finalGames == receipt.gameCount ? accent : .white.opacity(0.48))
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.black)).foregroundStyle(accent)
+                }
+                HStack(spacing: 8) {
+                    roundMetric("BRACKET", value: receipt.bracketPoints, detail: "\(receipt.bracketHits) hits")
+                    roundMetric(
+                        "FRESH CARD",
+                        value: receipt.freshHits,
+                        detail: receipt.freshCardFiled ? "filed" : "not filed",
+                        muted: !receipt.freshCardFiled
+                    )
+                }
             }
-            HStack(spacing: 8) {
-                roundMetric("BRACKET", value: receipt.bracketPoints, detail: "\(receipt.bracketHits) hits")
-                roundMetric(
-                    "FRESH CARD",
-                    value: receipt.freshHits,
-                    detail: receipt.freshCardFiled ? "filed" : "not filed",
-                    muted: !receipt.freshCardFiled
-                )
-            }
+            .padding(12)
+            .background(accent.opacity(0.07), in: RoundedRectangle(cornerRadius: 13))
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(accent.opacity(0.18)))
         }
-        .padding(12)
-        .background(accent.opacity(0.07), in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).stroke(accent.opacity(0.18)))
+        .buttonStyle(.plain)
     }
 
     private func roundMetric(_ label: String, value: Int, detail: String, muted: Bool = false) -> some View {
@@ -2668,6 +2719,84 @@ private struct FieldhouseTournamentScorecardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(9)
         .background(.black.opacity(0.56), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+private struct FieldhouseTournamentRoundReceiptView: View {
+    @Environment(\.fieldhouseLeague) private var league
+    private var accent: Color { FieldhouseTheme.accent(for: league) }
+    let receipt: FieldhousePostseasonRoundReceipt
+
+    var body: some View {
+        ZStack {
+            FieldhouseBackdrop(leagueOverride: league).ignoresSafeArea()
+            ScrollView {
+                VStack(spacing: 12) {
+                    FieldhouseHero(
+                        kicker: "CERTIFIED ROUND RECEIPT",
+                        title: FieldhouseBracketEngine.roundTitle(receipt.roundKey),
+                        detail: "\(receipt.finalGames) of \(receipt.gameCount) games final · bracket +\(receipt.bracketPoints) · fresh card +\(receipt.freshHits)",
+                        icon: "basketball.fill"
+                    )
+                    ForEach(receipt.games) { game in
+                        gameReceipt(game)
+                    }
+                }
+                .padding(16).padding(.bottom, 24)
+            }
+        }
+        .navigationTitle("Round Scores")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func gameReceipt(_ game: FieldhousePostseasonGameReceipt) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(game.label).font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(accent)
+                Spacer()
+                Text(game.isFinal ? "FINAL" : tipLabel(game.startsAt))
+                    .font(.system(size: 8, weight: .black)).tracking(0.8)
+                    .foregroundStyle(game.isFinal ? .white : .white.opacity(0.48))
+            }
+            teamScore(game.firstTeam, score: game.firstScore, winnerID: game.winnerTeamID)
+            teamScore(game.secondTeam, score: game.secondScore, winnerID: game.winnerTeamID)
+            Divider().overlay(accent.opacity(0.24))
+            pickReceipt("ORIGINAL BRACKET", team: game.bracketPickName, points: game.bracketPoints, final: game.isFinal)
+            pickReceipt("FRESH ROUND", team: game.freshPickName, points: game.freshPoints, final: game.isFinal)
+        }
+        .padding(14)
+        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.30)))
+    }
+
+    private func teamScore(_ team: FieldhouseBracketTeam, score: Int?, winnerID: String?) -> some View {
+        let winner = winnerID == team.id
+        return HStack(spacing: 10) {
+            Text("#\(team.seed)").font(.caption.weight(.black)).foregroundStyle(accent).frame(width: 28, alignment: .leading)
+            Text(team.name).font(.subheadline.weight(.black)).foregroundStyle(winner ? .green : .white)
+            Spacer()
+            Text(score.map(String.init) ?? "—").font(.title3.weight(.black)).monospacedDigit().foregroundStyle(winner ? .green : .white.opacity(0.72))
+        }
+    }
+
+    private func pickReceipt(_ label: String, team: String?, points: Int, final: Bool) -> some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).font(.system(size: 7, weight: .black)).tracking(0.9).foregroundStyle(.white.opacity(0.42))
+                Text(team ?? "NO PICK FILED").font(.caption.weight(.bold)).foregroundStyle(.white.opacity(team == nil ? 0.42 : 0.82))
+            }
+            Spacer()
+            Text(final ? "+\(points)" : "PENDING")
+                .font(.caption.weight(.black)).foregroundStyle(final ? (points > 0 ? .green : .red) : .yellow)
+        }
+    }
+
+    private func tipLabel(_ value: String?) -> String {
+        guard let value, let date = ISO8601DateFormatter().date(from: value) else { return "TIP PENDING" }
+        let formatter = DateFormatter()
+        formatter.timeZone = TimeZone(identifier: "America/New_York")
+        formatter.dateFormat = "EEE MMM d · h:mm a"
+        return formatter.string(from: date).uppercased()
     }
 }
 

@@ -795,7 +795,9 @@ final class FieldhouseExperienceTests: XCTestCase {
                 ordinal: game.ordinal, region: game.region, firstTeamID: game.firstTeamID,
                 secondTeamID: game.secondTeamID, firstSourceGameID: game.firstSourceGameID,
                 secondSourceGameID: game.secondSourceGameID, startsAt: game.startsAt,
-                winnerTeamID: index == 0 ? game.firstTeamID : nil
+                winnerTeamID: index == 0 ? game.firstTeamID : nil,
+                firstScore: index == 0 ? 88 : nil,
+                secondScore: index == 0 ? 72 : nil
             )
         }
         let field = FieldhouseOfficialField(
@@ -816,6 +818,11 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(receipt?.bracketPoints, 1)
         XCTAssertEqual(receipt?.freshHits, 1)
         XCTAssertEqual(receipt?.freshCardFiled, true)
+        XCTAssertEqual(receipt?.games.first?.firstScore, 88)
+        XCTAssertEqual(receipt?.games.first?.secondScore, 72)
+        XCTAssertEqual(receipt?.games.first?.bracketPickName, receipt?.games.first?.firstTeam.name)
+        XCTAssertEqual(receipt?.games.first?.bracketPoints, 1)
+        XCTAssertEqual(receipt?.games.first?.freshPoints, 1)
         XCTAssertEqual(FieldhousePostseasonScoreEngine.bracketWeight(for: "title"), 32)
     }
 

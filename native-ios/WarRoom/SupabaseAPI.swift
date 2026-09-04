@@ -451,6 +451,8 @@ struct FieldhouseTournamentGameRecord: Decodable, Sendable {
     let secondSourceGameId: String?
     let startsAt: String?
     let winnerTeamId: String?
+    let firstScore: Int?
+    let secondScore: Int?
     enum CodingKeys: String, CodingKey {
         case ordinal, region
         case gameId = "game_id"
@@ -462,6 +464,8 @@ struct FieldhouseTournamentGameRecord: Decodable, Sendable {
         case secondSourceGameId = "second_source_game_id"
         case startsAt = "starts_at"
         case winnerTeamId = "winner_team_id"
+        case firstScore = "first_score"
+        case secondScore = "second_score"
     }
 }
 
@@ -1768,7 +1772,7 @@ enum SupabaseAPI {
         ]
         var gameComponents = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/fieldhouse_tournament_games"), resolvingAgainstBaseURL: false)!
         gameComponents.queryItems = [
-            URLQueryItem(name: "select", value: "game_id,round_key,round_order,ordinal,region,first_team_id,second_team_id,first_source_game_id,second_source_game_id,starts_at,winner_team_id"),
+            URLQueryItem(name: "select", value: "game_id,round_key,round_order,ordinal,region,first_team_id,second_team_id,first_source_game_id,second_source_game_id,starts_at,winner_team_id,first_score,second_score"),
             URLQueryItem(name: "tournament_id", value: "eq.\(tournament.id.uuidString.lowercased())"),
             URLQueryItem(name: "order", value: "round_order.asc,ordinal.asc")
         ]
@@ -1783,7 +1787,7 @@ enum SupabaseAPI {
             tournamentID: tournament.id, sportID: tournament.sportId, seasonKey: tournament.seasonKey,
             status: tournament.status, firstTipAt: tournament.firstTipAt,
             teams: loadedTeams.map { .init(teamID: $0.teamId, displayName: $0.displayName, region: $0.region, seed: $0.seed) },
-            games: loadedGames.map { .init(gameID: $0.gameId, roundKey: $0.roundKey, roundOrder: $0.roundOrder, ordinal: $0.ordinal, region: $0.region, firstTeamID: $0.firstTeamId, secondTeamID: $0.secondTeamId, firstSourceGameID: $0.firstSourceGameId, secondSourceGameID: $0.secondSourceGameId, startsAt: $0.startsAt, winnerTeamID: $0.winnerTeamId) }
+            games: loadedGames.map { .init(gameID: $0.gameId, roundKey: $0.roundKey, roundOrder: $0.roundOrder, ordinal: $0.ordinal, region: $0.region, firstTeamID: $0.firstTeamId, secondTeamID: $0.secondTeamId, firstSourceGameID: $0.firstSourceGameId, secondSourceGameID: $0.secondSourceGameId, startsAt: $0.startsAt, winnerTeamID: $0.winnerTeamId, firstScore: $0.firstScore, secondScore: $0.secondScore) }
         )
     }
 

@@ -26,7 +26,39 @@ struct FieldhouseOfficialGame: Identifiable, Hashable, Codable {
     let secondSourceGameID: String?
     let startsAt: String?
     let winnerTeamID: String?
+    let firstScore: Int?
+    let secondScore: Int?
     var id: String { gameID }
+
+    init(
+        gameID: String,
+        roundKey: String,
+        roundOrder: Int,
+        ordinal: Int,
+        region: String?,
+        firstTeamID: String?,
+        secondTeamID: String?,
+        firstSourceGameID: String?,
+        secondSourceGameID: String?,
+        startsAt: String?,
+        winnerTeamID: String?,
+        firstScore: Int? = nil,
+        secondScore: Int? = nil
+    ) {
+        self.gameID = gameID
+        self.roundKey = roundKey
+        self.roundOrder = roundOrder
+        self.ordinal = ordinal
+        self.region = region
+        self.firstTeamID = firstTeamID
+        self.secondTeamID = secondTeamID
+        self.firstSourceGameID = firstSourceGameID
+        self.secondSourceGameID = secondSourceGameID
+        self.startsAt = startsAt
+        self.winnerTeamID = winnerTeamID
+        self.firstScore = firstScore
+        self.secondScore = secondScore
+    }
 }
 
 struct FieldhouseRoundEntry: Equatable, Codable {
