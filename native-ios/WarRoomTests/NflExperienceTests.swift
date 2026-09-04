@@ -101,7 +101,12 @@ struct NflExperienceTests {
         #expect(FoundryLabPolicy.accepts(mode: "foundry", sportId: "nfl", preferredSportId: "nfl"))
         #expect(!FoundryLabPolicy.accepts(mode: "foundry", sportId: "cfb", preferredSportId: "nfl"))
         #expect(!FoundryLabPolicy.accepts(mode: "production", sportId: "nfl", preferredSportId: "nfl"))
-        #expect(WeaponStrikeCatalog.presentation(for: "nfl") == nil)
+    }
+
+    @Test func nflJdamUsesItsDedicatedBundledStrikeVideo() throws {
+        #expect(WeaponStrikeCatalog.presentation(for: "nfl")?.resourceName == "nuke-football-2")
+        #expect(WeaponStrikeCatalog.presentation(for: "cfb")?.resourceName != "nuke-football-2")
+        #expect(Bundle.main.url(forResource: "nuke-football-2", withExtension: "mp4") != nil)
     }
 
     @Test func nflIdentityRewritesInheritedCollegeVocabulary() {

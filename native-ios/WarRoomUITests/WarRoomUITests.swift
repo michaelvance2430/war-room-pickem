@@ -53,6 +53,16 @@ final class WarRoomUITests: XCTestCase {
     }
 
     @MainActor
+    func testNflJdamStrikeFeedOpensItsDedicatedVideo() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--strike-preview-nfl"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["TACTICAL STRIKE · LIVE"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["STRIKE FEED LOST"].exists)
+    }
+
+    @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {

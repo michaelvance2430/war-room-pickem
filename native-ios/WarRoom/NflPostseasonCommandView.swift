@@ -15,6 +15,7 @@ struct NflPostseasonCloudView: View {
     @State private var showingFieldEditor = false
     @State private var showingResults = false
     @State private var foundryBotsSeeded: Int?
+    @State private var strikePresentation: StrikePresentation?
 
     private var seasonKey: Int { NflSeasonCalendar.seasonKey() }
     private var isCommissioner: Bool { auth.user.map { membership.isCommissioner(userId: $0.id) } ?? false }
@@ -77,6 +78,9 @@ struct NflPostseasonCloudView: View {
             Task { await load() }
         }
         .alert("AUTHORIZE JDAM?",isPresented:$confirmingJdam){Button("KEEP CONTROL",role:.cancel){};Button("AUTHORIZE",role:.destructive){Task{await deployJdam()}}}message:{Text("JDAM replaces every open decision, fills all 13 picks, records the authorization in your permanent service history, and seals the bracket. No rerolls.")}
+        .fullScreenCover(item: $strikePresentation) { strike in
+            WeaponStrikeVideoView(presentation: strike) { strikePresentation = nil }
+        }
     }
 
     private var hero: some View {
@@ -148,8 +152,8 @@ struct NflPostseasonCloudView: View {
     private func resultMark(_ game:NflBracketGame,team:NflPostseasonTeam)->String { guard let result=results[game.id] else{return "ADVANCE"};return result==team.id ? "✓ CORRECT":"PICK" }
     private func select(_ team:NflPostseasonTeam,in game:NflBracketGame){picks[game.id]=team.id;NflBracketEngine.clearedDownstream(after:game.id,picks:&picks)}
     @MainActor private func load() async { defer{loading=false};guard let token=auth.token,let user=auth.user else{return};do{var loaded=try await SupabaseAPI.nflPostseasonSlate(token:token,leagueId:membership.leagueId,seasonKey:seasonKey);if loaded==nil && membership.leagues.mode=="foundry" && isCommissioner{loaded=try await SupabaseAPI.publishNflPostseasonSlate(token:token,leagueId:membership.leagueId,seasonKey:seasonKey,teams:Self.foundryField)};slate=loaded;if loaded != nil && membership.leagues.mode=="foundry" && isCommissioner{foundryBotsSeeded=try await SupabaseAPI.seedFoundryNflPostseason(token:token,leagueId:membership.leagueId,seasonKey:seasonKey).botsSeeded};async let loadedEntry=SupabaseAPI.nflPostseasonEntry(token:token,leagueId:membership.leagueId,userId:user.id,seasonKey:seasonKey);async let loadedResults=SupabaseAPI.nflPostseasonResults(token:token,leagueId:membership.leagueId,seasonKey:seasonKey);async let loadedScore=SupabaseAPI.nflPostseasonScorecard(token:token,leagueId:membership.leagueId,userId:user.id,seasonKey:seasonKey);entry=try await loadedEntry;picks=entry?.picks ?? [:];results=(try await loadedResults)?.winners ?? [:];scorecard=try await loadedScore}catch{errorMessage=error.localizedDescription} }
-    @MainActor private func lockBracket(usedJdam:Bool) async {guard let token=auth.token else{return};saving=true;errorMessage=nil;do{entry=try await SupabaseAPI.lockNflPostseasonBracket(token:token,leagueId:membership.leagueId,seasonKey:seasonKey,picks:picks,usedJdam:usedJdam)}catch{errorMessage=error.localizedDescription};saving=false}
-    @MainActor private func deployJdam() async {guard let teams=slate?.teams else{return};picks=NflBracketEngine.jdamPicks(teams:teams);guard complete else{errorMessage="JDAM could not resolve the bracket. Reopen postseason command and try again.";return};await lockBracket(usedJdam:true)}
+    @MainActor private func lockBracket(usedJdam:Bool) async -> Bool {guard let token=auth.token else{return false};saving=true;errorMessage=nil;do{entry=try await SupabaseAPI.lockNflPostseasonBracket(token:token,leagueId:membership.leagueId,seasonKey:seasonKey,picks:picks,usedJdam:usedJdam);saving=false;return true}catch{errorMessage=error.localizedDescription;saving=false;return false}}
+    @MainActor private func deployJdam() async {guard let teams=slate?.teams else{return};picks=NflBracketEngine.jdamPicks(teams:teams);guard complete else{errorMessage="JDAM could not resolve the bracket. Reopen postseason command and try again.";return};if await lockBracket(usedJdam:true){strikePresentation=WeaponStrikeCatalog.presentation(for:"nfl")}}
     static var foundryField:[NflPostseasonTeam]{["AFC","NFC"].flatMap{conference in FootballTeamCatalog.nfl.filter{$0.conference.hasPrefix(conference)}.prefix(7).enumerated().map{index,team in .init(id:FootballTeamCatalog.normalizedTeamId(team.name),name:team.name,conference:conference,seed:index+1)}}}
 }
 

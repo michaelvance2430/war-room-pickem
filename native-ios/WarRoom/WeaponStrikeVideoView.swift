@@ -10,7 +10,8 @@ enum WeaponStrikeCatalog {
     static func presentation(for sportId: String) -> StrikePresentation? {
         let names: [String]
         switch sportId.lowercased() {
-        case "cfb": names = ["nuke-football-1", "nuke-football-2", "nuke-football-3"]
+        case "cfb": names = ["nuke-football-1", "nuke-football-3"]
+        case "nfl": names = ["nuke-football-2"]
         case "cbb": names = ["hellfire-fieldhouse-1"]
         default: names = []
         }

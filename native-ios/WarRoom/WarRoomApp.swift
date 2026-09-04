@@ -8,7 +8,9 @@ struct WarRoomApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--fieldhouse-preview") {
+            if ProcessInfo.processInfo.arguments.contains("--strike-preview-nfl") {
+                WeaponStrikeVideoView(presentation: StrikePresentation(resourceName: "nuke-football-2")) {}
+            } else if ProcessInfo.processInfo.arguments.contains("--fieldhouse-preview") {
                 FieldhouseNativePreviewView(
                     initialLeague: ProcessInfo.processInfo.arguments.contains("--fieldhouse-ncaaw") ? .ncaaw : .ncaam
                 )
