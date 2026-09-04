@@ -1195,7 +1195,14 @@ begin
      or p_first_score<0 or p_second_score<0 or p_first_score=p_second_score then
     raise exception 'Invalid final basketball score';
   end if;
+  if (p_winner_team_id=v_first and p_first_score<p_second_score)
+     or (p_winner_team_id=v_second and p_second_score<p_first_score) then
+    raise exception 'Winner does not match the official final score';
+  end if;
   if p_completed_at is null then raise exception 'Completed time required'; end if;
+  if g.starts_at is not null and p_completed_at<g.starts_at then
+    raise exception 'Completed time cannot precede the official tip';
+  end if;
   update public.fieldhouse_tournament_games set winner_team_id=p_winner_team_id,
     first_score=p_first_score,second_score=p_second_score,completed_at=p_completed_at
   where tournament_id=p_tournament_id and game_id=p_game_id;

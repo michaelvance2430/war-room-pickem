@@ -45,6 +45,8 @@ assert.match(sql, /else round\(s\.raw_points\*0\.5\)::integer/);
 assert.match(sql, /fieldhouse_round_entries.*one point per correct official winner/is);
 assert.match(sql, /create or replace function public\.record_fieldhouse_tournament_result/);
 assert.match(sql, /first_score=p_first_score,second_score=p_second_score/);
+assert.match(sql, /Winner does not match the official final score/);
+assert.match(sql, /Completed time cannot precede the official tip/);
 assert.match(sql, /raise exception 'Tournament result is already final'/);
 assert.match(sql, /'alreadyRecorded',true/);
 assert.match(sql, /create or replace function public\.finalize_fieldhouse_postseason_awards/);
