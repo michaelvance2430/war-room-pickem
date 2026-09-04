@@ -40,6 +40,7 @@
     "verify:big-balls-ben-legacy": "node scripts/verify-big-balls-ben-legacy.mjs",
     "verify:standings-permanent-hardware": "node scripts/verify-standings-permanent-hardware.mjs",
     "verify:fieldhouse-hellfire": "node --import tsx scripts/verify-fieldhouse-hellfire.mjs",
+    "verify:fieldhouse-postseason-build21": "node scripts/verify-fieldhouse-postseason-build21.mjs",
     "verify:nfl-jdam": "node --import tsx scripts/verify-nfl-jdam.mjs",
     "verify:nfl-season": "node --import tsx scripts/verify-nfl-season-language.mjs",
     "verify:football-favorites": "node --import tsx scripts/verify-football-favorite-interest.mjs && node scripts/verify-nfl-crystal-ball-lock.mjs",

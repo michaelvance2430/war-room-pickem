@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import UserNotifications
+import UniformTypeIdentifiers
 
 private struct FieldhouseLeagueEnvironmentKey: EnvironmentKey {
     static let defaultValue: FieldhouseLeague = .activeBuild
@@ -108,6 +109,7 @@ enum FieldhousePreviewIdentity {
 
 enum FieldhouseSeasonCalendar {
     static let eastern = TimeZone(identifier: "America/New_York")!
+    static let postseasonSeasonKey = 2027
     static var openingTip: Date {
         var components = DateComponents()
         components.calendar = Calendar(identifier: .gregorian)
@@ -211,6 +213,9 @@ struct FieldhouseAuthenticatedSnapshot {
     var standings: [Standing] = []
     var scoringCard: WeekCard? = nil
     var scoringPick: PlayerPick? = nil
+    var officialField: FieldhouseOfficialField? = nil
+    var bracketEntry: FieldhouseBracketEntryRecord? = nil
+    var roundEntries: [FieldhouseRoundEntryRecord] = []
 }
 
 private struct FieldhouseRepositoryError: LocalizedError {
@@ -275,6 +280,30 @@ enum FieldhouseAuthenticatedRepository {
             : nil
 
         let loadedScorecards = try await scorecards
+        let loadedField = try await SupabaseAPI.fieldhouseOfficialField(
+            token: token,
+            sportId: fieldhouseLeague.favoriteSportID,
+            seasonKey: FieldhouseSeasonCalendar.postseasonSeasonKey
+        )
+        let loadedBracket: FieldhouseBracketEntryRecord?
+        let loadedRounds: [FieldhouseRoundEntryRecord]
+        if let loadedField {
+            loadedBracket = try await SupabaseAPI.fieldhouseBracketEntry(
+                token: token,
+                tournamentId: loadedField.tournamentID,
+                leagueId: membership.leagueId,
+                userId: userID
+            )
+            loadedRounds = try await SupabaseAPI.fieldhouseRoundEntries(
+                token: token,
+                tournamentId: loadedField.tournamentID,
+                leagueId: membership.leagueId,
+                userId: userID
+            )
+        } else {
+            loadedBracket = nil
+            loadedRounds = []
+        }
         return try await FieldhouseAuthenticatedSnapshot(
             membership: membership,
             card: card,
@@ -284,7 +313,10 @@ enum FieldhouseAuthenticatedRepository {
             latestScorecard: loadedScorecards.first,
             standings: standings,
             scoringCard: scoringCard,
-            scoringPick: scoringPick
+            scoringPick: scoringPick,
+            officialField: loadedField,
+            bracketEntry: loadedBracket,
+            roundEntries: loadedRounds
         )
     }
 
@@ -358,6 +390,50 @@ enum FieldhouseAuthenticatedRepository {
             token: token, leagueId: membership.leagueId, trophyId: trophyID
         )
     }
+
+    static func saveBracket(token: String, membership: LeagueMembership, state: FieldhouseSeasonState) async throws {
+        guard let field = state.officialPostseasonField else {
+            throw FieldhouseRepositoryError(message: "The official Selection Sunday field has not been published.")
+        }
+        guard FieldhouseBracketEngine.progress(picks: state.postseasonBracketPicks, league: state.league, field: field) == 75 else {
+            throw FieldhouseRepositoryError(message: "Complete all 75 bracket decisions before filing.")
+        }
+        _ = try await SupabaseAPI.saveFieldhouseBracket(
+            token: token,
+            leagueId: membership.leagueId,
+            seasonKey: field.seasonKey,
+            picks: state.postseasonBracketPicks,
+            hellfire: state.bracketHellfireUsed
+        )
+    }
+
+    static func saveRoundPicks(token: String, membership: LeagueMembership, state: FieldhouseSeasonState) async throws {
+        guard let field = state.officialPostseasonField,
+              let round = state.activePostseasonRound else {
+            throw FieldhouseRepositoryError(message: "No official tournament round is open for picks.")
+        }
+        let required = field.games.filter { $0.roundKey == round }.count
+        let picks = state.postseasonRoundPicks[round] ?? [:]
+        guard required > 0, picks.count == required else {
+            throw FieldhouseRepositoryError(message: "Pick every game in \(FieldhouseBracketEngine.roundTitle(round)) before filing.")
+        }
+        _ = try await SupabaseAPI.saveFieldhouseRoundPicks(
+            token: token, leagueId: membership.leagueId, seasonKey: field.seasonKey,
+            roundKey: round, picks: picks
+        )
+    }
+
+    static func importOfficialField(token: String, userID: UUID, membership: LeagueMembership, data: Data, publish: Bool) async throws {
+        guard AppIdentity.isCreator(userID) else {
+            throw FieldhouseRepositoryError(message: "War Room owner access required.")
+        }
+        let league = FieldhouseLeague(summary: membership.leagues)
+        _ = try await SupabaseAPI.importFieldhouseOfficialField(
+            token: token, sportId: league.favoriteSportID,
+            seasonKey: FieldhouseSeasonCalendar.postseasonSeasonKey,
+            fieldData: data, publish: publish
+        )
+    }
 }
 
 struct FieldhouseCardWritePlan {
@@ -419,7 +495,8 @@ private struct FieldhouseLiveContext {
 }
 
 private enum FieldhousePersistenceEvent {
-    case setup, publishCard, picks, trophy, favoriteTeam
+    case setup, publishCard, picks, trophy, favoriteTeam, bracket, postseasonRound
+    case importOfficialField(Data, publish: Bool)
 }
 
 private struct FieldhousePersistenceActionKey: EnvironmentKey {
@@ -1060,6 +1137,8 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var lastCertifiedWindow: Int?
     var lastCertifiedPoints: Int?
     var phase: FieldhouseSeasonPhase = .regularSeason
+    var isAuthenticatedSession = false
+    var isCreator = false
     var isCommissioner = true
     var seasonHasStarted = true
     var cardIsPublished = false
@@ -1071,8 +1150,11 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var regularHellfiresUsed = 0
     var bracketHellfireUsed = false
     var bracketLocked = false
+    var officialPostseasonField: FieldhouseOfficialField?
     var postseasonBracketPicks: [String: String] = [:]
     var bracketSubmitted = false
+    var postseasonRoundPicks: [String: [String: String]] = [:]
+    var postseasonRoundSubmitted: Set<String> = []
     var selectedRegion: FieldhouseRegion = .midwest
     var favoriteTeam: String?
     var crystalBallChampion: String?
@@ -1084,6 +1166,9 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var hellfireDeployedOnCurrentCard = false
 
     var regularHellfiresRemaining: Int { max(0, 2 - regularHellfiresUsed) }
+    var activePostseasonRound: String? {
+        officialPostseasonField.flatMap { FieldhouseBracketEngine.liveRoundKey(field: $0) }
+    }
     var scoringFinalGames: Int {
         scoringGames.filter { scoringResults[$0.id]?.isFinal == true }.count
     }
@@ -1289,6 +1374,8 @@ enum FieldhouseStateHydrator {
         now: Date = Date()
     ) -> FieldhouseSeasonState {
         var state = cached ?? FieldhouseSeasonState()
+        state.isAuthenticatedSession = true
+        state.isCreator = AppIdentity.isCreator(userID)
         let league = FieldhouseLeague(summary: snapshot.membership.leagues)
         if state.league != league { state.selectLeague(league) }
 
@@ -1296,8 +1383,8 @@ enum FieldhouseStateHydrator {
         state.isCommissioner = snapshot.membership.isCommissioner(userId: userID)
         if !snapshot.standings.isEmpty {
             state.playerCount = snapshot.standings.count
-            let userDivision = snapshot.standings.first(where: { $0.userId == userID })?.division ?? snapshot.membership.division
-            let regional = snapshot.standings.filter { $0.division == userDivision }
+            let userDivision = snapshot.standings.first(where: { $0.userId == userID })?.fieldhouseRegion ?? snapshot.membership.fieldhouseRegion
+            let regional = snapshot.standings.filter { $0.fieldhouseRegion == userDivision }
             state.regionPlayerCount = max(1, regional.count)
             if let index = regional.firstIndex(where: { $0.userId == userID }) { state.rank = index + 1 }
         }
@@ -1306,6 +1393,13 @@ enum FieldhouseStateHydrator {
             FieldhouseTeamCatalog.displayName(forStoredID: $0.teamId, league: league)
         }
         state.crystalBallChampion = snapshot.crystalBall?.teamName
+        state.officialPostseasonField = snapshot.officialField
+        state.postseasonBracketPicks = snapshot.bracketEntry?.picks ?? state.postseasonBracketPicks
+        state.bracketSubmitted = snapshot.bracketEntry?.submittedAt != nil
+        state.bracketLocked = snapshot.bracketEntry?.lockedAt != nil
+        state.bracketHellfireUsed = snapshot.bracketEntry?.hellfireUsed == true
+        state.postseasonRoundPicks = Dictionary(uniqueKeysWithValues: snapshot.roundEntries.map { ($0.roundKey, $0.picks) })
+        state.postseasonRoundSubmitted = Set(snapshot.roundEntries.compactMap { $0.submittedAt == nil ? nil : $0.roundKey })
 
         if let trophyID = snapshot.membership.leagues.championshipTrophyId,
            FieldhouseTrophyCatalog.options(for: league).contains(where: { $0.id == trophyID }) {
@@ -1711,6 +1805,26 @@ struct FieldhouseNativePreviewView: View {
                 case .favoriteTeam:
                     guard let favorite = pendingState.favoriteTeam else { throw FieldhouseRepositoryError(message: "Choose a favorite team before saving.") }
                     try await FieldhouseAuthenticatedRepository.saveFavoriteTeam(token: liveContext.token, userID: liveContext.userID, membership: liveContext.membership, favoriteTeam: favorite)
+                case .bracket:
+                    try await FieldhouseAuthenticatedRepository.saveBracket(
+                        token: liveContext.token,
+                        membership: liveContext.membership,
+                        state: pendingState
+                    )
+                case .postseasonRound:
+                    try await FieldhouseAuthenticatedRepository.saveRoundPicks(
+                        token: liveContext.token,
+                        membership: liveContext.membership,
+                        state: pendingState
+                    )
+                case .importOfficialField(let data, let publish):
+                    try await FieldhouseAuthenticatedRepository.importOfficialField(
+                        token: liveContext.token,
+                        userID: liveContext.userID,
+                        membership: liveContext.membership,
+                        data: data,
+                        publish: publish
+                    )
                 }
 
                 let verified = try await FieldhouseAuthenticatedRepository.load(token: liveContext.token, userID: liveContext.userID, preferredLeagueID: liveContext.membership.leagueId)
@@ -2867,7 +2981,7 @@ private struct FieldhouseStandingsPage: View {
             lhs.totalPoints == rhs.totalPoints ? lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending : lhs.totalPoints > rhs.totalPoints
         }
         guard !showingOverall else { return sorted }
-        return sorted.filter { ($0.division ?? "").caseInsensitiveCompare(state.selectedRegion.rawValue) == .orderedSame }
+        return sorted.filter { ($0.fieldhouseRegion ?? "").caseInsensitiveCompare(state.selectedRegion.rawValue) == .orderedSame }
     }
     private var displayedPlayerCount: Int {
         authenticatedStandings.isEmpty ? state.regionPlayerCount : visibleStandings.count
@@ -3025,7 +3139,7 @@ private struct FieldhouseStandingsPage: View {
             ProfileAvatar(urlString: profile?.avatarURL, name: standing.name, size: 42, borderId: profile?.equippedBorderId, accent: accent)
             VStack(alignment: .leading, spacing: 3) {
                 Text(displayName).font(.headline.weight(.black))
-                Text(showingOverall ? "FIELDHOUSE OVERALL" : "\(standing.division?.uppercased() ?? "UNASSIGNED") REGION")
+                Text(showingOverall ? "FIELDHOUSE OVERALL" : "\(standing.fieldhouseRegion?.uppercased() ?? "UNASSIGNED") REGION")
                     .font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.44))
             }
             Spacer()
@@ -3077,21 +3191,44 @@ private struct FieldhouseBracketPreview: View {
 
 private struct FieldhouseBracketsPage: View {
     @Environment(\.fieldhouseLeague) private var themedLeague
+    @Environment(\.fieldhousePersist) private var persist
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
     @State private var confirmingBracketHellfire = false
     @State private var showingHistory = false
     @State private var showingBracketPicker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
+    @State private var showingRoundPicker = false
+    @State private var showingFieldImporter = false
+    @State private var pendingFieldData: Data?
+    @State private var confirmingFieldPublish = false
     var body: some View {
         Group {
-            if showingBracketPicker {
+            if showingRoundPicker, let field = state.officialPostseasonField, let round = state.activePostseasonRound {
+                FieldhouseRoundPickerView(
+                    league: state.league,
+                    field: field,
+                    roundKey: round,
+                    picks: Binding(
+                        get: { state.postseasonRoundPicks[round] ?? [:] },
+                        set: { state.postseasonRoundPicks[round] = $0 }
+                    ),
+                    submitted: state.postseasonRoundSubmitted.contains(round),
+                    save: {
+                        state.postseasonRoundSubmitted.insert(round)
+                        persist(.postseasonRound)
+                    },
+                    close: { showingRoundPicker = false }
+                )
+            } else if showingBracketPicker {
                 FieldhouseBracketPickerView(
                     league: state.league,
+                    officialField: state.officialPostseasonField,
                     picks: $state.postseasonBracketPicks,
                     submitted: $state.bracketSubmitted,
                     locked: state.bracketLocked,
                     hellfireUsed: state.bracketHellfireUsed,
+                    save: { persist(.bracket) },
                     close: { showingBracketPicker = false }
                 )
             } else {
@@ -3104,23 +3241,62 @@ private struct FieldhouseBracketsPage: View {
         } message: {
             Text("This cannot be undone. The machine makes all 75 decisions in the 76-team bracket, locks it permanently, and allows no edits or rerolls. At least 60% correct earns 1.5× raw bracket points. Below 60% cuts raw bracket points in half.")
         }
+        .fileImporter(isPresented: $showingFieldImporter, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            pendingFieldData = try? Data(contentsOf: url)
+            confirmingFieldPublish = pendingFieldData != nil
+        }
+        .alert("Publish this official 76-team field?", isPresented: $confirmingFieldPublish) {
+            Button("CANCEL", role: .cancel) { pendingFieldData = nil }
+            Button("IMPORT DRAFT") {
+                if let data = pendingFieldData { persist(.importOfficialField(data, publish: false)) }
+                pendingFieldData = nil
+            }
+            Button("PUBLISH FIELD") {
+                if let data = pendingFieldData { persist(.importOfficialField(data, publish: true)) }
+                pendingFieldData = nil
+            }
+        } message: {
+            Text("War Room validates exactly 76 teams, 75 connected games, four 19-team regions, and official tip times. Publishing opens this same field in every \(state.league.rawValue) league.")
+        }
     }
 
     private var overview: some View {
         VStack(spacing: 13) {
             Button { confirmingBracketHellfire = true } label: {
                 FieldhouseAction(kicker: "BRACKET HELLFIRE · 1/1", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch the AI Crazy Pick", detail: state.bracketHellfireUsed ? "All 75 decisions are sealed. No reroll." : "One-way door. AI fills an erratic 76-team bracket and seals all 75 decisions. Hit 60% for 1.5×; miss it and raw points are cut in half.", icon: "wand.and.stars")
-            }.buttonStyle(.plain).disabled(state.bracketHellfireUsed)
+            }.buttonStyle(.plain).disabled(state.bracketHellfireUsed || (state.officialPostseasonField == nil && state.isAuthenticatedSession))
             FieldhouseHero(kicker: "MARCH COMMAND · 76 TEAMS · 75 DECISIONS", title: "ROAD TO CENTER COURT", detail: "Twelve Opening Round games feed the familiar field of 64. Every winner advances through the real bracket path.", icon: "point.3.connected.trianglepath.dotted")
+            if state.isCreator {
+                Button { showingFieldImporter = true } label: {
+                    FieldhouseAction(kicker: "OWNER CONTROL · SELECTION SUNDAY", title: "Import Official Field", detail: "Load one validated JSON bracket for every \(state.league.rawValue) league. Draft first or publish when verified.", icon: "doc.badge.plus")
+                }.buttonStyle(.plain)
+            }
             postseasonPaths
+            if let round = state.activePostseasonRound, let field = state.officialPostseasonField {
+                let required = field.games.filter { $0.roundKey == round }.count
+                let complete = (state.postseasonRoundPicks[round] ?? [:]).count == required
+                Button { showingRoundPicker = true } label: {
+                    FieldhouseAction(
+                        kicker: complete ? "ROUND CARD COMPLETE" : "ACTION REQUIRED · \(FieldhouseBracketEngine.roundTitle(round))",
+                        title: complete ? "Review My Round Picks" : "Make My Round Picks",
+                        detail: "\((state.postseasonRoundPicks[round] ?? [:]).count)/\(required) winners selected · one point each · locks at first tip.",
+                        icon: "basketball.fill"
+                    )
+                }.buttonStyle(.plain)
+            } else if state.isAuthenticatedSession {
+                FieldhouseAction(kicker: "ROUND PICKS", title: "Next round pending", detail: "The next card opens automatically after every team in the prior round is official.", icon: "clock.fill")
+            }
             Button { showingBracketPicker = true } label: {
                 FieldhouseAction(
                     kicker: state.bracketLocked ? "PERMANENT BRACKET RECEIPT" : state.bracketSubmitted ? "BRACKET FILED · EDITABLE UNTIL TIP" : "SELECTION SUNDAY · PICKS OPEN",
                     title: state.bracketLocked ? "View My Locked Bracket" : state.bracketSubmitted ? "Review or Change My Bracket" : "Fill Out My 76-Team Bracket",
-                    detail: "Buy-In games, four regions, Final Four, and the championship. \(FieldhouseBracketEngine.progress(picks: state.postseasonBracketPicks, league: state.league))/75 decisions complete.",
+                    detail: bracketDetail,
                     icon: "rectangle.split.3x3.fill"
                 )
-            }.buttonStyle(.plain)
+            }.buttonStyle(.plain).disabled(state.officialPostseasonField == nil && state.isAuthenticatedSession)
             FieldhouseRegionalRacePreview(selectedRegion: state.selectedRegion)
             HStack(spacing: 8) {
                 bracketModeButton("CURRENT BRACKET", history: false)
@@ -3171,11 +3347,20 @@ private struct FieldhouseBracketsPage: View {
 
     private func deployBracketHellfire() {
         guard !state.bracketHellfireUsed else { return }
-        state.postseasonBracketPicks = FieldhouseBracketEngine.hellfirePicks(league: state.league)
+        state.postseasonBracketPicks = FieldhouseBracketEngine.hellfirePicks(league: state.league, field: state.officialPostseasonField)
         state.bracketSubmitted = true
         state.bracketHellfireUsed = true
         state.bracketLocked = true
+        persist(.bracket)
         strikePresentation = StrikePresentation(resourceName: state.league == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1")
+    }
+
+    private var bracketDetail: String {
+        guard state.officialPostseasonField != nil || !state.isAuthenticatedSession else {
+            return "Selection Sunday field pending. War Room will publish the verified 76-team bracket here—no commissioner entry required."
+        }
+        let complete = FieldhouseBracketEngine.progress(picks: state.postseasonBracketPicks, league: state.league, field: state.officialPostseasonField)
+        return "Buy-In games, four regions, Final Four, and the championship. \(complete)/75 decisions complete."
     }
 }
 

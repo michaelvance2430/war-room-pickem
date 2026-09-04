@@ -26,6 +26,7 @@ final class FieldhouseExperienceTests: XCTestCase {
             weeklyPoints: [],
             weeksPlayed: 0,
             division: "East",
+            fieldhouseRegion: "Midwest",
             joinedAt: nil,
             atsCorrect: 0,
             atsTotal: 0,
@@ -78,8 +79,8 @@ final class FieldhouseExperienceTests: XCTestCase {
                 seasonTotalAfter: 23
             ),
             standings: [
-                Standing(id: UUID(), userId: userID, totalPoints: 23, weeklyPoints: [23], weeksPlayed: 1, displayNameOverride: "Riley V.", division: "East", profiles: nil, atsCorrect: 2, atsTotal: 2, currentStreak: 1, bestWeek: 23, worstWeek: 23, perfectWeeks: 0, bestBetHits: 1, bestBetTotal: 1, propHits: 1, propTotal: 1, isBot: false),
-                Standing(id: UUID(), userId: UUID(), totalPoints: 17, weeklyPoints: [17], weeksPlayed: 1, displayNameOverride: "Baseline Bandit", division: "East", profiles: nil, atsCorrect: 1, atsTotal: 2, currentStreak: 1, bestWeek: 17, worstWeek: 17, perfectWeeks: 0, bestBetHits: 0, bestBetTotal: 1, propHits: 1, propTotal: 1, isBot: false)
+                Standing(id: UUID(), userId: userID, totalPoints: 23, weeklyPoints: [23], weeksPlayed: 1, displayNameOverride: "Riley V.", division: "East", fieldhouseRegion: "Midwest", profiles: nil, atsCorrect: 2, atsTotal: 2, currentStreak: 1, bestWeek: 23, worstWeek: 23, perfectWeeks: 0, bestBetHits: 1, bestBetTotal: 1, propHits: 1, propTotal: 1, isBot: false),
+                Standing(id: UUID(), userId: UUID(), totalPoints: 17, weeklyPoints: [17], weeksPlayed: 1, displayNameOverride: "Baseline Bandit", division: "East", fieldhouseRegion: "East", profiles: nil, atsCorrect: 1, atsTotal: 2, currentStreak: 1, bestWeek: 17, worstWeek: 17, perfectWeeks: 0, bestBetHits: 0, bestBetTotal: 1, propHits: 1, propTotal: 1, isBot: false)
             ]
         )
 
@@ -112,8 +113,24 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.lastCertifiedWindow, 0)
         XCTAssertEqual(state.lastCertifiedPoints, 23)
         XCTAssertEqual(state.playerCount, 2)
-        XCTAssertEqual(state.regionPlayerCount, 2)
+        XCTAssertEqual(state.regionPlayerCount, 1)
         XCTAssertEqual(state.rank, 1)
+    }
+
+    func testFreshRoundUsesOfficialWinnersToOpenNextRound() {
+        let first = FieldhouseOfficialTeam(teamID: "a", displayName: "Alpha", region: "East", seed: 1)
+        let second = FieldhouseOfficialTeam(teamID: "b", displayName: "Bravo", region: "East", seed: 16)
+        let third = FieldhouseOfficialTeam(teamID: "c", displayName: "Charlie", region: "East", seed: 8)
+        let fourth = FieldhouseOfficialTeam(teamID: "d", displayName: "Delta", region: "East", seed: 9)
+        let games = [
+            FieldhouseOfficialGame(gameID: "r64-1", roundKey: "r64", roundOrder: 1, ordinal: 0, region: "East", firstTeamID: "a", secondTeamID: "b", firstSourceGameID: nil, secondSourceGameID: nil, startsAt: "2027-03-18T16:00:00Z", winnerTeamID: "a"),
+            FieldhouseOfficialGame(gameID: "r64-2", roundKey: "r64", roundOrder: 1, ordinal: 1, region: "East", firstTeamID: "c", secondTeamID: "d", firstSourceGameID: nil, secondSourceGameID: nil, startsAt: "2027-03-18T18:00:00Z", winnerTeamID: "d"),
+            FieldhouseOfficialGame(gameID: "r32-1", roundKey: "r32", roundOrder: 2, ordinal: 0, region: "East", firstTeamID: nil, secondTeamID: nil, firstSourceGameID: "r64-1", secondSourceGameID: "r64-2", startsAt: "2027-03-20T16:00:00Z", winnerTeamID: nil)
+        ]
+        let field = FieldhouseOfficialField(tournamentID: UUID(), sportID: "ncaam", seasonKey: 2027, status: "in_progress", firstTipAt: "2027-03-18T16:00:00Z", teams: [first, second, third, fourth], games: games)
+        let matchups = FieldhouseBracketEngine.roundMatchups(key: "r32", field: field)
+        XCTAssertEqual(matchups.first?.teams.map(\.id), ["a", "d"])
+        XCTAssertEqual(FieldhouseBracketEngine.liveRoundKey(field: field, now: ISO8601DateFormatter().date(from: "2027-03-19T00:00:00Z")!), "r32")
     }
 
     func testCardWritePlanTranslatesTeamFavoriteToSharedHomeAwayContract() throws {

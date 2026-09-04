@@ -4,6 +4,48 @@
 
 begin;
 
+-- Football divisions and basketball regions are different concepts. Do not overload
+-- the legacy North/South/East/West enum: Fieldhouse requires a real Midwest region.
+alter table public.memberships add column if not exists fieldhouse_region text;
+alter table public.memberships drop constraint if exists memberships_fieldhouse_region_check;
+alter table public.memberships add constraint memberships_fieldhouse_region_check
+  check (fieldhouse_region is null or fieldhouse_region in ('East','West','South','Midwest'));
+
+create or replace function public.assign_fieldhouse_region()
+returns trigger
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare v_sport text; v_region text;
+begin
+  select sport_id into v_sport from public.leagues where id=new.league_id;
+  if v_sport not in ('ncaam','ncaaw') then return new; end if;
+  if new.fieldhouse_region is not null then return new; end if;
+  select r.region into v_region
+  from (values ('East',1),('West',2),('South',3),('Midwest',4)) r(region,ord)
+  left join public.memberships m on m.league_id=new.league_id and m.fieldhouse_region=r.region
+  group by r.region,r.ord order by count(m.user_id),r.ord limit 1;
+  new.fieldhouse_region:=v_region;
+  return new;
+end;
+$$;
+revoke all on function public.assign_fieldhouse_region() from public,anon,authenticated;
+
+drop trigger if exists assign_fieldhouse_region_before_insert on public.memberships;
+create trigger assign_fieldhouse_region_before_insert before insert on public.memberships
+for each row execute function public.assign_fieldhouse_region();
+
+with ranked as (
+  select m.league_id,m.user_id,
+    row_number() over(partition by m.league_id order by m.joined_at,m.user_id) rn
+  from public.memberships m join public.leagues l on l.id=m.league_id
+  where l.sport_id in ('ncaam','ncaaw') and m.fieldhouse_region is null
+)
+update public.memberships m set fieldhouse_region=
+  (array['East','West','South','Midwest'])[1+((ranked.rn-1)%4)]
+from ranked where m.league_id=ranked.league_id and m.user_id=ranked.user_id;
+
 create or replace function public.d1b_b_normalize_sport_id(p_sport text)
 returns text
 language plpgsql
@@ -140,10 +182,11 @@ begin
   ) returning id into v_league_id;
 
   insert into public.memberships (
-    league_id, user_id, role, division, total_points, weeks_played,
+    league_id, user_id, role, division, fieldhouse_region, total_points, weeks_played,
     is_bot, is_deputy, is_moderator, locker_muted
   ) values (
     v_league_id, v_uid, 'commissioner', case when v_is_fieldhouse then 'East' else 'North' end,
+    case when v_is_fieldhouse then 'East' else null end,
     0, 0, false, false, false, false
   );
 

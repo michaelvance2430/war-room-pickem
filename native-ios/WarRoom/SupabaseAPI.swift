@@ -47,6 +47,7 @@ struct Standing: Decodable, Identifiable, Sendable {
     let weeksPlayed: Int
     let displayNameOverride: String?
     let division: String?
+    var fieldhouseRegion: String? = nil
     let profiles: Profile?
     let atsCorrect: Int
     let atsTotal: Int
@@ -70,6 +71,7 @@ struct Standing: Decodable, Identifiable, Sendable {
         case weeksPlayed = "weeks_played"
         case displayNameOverride = "display_name_override"
         case division
+        case fieldhouseRegion = "fieldhouse_region"
         case profiles
         case atsCorrect = "ats_correct"
         case atsTotal = "ats_total"
@@ -137,6 +139,7 @@ struct LeagueMembership: Decodable, Identifiable, Sendable {
     let weeklyPoints: [Int]?
     let weeksPlayed: Int?
     let division: String?
+    var fieldhouseRegion: String? = nil
     let joinedAt: String?
     let atsCorrect: Int
     let atsTotal: Int
@@ -162,6 +165,7 @@ struct LeagueMembership: Decodable, Identifiable, Sendable {
         case weeklyPoints = "weekly_points"
         case weeksPlayed = "weeks_played"
         case division
+        case fieldhouseRegion = "fieldhouse_region"
         case joinedAt = "joined_at"
         case atsCorrect = "ats_correct"
         case atsTotal = "ats_total"
@@ -407,6 +411,104 @@ struct FootballScoreEvent: Decodable, Identifiable, Sendable {
 struct FootballTeamScore: Decodable, Sendable {
     let name: String
     let score: String
+}
+
+struct FieldhouseTournamentRecord: Decodable, Sendable {
+    let id: UUID
+    let sportId: String
+    let seasonKey: Int
+    let status: String
+    let firstTipAt: String?
+    enum CodingKeys: String, CodingKey {
+        case id, status
+        case sportId = "sport_id"
+        case seasonKey = "season_key"
+        case firstTipAt = "first_tip_at"
+    }
+}
+
+struct FieldhouseTournamentTeamRecord: Decodable, Sendable {
+    let teamId: String
+    let displayName: String
+    let region: String
+    let seed: Int
+    enum CodingKeys: String, CodingKey {
+        case region, seed
+        case teamId = "team_id"
+        case displayName = "display_name"
+    }
+}
+
+struct FieldhouseTournamentGameRecord: Decodable, Sendable {
+    let gameId: String
+    let roundKey: String
+    let roundOrder: Int
+    let ordinal: Int
+    let region: String?
+    let firstTeamId: String?
+    let secondTeamId: String?
+    let firstSourceGameId: String?
+    let secondSourceGameId: String?
+    let startsAt: String?
+    let winnerTeamId: String?
+    enum CodingKeys: String, CodingKey {
+        case ordinal, region
+        case gameId = "game_id"
+        case roundKey = "round_key"
+        case roundOrder = "round_order"
+        case firstTeamId = "first_team_id"
+        case secondTeamId = "second_team_id"
+        case firstSourceGameId = "first_source_game_id"
+        case secondSourceGameId = "second_source_game_id"
+        case startsAt = "starts_at"
+        case winnerTeamId = "winner_team_id"
+    }
+}
+
+struct FieldhouseRoundEntryRecord: Decodable, Sendable {
+    let roundKey: String
+    let picks: [String: String]
+    let submittedAt: String?
+    let lockedAt: String?
+    let points: Int
+    enum CodingKeys: String, CodingKey {
+        case picks, points
+        case roundKey = "round_key"
+        case submittedAt = "submitted_at"
+        case lockedAt = "locked_at"
+    }
+}
+
+struct FieldhouseRoundSaveResponse: Decodable, Sendable {
+    let ok: Bool
+    let round: String
+    let picks: Int
+}
+
+struct FieldhouseFieldImportResponse: Decodable, Sendable {
+    let ok: Bool
+    let tournamentId: UUID
+    let published: Bool
+    let teams: Int
+    let games: Int
+}
+
+struct FieldhouseBracketEntryRecord: Decodable, Sendable {
+    let picks: [String: String]
+    let submittedAt: String?
+    let lockedAt: String?
+    let hellfireUsed: Bool
+    enum CodingKeys: String, CodingKey {
+        case picks
+        case submittedAt = "submitted_at"
+        case lockedAt = "locked_at"
+        case hellfireUsed = "hellfire_used"
+    }
+}
+
+struct FieldhouseBracketSaveResponse: Decodable, Sendable {
+    let ok: Bool
+    let locked: Bool
 }
 
 enum AppIdentity {
@@ -975,7 +1077,7 @@ enum SupabaseAPI {
     static func leagueMemberships(token: String, userId: UUID, includeFoundry: Bool = false) async throws -> [LeagueMembership] {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/memberships"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "league_id,role,is_moderator,is_deputy,total_points,weekly_points,weeks_played,division,joined_at,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,leagues(name,code,sport_id,sport_settings,current_week,regular_season_weeks,commissioner_id,crystal_ball_enabled,championship_trophy_id,mode,max_human_members)"),
+            URLQueryItem(name: "select", value: "league_id,role,is_moderator,is_deputy,total_points,weekly_points,weeks_played,division,fieldhouse_region,joined_at,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,leagues(name,code,sport_id,sport_settings,current_week,regular_season_weeks,commissioner_id,crystal_ball_enabled,championship_trophy_id,mode,max_human_members)"),
             URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())"),
         ]
         var request = URLRequest(url: components.url!)
@@ -1562,6 +1664,102 @@ enum SupabaseAPI {
         return try await send(request, as: OddsFeed.self)
     }
 
+    static func fieldhouseOfficialField(token: String, sportId: String, seasonKey: Int) async throws -> FieldhouseOfficialField? {
+        var tournamentComponents = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/fieldhouse_tournaments"), resolvingAgainstBaseURL: false)!
+        tournamentComponents.queryItems = [
+            URLQueryItem(name: "select", value: "id,sport_id,season_key,status,first_tip_at"),
+            URLQueryItem(name: "sport_id", value: "eq.\(sportId.lowercased())"),
+            URLQueryItem(name: "season_key", value: "eq.\(seasonKey)"),
+            URLQueryItem(name: "status", value: "neq.draft"),
+            URLQueryItem(name: "limit", value: "1")
+        ]
+        guard let tournament = try await send(authorizedRequest(url: tournamentComponents.url!, token: token), as: [FieldhouseTournamentRecord].self).first else { return nil }
+
+        var teamComponents = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/fieldhouse_tournament_teams"), resolvingAgainstBaseURL: false)!
+        teamComponents.queryItems = [
+            URLQueryItem(name: "select", value: "team_id,display_name,region,seed"),
+            URLQueryItem(name: "tournament_id", value: "eq.\(tournament.id.uuidString.lowercased())"),
+            URLQueryItem(name: "order", value: "region.asc,seed.asc,team_id.asc")
+        ]
+        var gameComponents = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/fieldhouse_tournament_games"), resolvingAgainstBaseURL: false)!
+        gameComponents.queryItems = [
+            URLQueryItem(name: "select", value: "game_id,round_key,round_order,ordinal,region,first_team_id,second_team_id,first_source_game_id,second_source_game_id,starts_at,winner_team_id"),
+            URLQueryItem(name: "tournament_id", value: "eq.\(tournament.id.uuidString.lowercased())"),
+            URLQueryItem(name: "order", value: "round_order.asc,ordinal.asc")
+        ]
+        let teamURL = teamComponents.url!
+        let gameURL = gameComponents.url!
+        async let teams = send(authorizedRequest(url: teamURL, token: token), as: [FieldhouseTournamentTeamRecord].self)
+        async let games = send(authorizedRequest(url: gameURL, token: token), as: [FieldhouseTournamentGameRecord].self)
+        let loadedTeams = try await teams
+        let loadedGames = try await games
+        guard loadedTeams.count == 76, loadedGames.count == 75 else { throw RequestError(message: "The official Fieldhouse bracket is incomplete.") }
+        return FieldhouseOfficialField(
+            tournamentID: tournament.id, sportID: tournament.sportId, seasonKey: tournament.seasonKey,
+            status: tournament.status, firstTipAt: tournament.firstTipAt,
+            teams: loadedTeams.map { .init(teamID: $0.teamId, displayName: $0.displayName, region: $0.region, seed: $0.seed) },
+            games: loadedGames.map { .init(gameID: $0.gameId, roundKey: $0.roundKey, roundOrder: $0.roundOrder, ordinal: $0.ordinal, region: $0.region, firstTeamID: $0.firstTeamId, secondTeamID: $0.secondTeamId, firstSourceGameID: $0.firstSourceGameId, secondSourceGameID: $0.secondSourceGameId, startsAt: $0.startsAt, winnerTeamID: $0.winnerTeamId) }
+        )
+    }
+
+    static func fieldhouseRoundEntries(token: String, tournamentId: UUID, leagueId: UUID, userId: UUID) async throws -> [FieldhouseRoundEntryRecord] {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/fieldhouse_round_entries"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "round_key,picks,submitted_at,locked_at,points"),
+            URLQueryItem(name: "tournament_id", value: "eq.\(tournamentId.uuidString.lowercased())"),
+            URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())")
+        ]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [FieldhouseRoundEntryRecord].self)
+    }
+
+    static func fieldhouseBracketEntry(token: String, tournamentId: UUID, leagueId: UUID, userId: UUID) async throws -> FieldhouseBracketEntryRecord? {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/fieldhouse_bracket_entries"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "picks,submitted_at,locked_at,hellfire_used"),
+            URLQueryItem(name: "tournament_id", value: "eq.\(tournamentId.uuidString.lowercased())"),
+            URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())"),
+            URLQueryItem(name: "limit", value: "1")
+        ]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [FieldhouseBracketEntryRecord].self).first
+    }
+
+    static func saveFieldhouseBracket(token: String, leagueId: UUID, seasonKey: Int, picks: [String: String], hellfire: Bool) async throws -> FieldhouseBracketSaveResponse {
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/save_fieldhouse_bracket"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "p_league_id": leagueId.uuidString.lowercased(), "p_season_key": seasonKey,
+            "p_picks": picks, "p_hellfire": hellfire
+        ])
+        return try await send(request, as: FieldhouseBracketSaveResponse.self)
+    }
+
+    static func saveFieldhouseRoundPicks(token: String, leagueId: UUID, seasonKey: Int, roundKey: String, picks: [String: String]) async throws -> FieldhouseRoundSaveResponse {
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/save_fieldhouse_round_picks"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "p_league_id": leagueId.uuidString.lowercased(), "p_season_key": seasonKey,
+            "p_round_key": roundKey, "p_picks": picks
+        ])
+        return try await send(request, as: FieldhouseRoundSaveResponse.self)
+    }
+
+    static func importFieldhouseOfficialField(token: String, sportId: String, seasonKey: Int, fieldData: Data, publish: Bool) async throws -> FieldhouseFieldImportResponse {
+        let decoded = try JSONSerialization.jsonObject(with: fieldData)
+        guard let field = decoded as? [String: Any] else { throw RequestError(message: "The official field file must contain one JSON object.") }
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/import_fieldhouse_official_field"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "p_sport_id": sportId.lowercased(), "p_season_key": seasonKey,
+            "p_field": field, "p_publish": publish
+        ])
+        return try await send(request, as: FieldhouseFieldImportResponse.self)
+    }
+
     static func footballScores(token: String, leagueId: UUID, sportId: String, daysFrom: Int = 3) async throws -> FootballScoreFeed {
         var request = URLRequest(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/football-scores"))
         request.httpMethod = "POST"
@@ -1611,7 +1809,7 @@ enum SupabaseAPI {
     static func standings(token: String, leagueId: UUID) async throws -> [Standing] {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/memberships"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,user_id,total_points,weekly_points,weeks_played,display_name_override,division,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,is_bot,profiles(display_name,avatar_url,last_seen_at,equipped_title_id,equipped_border_id,equipped_rank_id,career_rank_floor)"),
+            URLQueryItem(name: "select", value: "id,user_id,total_points,weekly_points,weeks_played,display_name_override,division,fieldhouse_region,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,is_bot,profiles(display_name,avatar_url,last_seen_at,equipped_title_id,equipped_border_id,equipped_rank_id,career_rank_floor)"),
             URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
             URLQueryItem(name: "order", value: "total_points.desc"),
         ]

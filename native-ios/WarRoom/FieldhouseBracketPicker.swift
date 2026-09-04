@@ -6,6 +6,47 @@ struct FieldhouseBracketTeam: Identifiable, Hashable, Codable {
     let seed: Int
 }
 
+struct FieldhouseOfficialTeam: Identifiable, Hashable, Codable {
+    let teamID: String
+    let displayName: String
+    let region: String
+    let seed: Int
+    var id: String { teamID }
+}
+
+struct FieldhouseOfficialGame: Identifiable, Hashable, Codable {
+    let gameID: String
+    let roundKey: String
+    let roundOrder: Int
+    let ordinal: Int
+    let region: String?
+    let firstTeamID: String?
+    let secondTeamID: String?
+    let firstSourceGameID: String?
+    let secondSourceGameID: String?
+    let startsAt: String?
+    let winnerTeamID: String?
+    var id: String { gameID }
+}
+
+struct FieldhouseRoundEntry: Equatable, Codable {
+    let roundKey: String
+    let picks: [String: String]
+    let submittedAt: String?
+    let lockedAt: String?
+    let points: Int
+}
+
+struct FieldhouseOfficialField: Equatable, Codable {
+    let tournamentID: UUID
+    let sportID: String
+    let seasonKey: Int
+    let status: String
+    let firstTipAt: String?
+    let teams: [FieldhouseOfficialTeam]
+    let games: [FieldhouseOfficialGame]
+}
+
 struct FieldhouseBracketMatchup: Identifiable, Equatable {
     let id: String
     let label: String
@@ -53,6 +94,65 @@ enum FieldhouseBracketEngine {
         + ["national.ff.0", "national.ff.1", "national.title.0"]
     }
 
+    static func decisionIDs(field: FieldhouseOfficialField?) -> [String] {
+        field?.games.sorted { ($0.roundOrder, $0.ordinal) < ($1.roundOrder, $1.ordinal) }.map(\.gameID) ?? allDecisionIDs
+    }
+
+    static let orderedRoundKeys = ["opening", "r64", "r32", "s16", "e8", "ff", "title"]
+
+    static func roundTitle(_ key: String) -> String {
+        switch key {
+        case "opening": "OPENING ROUND"
+        case "r64": "FIRST ROUND"
+        case "r32": "SECOND ROUND"
+        case "s16": "SWEET 16"
+        case "e8": "ELITE EIGHT"
+        case "ff": "FINAL FOUR"
+        case "title": "NATIONAL CHAMPIONSHIP"
+        default: key.uppercased()
+        }
+    }
+
+    static func liveRoundKey(field: FieldhouseOfficialField, now: Date = Date()) -> String? {
+        let formatter = ISO8601DateFormatter()
+        for key in orderedRoundKeys {
+            let games = field.games.filter { $0.roundKey == key }
+            guard !games.isEmpty, games.contains(where: { $0.winnerTeamID == nil }) else { continue }
+            let participantsReady = games.allSatisfy { game in
+                resolveParticipant(game.firstTeamID, source: game.firstSourceGameID, field: field) != nil &&
+                resolveParticipant(game.secondTeamID, source: game.secondSourceGameID, field: field) != nil
+            }
+            guard participantsReady else { continue }
+            let tips = games.compactMap { $0.startsAt.flatMap(formatter.date(from:)) }
+            if tips.isEmpty || now < (tips.min() ?? now) { return key }
+            return key
+        }
+        return nil
+    }
+
+    static func roundMatchups(key: String, field: FieldhouseOfficialField) -> [FieldhouseBracketMatchup] {
+        field.games.filter { $0.roundKey == key }.sorted { $0.ordinal < $1.ordinal }.map {
+            officialRoundMatchup($0, field: field)
+        }
+    }
+
+    private static func resolveParticipant(_ teamID: String?, source: String?, field: FieldhouseOfficialField) -> String? {
+        teamID ?? source.flatMap { sourceID in field.games.first(where: { $0.gameID == sourceID })?.winnerTeamID }
+    }
+
+    private static func officialRoundMatchup(_ game: FieldhouseOfficialGame, field: FieldhouseOfficialField) -> FieldhouseBracketMatchup {
+        func team(_ id: String?) -> FieldhouseBracketTeam? {
+            guard let id, let value = field.teams.first(where: { $0.teamID == id }) else { return nil }
+            return .init(id: id, name: value.displayName, seed: value.seed)
+        }
+        return .init(
+            id: game.gameID,
+            label: [game.region?.uppercased(), "GAME \(game.ordinal + 1)"].compactMap { $0 }.joined(separator: " · "),
+            first: team(resolveParticipant(game.firstTeamID, source: game.firstSourceGameID, field: field)),
+            second: team(resolveParticipant(game.secondTeamID, source: game.secondSourceGameID, field: field))
+        )
+    }
+
     static func openingGames(league: FieldhouseLeague = .ncaam) -> [FieldhouseBracketMatchup] {
         let catalog = Array(FieldhouseTeamCatalog.teams(for: league).dropFirst(64).prefix(24))
         return (0..<12).map { index in
@@ -72,8 +172,10 @@ enum FieldhouseBracketEngine {
     static func matchups(
         for section: FieldhouseBracketSection,
         league: FieldhouseLeague,
-        picks: [String: String]
+        picks: [String: String],
+        field: FieldhouseOfficialField? = nil
     ) -> [(round: String, games: [FieldhouseBracketMatchup])] {
+        if let field { return officialMatchups(for: section, field: field, picks: picks) }
         switch section {
         case .buyIn:
             return [("OPENING ROUND · 12 GAMES", openingGames(league: league))]
@@ -92,14 +194,15 @@ enum FieldhouseBracketEngine {
         }
     }
 
-    static func progress(picks: [String: String], league: FieldhouseLeague) -> Int {
-        pruned(picks: picks, league: league).count
+    static func progress(picks: [String: String], league: FieldhouseLeague, field: FieldhouseOfficialField? = nil) -> Int {
+        if let field { return officialPruned(picks: picks, field: field).count }
+        return pruned(picks: picks, league: league).count
     }
 
-    static func choose(_ team: FieldhouseBracketTeam, in matchup: FieldhouseBracketMatchup, picks: inout [String: String], league: FieldhouseLeague) {
+    static func choose(_ team: FieldhouseBracketTeam, in matchup: FieldhouseBracketMatchup, picks: inout [String: String], league: FieldhouseLeague, field: FieldhouseOfficialField? = nil) {
         guard matchup.teams.contains(team) else { return }
         picks[matchup.id] = team.id
-        picks = pruned(picks: picks, league: league)
+        picks = field.map { officialPruned(picks: picks, field: $0) } ?? pruned(picks: picks, league: league)
     }
 
     static func pruned(picks: [String: String], league: FieldhouseLeague) -> [String: String] {
@@ -116,7 +219,15 @@ enum FieldhouseBracketEngine {
         return valid
     }
 
-    static func hellfirePicks(league: FieldhouseLeague) -> [String: String] {
+    static func hellfirePicks(league: FieldhouseLeague, field: FieldhouseOfficialField? = nil) -> [String: String] {
+        if let field {
+            var picks: [String: String] = [:]
+            for game in field.games.sorted(by: { ($0.roundOrder, $0.ordinal) < ($1.roundOrder, $1.ordinal) }) {
+                let matchup = officialMatchup(game, field: field, picks: picks)
+                if let team = matchup.teams.max(by: { $0.seed < $1.seed }) { picks[game.gameID] = team.id }
+            }
+            return officialPruned(picks: picks, field: field)
+        }
         var picks: [String: String] = [:]
         for game in openingGames(league: league) { if let team = game.teams.last { choose(team, in: game, picks: &picks, league: league) } }
         for region in FieldhouseRegion.allCases {
@@ -131,13 +242,58 @@ enum FieldhouseBracketEngine {
         return picks
     }
 
-    static func regionalChampion(_ region: FieldhouseRegion, picks: [String: String], league: FieldhouseLeague) -> FieldhouseBracketTeam? {
+    static func regionalChampion(_ region: FieldhouseRegion, picks: [String: String], league: FieldhouseLeague, field: FieldhouseOfficialField? = nil) -> FieldhouseBracketTeam? {
+        if let field, let game = field.games.first(where: { $0.roundKey == "e8" && $0.region == region.rawValue }) {
+            return selectedTeam(in: officialMatchup(game, field: field, picks: picks), picks: picks)
+        }
         let game = derivedRound(region: region, round: "e8", source: "s16", count: 1, picks: picks)[0]
         return selectedTeam(in: game, picks: picks)
     }
 
-    static func nationalChampion(picks: [String: String]) -> FieldhouseBracketTeam? {
-        selectedTeam(in: titleGame(picks: picks), picks: picks)
+    static func nationalChampion(picks: [String: String], field: FieldhouseOfficialField? = nil) -> FieldhouseBracketTeam? {
+        if let field, let game = field.games.first(where: { $0.roundKey == "title" }) {
+            return selectedTeam(in: officialMatchup(game, field: field, picks: picks), picks: picks)
+        }
+        return selectedTeam(in: titleGame(picks: picks), picks: picks)
+    }
+
+    private static func officialMatchups(for section: FieldhouseBracketSection, field: FieldhouseOfficialField, picks: [String: String]) -> [(round: String, games: [FieldhouseBracketMatchup])] {
+        let keys: [(String, String)]
+        switch section {
+        case .buyIn: keys = [("opening", "OPENING ROUND · 12 GAMES")]
+        case .region: keys = [("r64", "FIRST ROUND · 8 GAMES"), ("r32", "SECOND ROUND · 4 GAMES"), ("s16", "SWEET 16 · 2 GAMES"), ("e8", "ELITE EIGHT · REGIONAL FINAL")]
+        case .finalFour: keys = [("ff", "NATIONAL SEMIFINALS"), ("title", "NATIONAL CHAMPIONSHIP")]
+        }
+        return keys.map { key, title in
+            let games = field.games.filter { game in
+                guard game.roundKey == key else { return false }
+                if case .region(let region) = section { return game.region == region.rawValue }
+                return true
+            }.sorted { $0.ordinal < $1.ordinal }.map { officialMatchup($0, field: field, picks: picks) }
+            return (title, games)
+        }
+    }
+
+    private static func officialMatchup(_ game: FieldhouseOfficialGame, field: FieldhouseOfficialField, picks: [String: String]) -> FieldhouseBracketMatchup {
+        func participant(teamID: String?, sourceID: String?) -> FieldhouseBracketTeam? {
+            let resolved = teamID ?? sourceID.flatMap { picks[$0] }
+            guard let resolved, let team = field.teams.first(where: { $0.teamID == resolved }) else { return nil }
+            return FieldhouseBracketTeam(id: team.teamID, name: team.displayName, seed: team.seed)
+        }
+        return FieldhouseBracketMatchup(
+            id: game.gameID,
+            label: [game.region?.uppercased(), "GAME \(game.ordinal + 1)"].compactMap { $0 }.joined(separator: " · "),
+            first: participant(teamID: game.firstTeamID, sourceID: game.firstSourceGameID),
+            second: participant(teamID: game.secondTeamID, sourceID: game.secondSourceGameID)
+        )
+    }
+
+    private static func officialPruned(picks: [String: String], field: FieldhouseOfficialField) -> [String: String] {
+        var valid: [String: String] = [:]
+        for game in field.games.sorted(by: { ($0.roundOrder, $0.ordinal) < ($1.roundOrder, $1.ordinal) }) {
+            retain(officialMatchup(game, field: field, picks: valid), from: picks, into: &valid)
+        }
+        return valid
     }
 
     private static func regionalRound64(region: FieldhouseRegion, league: FieldhouseLeague, picks: [String: String]) -> [FieldhouseBracketMatchup] {
@@ -211,10 +367,12 @@ enum FieldhouseBracketEngine {
 
 struct FieldhouseBracketPickerView: View {
     let league: FieldhouseLeague
+    let officialField: FieldhouseOfficialField?
     @Binding var picks: [String: String]
     @Binding var submitted: Bool
     let locked: Bool
     let hellfireUsed: Bool
+    let save: () -> Void
     let close: () -> Void
 
     @State private var section: FieldhouseBracketSection = .buyIn
@@ -222,7 +380,7 @@ struct FieldhouseBracketPickerView: View {
     @State private var showingSubmitConfirmation = false
 
     private var accent: Color { FieldhouseTheme.accent(for: league) }
-    private var progress: Int { FieldhouseBracketEngine.progress(picks: picks, league: league) }
+    private var progress: Int { FieldhouseBracketEngine.progress(picks: picks, league: league, field: officialField) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -233,7 +391,7 @@ struct FieldhouseBracketPickerView: View {
                         sectionRail(position: "top")
                             .id("bracket-section-top")
                         sectionIntro
-                        ForEach(FieldhouseBracketEngine.matchups(for: section, league: league, picks: picks), id: \.round) { group in
+                        ForEach(FieldhouseBracketEngine.matchups(for: section, league: league, picks: picks, field: officialField), id: \.round) { group in
                             VStack(alignment: .leading, spacing: 10) {
                                 Text(group.round).font(.caption.weight(.black)).tracking(1.5).foregroundStyle(accent)
                                 ForEach(group.games) { matchup in matchupCard(matchup) }
@@ -266,7 +424,7 @@ struct FieldhouseBracketPickerView: View {
         .sheet(isPresented: $showingReview) { reviewSheet }
         .alert("File this bracket?", isPresented: $showingSubmitConfirmation) {
             Button("CANCEL", role: .cancel) {}
-            Button("CONFIRM BRACKET") { submitted = true; showingReview = false }
+            Button("CONFIRM BRACKET") { submitted = true; showingReview = false; save() }
         } message: {
             Text("Your 75 decisions will be recorded. You may reopen and edit them until the first Buy-In game tips. Bracket Hellfire is the only path that locks immediately.")
         }
@@ -319,7 +477,7 @@ struct FieldhouseBracketPickerView: View {
     }
 
     private func isComplete(_ item: FieldhouseBracketSection) -> Bool {
-        let games = FieldhouseBracketEngine.matchups(for: item, league: league, picks: picks).flatMap(\.games)
+        let games = FieldhouseBracketEngine.matchups(for: item, league: league, picks: picks, field: officialField).flatMap(\.games)
         return !games.isEmpty && games.allSatisfy { picks[$0.id] != nil }
     }
 
@@ -364,7 +522,7 @@ struct FieldhouseBracketPickerView: View {
         let selected = picks[matchup.id] == team.id
         return Button {
             guard !locked else { return }
-            FieldhouseBracketEngine.choose(team, in: matchup, picks: &picks, league: league)
+            FieldhouseBracketEngine.choose(team, in: matchup, picks: &picks, league: league, field: officialField)
             submitted = false
         } label: {
             HStack(spacing: 11) {
@@ -391,7 +549,7 @@ struct FieldhouseBracketPickerView: View {
                                 Image(region.regionalTrophyAsset).resizable().scaledToFit().frame(width: 54, height: 54)
                                 VStack(alignment: .leading) {
                                     Text("\(region.rawValue) CHAMPION").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(accent)
-                                    Text(FieldhouseBracketEngine.regionalChampion(region, picks: picks, league: league)?.name ?? "NOT DECIDED").font(.headline.weight(.black))
+                                    Text(FieldhouseBracketEngine.regionalChampion(region, picks: picks, league: league, field: officialField)?.name ?? "NOT DECIDED").font(.headline.weight(.black))
                                 }
                                 Spacer()
                             }.padding(12).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
@@ -400,7 +558,7 @@ struct FieldhouseBracketPickerView: View {
                             Image(systemName: "trophy.fill").font(.title).foregroundStyle(.yellow)
                             VStack(alignment: .leading) {
                                 Text("NATIONAL CHAMPION").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.yellow)
-                                Text(FieldhouseBracketEngine.nationalChampion(picks: picks)?.name ?? "NOT DECIDED").font(.title3.weight(.black))
+                                Text(FieldhouseBracketEngine.nationalChampion(picks: picks, field: officialField)?.name ?? "NOT DECIDED").font(.title3.weight(.black))
                             }; Spacer()
                         }.padding(15).background(.yellow.opacity(0.10), in: RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(.yellow.opacity(0.42)))
                         if hellfireUsed {
@@ -414,5 +572,77 @@ struct FieldhouseBracketPickerView: View {
             }
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("BACK") { showingReview = false }.foregroundStyle(accent) } }
         }.preferredColorScheme(.dark)
+    }
+}
+
+struct FieldhouseRoundPickerView: View {
+    let league: FieldhouseLeague
+    let field: FieldhouseOfficialField
+    let roundKey: String
+    @Binding var picks: [String: String]
+    let submitted: Bool
+    let save: () -> Void
+    let close: () -> Void
+
+    @State private var confirming = false
+    private var accent: Color { FieldhouseTheme.accent(for: league) }
+    private var games: [FieldhouseBracketMatchup] { FieldhouseBracketEngine.roundMatchups(key: roundKey, field: field) }
+    private var complete: Bool { !games.isEmpty && picks.count == games.count }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Button(action: close) {
+                    Image(systemName: "chevron.left").font(.headline.weight(.black))
+                        .frame(width: 40, height: 40).background(.white.opacity(0.10), in: Circle())
+                }.buttonStyle(.plain)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("FRESH ROUND PICKS").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(accent)
+                    Text(FieldhouseBracketEngine.roundTitle(roundKey)).font(.headline.weight(.black)).fontWidth(.condensed)
+                }
+                Spacer()
+                Text("\(picks.count)/\(games.count)").font(.title3.weight(.black)).foregroundStyle(complete ? accent : .red)
+            }
+            .padding(14).background(.black.opacity(0.94))
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    Text("Pick every straight-up winner for this round. These picks are separate from your Selection Sunday bracket and score one point each.")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.65))
+                    ForEach(games) { game in
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text(game.label).font(.caption2.weight(.black)).tracking(1.2).foregroundStyle(accent)
+                            ForEach(game.teams) { team in
+                                Button {
+                                    picks[game.id] = picks[game.id] == team.id ? nil : team.id
+                                } label: {
+                                    HStack {
+                                        Text("#\(team.seed)").font(.caption.weight(.black)).foregroundStyle(accent)
+                                        Text(team.name).font(.subheadline.weight(.black)).foregroundStyle(.white)
+                                        Spacer()
+                                        Image(systemName: picks[game.id] == team.id ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(picks[game.id] == team.id ? accent : .white.opacity(0.35))
+                                    }.padding(12).background(picks[game.id] == team.id ? accent.opacity(0.14) : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 11))
+                                }.buttonStyle(.plain)
+                            }
+                        }.padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
+                            .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.30)))
+                    }
+                    Button { confirming = true } label: {
+                        Text(submitted ? "UPDATE ROUND PICKS" : "FILE ROUND PICKS")
+                            .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(15)
+                            .foregroundStyle(complete ? .black : .white.opacity(0.55))
+                            .background(complete ? accent : .white.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
+                    }.buttonStyle(.plain).disabled(!complete)
+                }.padding(14).padding(.bottom, 28)
+            }
+        }
+        .background(Color.black)
+        .alert("File \(FieldhouseBracketEngine.roundTitle(roundKey)) picks?", isPresented: $confirming) {
+            Button("CANCEL", role: .cancel) {}
+            Button("CONFIRM PICKS") { save() }
+        } message: {
+            Text("Every game in this round locks together at the first official tip. You may update this card until then.")
+        }
     }
 }
