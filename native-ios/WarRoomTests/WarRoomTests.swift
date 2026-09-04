@@ -296,6 +296,13 @@ struct WarRoomTests {
         #expect(footballKickoffDate(value) != nil)
     }
 
+    @Test func submittedPickKickoffIncludesDayDateTimeAndZone() throws {
+        let eastern = try #require(TimeZone(identifier: "America/New_York"))
+        let label = try #require(footballKickoffLabel("2026-09-05T16:00:00Z", timeZone: eastern))
+        #expect(label == "SAT, SEP 5 · 12:00 PM EDT")
+        #expect(footballKickoffLabel(nil, timeZone: eastern) == nil)
+    }
+
     @Test func rivalryTracksTheClosestLiveStanding() {
         let player = standing(name: "Mike", points: 100, id: 1)
         let closeBehind = standing(name: "Kahmann", points: 98, id: 2)

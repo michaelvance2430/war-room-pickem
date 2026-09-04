@@ -1342,6 +1342,12 @@ private struct LockedPickSummaryView: View {
                                         if selection.isBestBet { Image(systemName: "star.fill").foregroundStyle(isNFL ? .red : .yellow).accessibilityLabel("Best Bet") }
                                     }
                                     Text("\(game.awayTeam) at \(game.homeTeam)").font(.caption).foregroundStyle(.white.opacity(0.42)).lineLimit(1)
+                                    if let kickoff = footballKickoffLabel(game.startTime) {
+                                        Label("KICKOFF · \(kickoff)", systemImage: "clock.fill")
+                                            .font(.caption.weight(.bold))
+                                            .foregroundStyle(accent.opacity(0.88))
+                                            .accessibilityIdentifier("submitted-pick-kickoff-\(game.id.uuidString)")
+                                    }
                                 }
                                 Spacer()
                                 Image(systemName: "checkmark").font(.caption.weight(.black)).foregroundStyle(accent)
@@ -4566,6 +4572,18 @@ func footballKickoffDate(_ value: String?) -> Date? {
         postgresValue += ":00"
     }
     return formatter.date(from: postgresValue)
+}
+
+func footballKickoffLabel(
+    _ value: String?,
+    timeZone: TimeZone = .autoupdatingCurrent
+) -> String? {
+    guard let date = footballKickoffDate(value) else { return nil }
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = timeZone
+    formatter.dateFormat = "EEE, MMM d · h:mm a z"
+    return formatter.string(from: date).uppercased()
 }
 
 func boardGameIsDeclassified(startTime: String?, at date: Date, weekScored: Bool) -> Bool {
