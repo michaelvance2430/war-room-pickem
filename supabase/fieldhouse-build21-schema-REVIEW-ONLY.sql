@@ -81,6 +81,22 @@ alter table public.leagues
     )
   );
 
+-- Fieldhouse regional hardware belongs on the same permanent career shelf as
+-- every football trophy. Keep one trophy_type per region so all four winners
+-- can be engraved for the same league and season without colliding with the
+-- existing (league_id, season_year, trophy_type) uniqueness contract.
+alter table public.league_trophies
+  drop constraint if exists league_trophies_trophy_type_check;
+alter table public.league_trophies
+  add constraint league_trophies_trophy_type_check check (
+    trophy_type in (
+      'championship','toilet_bowl','crystal_ball',
+      'division_north','division_south','division_east','division_west',
+      'fieldhouse_region_east','fieldhouse_region_west',
+      'fieldhouse_region_south','fieldhouse_region_midwest'
+    )
+  );
+
 alter table public.league_season_closeouts
   drop constraint if exists league_season_closeouts_sport_id_check;
 alter table public.league_season_closeouts

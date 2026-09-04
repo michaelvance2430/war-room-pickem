@@ -891,7 +891,10 @@ grant execute on function public.score_fieldhouse_postseason(uuid) to service_ro
 
 create or replace function public.finalize_fieldhouse_postseason_awards(p_tournament_id uuid)
 returns jsonb language plpgsql security definer set search_path=public as $$
-declare v_status text; v_count integer;
+declare
+  v_status text;
+  v_region_awards integer := 0;
+  v_league_awards integer := 0;
 begin
   select status into v_status from public.fieldhouse_tournaments where id=p_tournament_id;
   if v_status<>'final' then raise exception 'Tournament is not final'; end if;
@@ -913,6 +916,7 @@ begin
     'fieldhouse-regional-'||lower(fieldhouse_region),total_points from regional where place=1
   on conflict(tournament_id,league_id,award_key,player_region) where award_key='regional_champion' do update set
     user_id=excluded.user_id,trophy_id=excluded.trophy_id,total_points=excluded.total_points,awarded_at=now();
+  get diagnostics v_region_awards=row_count;
 
   with totals as (
     select p.league_id,p.user_id,p.total_points,m.total_points regular_points,l.championship_trophy_id
@@ -928,8 +932,63 @@ begin
     coalesce(championship_trophy_id,'fieldhouse-champion'),total_points from ranked where place=1
   on conflict(tournament_id,league_id,award_key) where award_key='league_champion' do update set
     user_id=excluded.user_id,trophy_id=excluded.trophy_id,total_points=excluded.total_points,awarded_at=now();
-  get diagnostics v_count=row_count;
-  return jsonb_build_object('ok',true,'leagueAwards',v_count);
+  get diagnostics v_league_awards=row_count;
+
+  -- The postseason awards table is the scoring receipt. The shared
+  -- league_trophies table is the permanent public hardware shelf consumed by
+  -- CFB, NFL, NCAAM and NCAAW profiles. Engrave both from the same final rows
+  -- so the profile can never disagree with the authoritative tournament total.
+  insert into public.league_trophies(
+    league_id,season_year,trophy_type,winner_name,winner_user_id,
+    subtitle,notes,awarded_at,trophy_design_id
+  )
+  select
+    a.league_id,t.season_key,
+    'fieldhouse_region_'||lower(a.player_region),
+    coalesce(nullif(trim(p.display_name),''),'Player'),a.user_id,
+    a.player_region||' Regional Champion · '||t.season_key::text,
+    'Won the '||a.player_region||' Region with '||a.total_points||' official tournament points.',
+    a.awarded_at,a.trophy_id
+  from public.fieldhouse_postseason_awards a
+  join public.fieldhouse_tournaments t on t.id=a.tournament_id
+  left join public.profiles p on p.id=a.user_id
+  where a.tournament_id=p_tournament_id and a.award_key='regional_champion'
+  on conflict(league_id,season_year,trophy_type) do update set
+    winner_name=excluded.winner_name,
+    winner_user_id=excluded.winner_user_id,
+    subtitle=excluded.subtitle,
+    notes=excluded.notes,
+    awarded_at=excluded.awarded_at,
+    trophy_design_id=excluded.trophy_design_id;
+
+  insert into public.league_trophies(
+    league_id,season_year,trophy_type,winner_name,winner_user_id,
+    subtitle,notes,awarded_at,trophy_design_id
+  )
+  select
+    a.league_id,t.season_key,'championship',
+    coalesce(nullif(trim(p.display_name),''),'Player'),a.user_id,
+    case t.sport_id when 'ncaaw' then 'NCAAW Fieldhouse Champion · ' else 'NCAAM Fieldhouse Champion · ' end||t.season_key::text,
+    'Won the Fieldhouse with '||a.total_points||' official tournament points.',
+    a.awarded_at,a.trophy_id
+  from public.fieldhouse_postseason_awards a
+  join public.fieldhouse_tournaments t on t.id=a.tournament_id
+  left join public.profiles p on p.id=a.user_id
+  where a.tournament_id=p_tournament_id and a.award_key='league_champion'
+  on conflict(league_id,season_year,trophy_type) do update set
+    winner_name=excluded.winner_name,
+    winner_user_id=excluded.winner_user_id,
+    subtitle=excluded.subtitle,
+    notes=excluded.notes,
+    awarded_at=excluded.awarded_at,
+    trophy_design_id=excluded.trophy_design_id;
+
+  return jsonb_build_object(
+    'ok',true,
+    'regionalAwards',v_region_awards,
+    'leagueAwards',v_league_awards,
+    'permanentHardware',v_region_awards+v_league_awards
+  );
 end;
 $$;
 revoke all on function public.finalize_fieldhouse_postseason_awards(uuid) from public,anon,authenticated;

@@ -1724,7 +1724,7 @@ struct FieldhouseNativePreviewView: View {
         ZStack {
             FieldhouseBackdrop(leagueOverride: state.league).ignoresSafeArea()
             VStack(spacing: 0) {
-                if desk != .home {
+                if desk != .home && desk != .profile {
                     FieldhouseHeader(state: state, canGoBack: true) { desk = .home }
                 }
                 if desk == .locker {
@@ -1732,10 +1732,14 @@ struct FieldhouseNativePreviewView: View {
                 } else if desk == .picks {
                     FieldhousePicksPage(state: $state, strikePresentation: $strikePresentation)
                 } else if desk == .profile {
-                    NavigationStack {
-                        ScrollView {
-                            FieldhouseProfilePage(state: $state)
-                                .padding(14).padding(.bottom, 30)
+                    if auth.user != nil && auth.token != nil {
+                        YouView(onBack: { desk = .home })
+                    } else {
+                        NavigationStack {
+                            ScrollView {
+                                FieldhouseProfilePage(state: $state)
+                                    .padding(14).padding(.bottom, 30)
+                            }
                         }
                     }
                 } else if desk == .standings {
@@ -2066,7 +2070,7 @@ private struct FieldhouseSeasonSetupView: View {
     }
 }
 
-private struct FieldhouseBackdrop: View {
+struct FieldhouseBackdrop: View {
     @Environment(\.fieldhouseLeague) private var league
     let leagueOverride: FieldhouseLeague?
     init(leagueOverride: FieldhouseLeague? = nil) { self.leagueOverride = leagueOverride }

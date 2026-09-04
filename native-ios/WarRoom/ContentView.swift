@@ -2218,7 +2218,7 @@ private struct PublicPlayerProfileView: View {
                         ForEach(displayTrophies) { trophy in
                             Button { selectedTrophy = trophy } label: {
                                 HStack(spacing: 13) {
-                                    TrophyRowIcon(trophyType: trophy.trophyType, size: 42)
+                                    TrophyRowIcon(trophyType: trophy.trophyType, trophyDesignId: trophy.trophyDesignId, size: 42)
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(trophyTitle(trophy.trophyType)).font(.headline.weight(.black))
                                         Text(trophy.subtitle ?? "\(String(trophy.seasonYear)) · Permanent record").font(.caption).foregroundStyle(.secondary)
@@ -2282,7 +2282,7 @@ private struct PublicPlayerProfileView: View {
         VStack(alignment: .leading, spacing: 2) { Text(title).font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(identity.isNFL ? .cyan : .yellow); Text(detail).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.38)) }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
     }
     private func trophyTitle(_ type: String) -> String {
-        switch type { case "championship": return "LEAGUE CHAMPION"; case "toilet_bowl": return "TOILET BOWL"; case "crystal_ball": return "VILLAGE NERD"; case "nfc_championship": return "NFC CHAMPIONSHIP"; default: return type.replacingOccurrences(of: "_", with: " ").uppercased() }
+        trophyDisplayTitle(type)
     }
     private func load() async {
         guard let token = auth.token else { return }
@@ -6016,22 +6016,25 @@ struct YouView: View {
         leagues.first { $0.leagueId == auth.selectedLeagueId } ?? leagues.first
     }
     private var identity: SportIdentity { SportIdentity(selectedMembership?.leagues.sportId) }
+    private var primaryAccent: Color { identity.isFieldhouse ? identity.accent : (identity.isNFL ? .cyan : .yellow) }
+    private var operationalAccent: Color { identity.isFieldhouse ? identity.accent : (identity.isNFL ? .cyan : .green) }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 if identity.isNFL { NflHomeBackdrop(phase: .regularSeason) }
+                else if identity.isFieldhouse { FieldhouseBackdrop(leagueOverride: identity.isNCAAW ? .ncaaw : .ncaam) }
                 else { ProfileShrineBackdrop() }
                 ScrollView {
                     VStack(spacing: 15) {
                         VStack(spacing: 10) {
-                            Text(identity.isNFL ? "PRO FOOTBALL PERSONNEL FILE" : "PLAYER DOSSIER").font(.caption2.weight(.black)).tracking(2.4).foregroundStyle(identity.isNFL ? .cyan : .yellow)
-                            ProfileAvatar(urlString: profile?.avatarURL, name: playerName, size: 104, borderId: profile?.equippedBorderId, accent: identity.isNFL ? .cyan : .green)
+                            Text(identity.isNFL ? "PRO FOOTBALL PERSONNEL FILE" : "PLAYER DOSSIER").font(.caption2.weight(.black)).tracking(2.4).foregroundStyle(primaryAccent)
+                            ProfileAvatar(urlString: profile?.avatarURL, name: playerName, size: 104, borderId: profile?.equippedBorderId, accent: operationalAccent)
                             ProfileRankPlacard(progress: profileRankProgress, isOwner: true, sportId: identity.sportId)
                             Text(playerName).font(.system(size: 32, weight: .black)).fontWidth(.condensed)
                             HStack(spacing: 7) {
-                                profileTag(roleLabel, color: identity.isNFL ? .blue : .green)
-                                profileTag(conferenceLabel, color: identity.isNFL ? .red : .yellow)
+                                profileTag(roleLabel, color: identity.isNFL ? .blue : operationalAccent)
+                                profileTag(conferenceLabel, color: identity.isNFL ? .red : primaryAccent)
                             }
                             Text(selectedMembership?.leagues.name.uppercased() ?? "NO ACTIVE LEAGUE")
                                 .font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(.white.opacity(0.48))
@@ -6039,7 +6042,7 @@ struct YouView: View {
                         .frame(maxWidth: .infinity).padding(.vertical, 22)
                         .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 20))
                         .overlay(alignment: .top) { if identity.isNFL { HStack(spacing: 0) { Color.blue; Color.white; Color.red }.frame(height: 3) } }
-                        .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 20).stroke((identity.isNFL ? Color.cyan : Color.yellow).opacity(0.42)))
+                        .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 20).stroke(primaryAccent.opacity(0.42)))
 
                             FavoriteTeamShrine(team: favoriteTeam)
                             if let user = auth.user { ProfileArsenalView(userId: user.id, sportId: identity.sportId) }
@@ -6050,7 +6053,7 @@ struct YouView: View {
                             dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
                             ForEach(regularSeasonScorecards) { scorecard in
                                 NavigationLink { RegularSeasonScorecardView(scorecard: scorecard, sportId: identity.sportId) } label: {
-                                    dossierRow("Week \(scorecard.weekNumber) · \(scorecard.totalPoints) points", "SEASON TOTAL · \(scorecard.seasonTotalAfter)", "checklist.checked", identity.isNFL ? .cyan : .green)
+                                    dossierRow("Week \(scorecard.weekNumber) · \(scorecard.totalPoints) points", "SEASON TOTAL · \(scorecard.seasonTotalAfter)", "checklist.checked", operationalAccent)
                                 }.buttonStyle(.plain)
                             }
                         }
@@ -6058,7 +6061,7 @@ struct YouView: View {
                             dossierLabel("POSTSEASON SCORECARDS", detail: "EVERY POINT. EVERY WEEK. NO MYSTERY MATH.")
                             ForEach(postseasonScorecards) { scorecard in
                                 NavigationLink { PostseasonScorecardView(scorecard: scorecard, sportId: identity.sportId) } label: {
-                                    dossierRow("Week \(scorecard.weekNumber) · \(scorecard.weeklyTotal) points", scorecard.phase.replacingOccurrences(of: "_", with: " ").uppercased(), "list.clipboard.fill", identity.isNFL ? .cyan : .yellow)
+                                    dossierRow("Week \(scorecard.weekNumber) · \(scorecard.weeklyTotal) points", scorecard.phase.replacingOccurrences(of: "_", with: " ").uppercased(), "list.clipboard.fill", primaryAccent)
                                 }.buttonStyle(.plain)
                             }
                         }
@@ -6090,7 +6093,7 @@ struct YouView: View {
                         }.buttonStyle(.plain)
                         if earnedSwagExpanded && displayAchievements.isEmpty {
                             HStack(spacing: 12) {
-                                Image(systemName: "lock.shield.fill").font(.title2).foregroundStyle(identity.isNFL ? .cyan : .yellow)
+                                Image(systemName: "lock.shield.fill").font(.title2).foregroundStyle(primaryAccent)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text("NO HARDWARE YET").font(.headline.weight(.black))
                                     Text("The season has not started. Fraud remains unconfirmed.").font(.caption).foregroundStyle(.secondary)
@@ -6131,7 +6134,7 @@ struct YouView: View {
                         if let membership = selectedMembership, let user = auth.user, membership.isCommissioner(userId: user.id) {
                             dossierLabel("COMMISSIONER VAULT", detail: "CHOOSE THE HARDWARE EVERYONE ELSE HAS TO LIVE WITH")
                             NavigationLink { ChampionshipTrophyPickerView(membership: membership) } label: {
-                                dossierRow(membership.leagues.championshipTrophyId == nil ? "Choose Championship Trophy" : "View Championship Trophy", membership.leagues.championshipTrophyId == nil ? "Six unreasonable options await" : "The season’s hardware is sealed", "trophy.fill", identity.isNFL ? .cyan : .yellow)
+                                dossierRow(membership.leagues.championshipTrophyId == nil ? "Choose Championship Trophy" : "View Championship Trophy", membership.leagues.championshipTrophyId == nil ? "Six unreasonable options await" : "The season’s hardware is sealed", "trophy.fill", primaryAccent)
                             }.buttonStyle(.plain)
                         }
 
@@ -6294,14 +6297,14 @@ struct YouView: View {
     }
     private func trophyRow(_ trophy: ProfileTrophy) -> some View {
         return HStack(spacing: 13) {
-            TrophyRowIcon(trophyType: trophy.trophyType, size: 42)
+            TrophyRowIcon(trophyType: trophy.trophyType, trophyDesignId: trophy.trophyDesignId, size: 42)
             VStack(alignment: .leading, spacing: 3) { Text(trophyTitle(trophy.trophyType)).font(.headline.weight(.black)); Text(trophy.subtitle ?? "\(String(trophy.seasonYear)) · Permanent record").font(.caption).foregroundStyle(.secondary) }
-            Spacer(); Text(verbatim: String(trophy.seasonYear)).font(.headline.weight(.black)).foregroundStyle(identity.isNFL ? .cyan : .yellow)
+            Spacer(); Text(verbatim: String(trophy.seasonYear)).font(.headline.weight(.black)).foregroundStyle(primaryAccent)
         }
-        .padding(14).background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 16)).overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 16).stroke((identity.isNFL ? Color.cyan : Color.yellow).opacity(0.24)))
+        .padding(14).background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 16)).overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 16).stroke(primaryAccent.opacity(0.24)))
     }
     private func trophyTitle(_ type: String) -> String {
-        switch type { case "championship": return "LEAGUE CHAMPION"; case "toilet_bowl": return "TOILET BOWL"; case "crystal_ball": return "VILLAGE NERD"; default: return type.replacingOccurrences(of: "_", with: " ").uppercased() }
+        trophyDisplayTitle(type)
     }
 }
 
@@ -7130,7 +7133,11 @@ private struct CheevoBriefingView: View {
 }
 
 private func trophyArtifactName(for trophy: ProfileTrophy) -> String? {
-    switch trophy.trophyDesignId ?? trophy.trophyType {
+    trophyArtifactName(trophyDesignId: trophy.trophyDesignId, trophyType: trophy.trophyType)
+}
+
+private func trophyArtifactName(trophyDesignId: String?, trophyType: String) -> String? {
+    switch trophyDesignId ?? trophyType {
     case "command_cup", "championship": return "ChampionshipArtifact"
     case "nfc_championship": return "NfcChampionshipArtifact"
     case "afc_championship": return "AfcChampionshipArtifact"
@@ -7145,6 +7152,22 @@ private func trophyArtifactName(for trophy: ProfileTrophy) -> String? {
     case "nfl_two_minute_monument": return "NflTwoMinuteMonumentArtifact"
     case "nfl_iron_end_zone": return "NflIronEndZoneArtifact"
     case "nfl_final_whistle": return "NflFinalWhistleArtifact"
+    case "m-iron-rim": return "FieldhouseMTheIronRim"
+    case "m-net-cutter": return "FieldhouseMTheNetCutter"
+    case "m-hardwood-crown": return "FieldhouseMTheHardwoodCrown"
+    case "m-final-possession": return "FieldhouseMTheFinalPossession"
+    case "m-glass-house": return "FieldhouseMTheGlassHouse"
+    case "m-fieldhouse-cup": return "FieldhouseMTheFieldhouseCup"
+    case "w-pure-game": return "FieldhouseWThePureGame"
+    case "w-extra-pass": return "FieldhouseWTheExtraPass"
+    case "w-94-feet": return "FieldhouseWNinetyFourFeet"
+    case "w-nylon-standard": return "FieldhouseWTheNylonStandard"
+    case "w-forty-minutes": return "FieldhouseWFortyMinutes"
+    case "w-better-bracket": return "FieldhouseWTheBetterBracket"
+    case "fieldhouse-regional-east", "fieldhouse_region_east": return "FieldhouseRegionalEast"
+    case "fieldhouse-regional-west", "fieldhouse_region_west": return "FieldhouseRegionalWest"
+    case "fieldhouse-regional-south", "fieldhouse_region_south": return "FieldhouseRegionalSouth"
+    case "fieldhouse-regional-midwest", "fieldhouse_region_midwest": return "FieldhouseRegionalMidwest"
     case "crystal_ball": return "VillageNerdArtifact"
     case "toilet_bowl": return "ToiletBowlArtifact"
     default: return nil
@@ -7158,6 +7181,10 @@ private func trophyDisplayTitle(_ type: String) -> String {
     case "crystal_ball": return "VILLAGE NERD"
     case "nfc_championship": return "NFC CHAMPIONSHIP"
     case "afc_championship": return "AFC CHAMPIONSHIP"
+    case "fieldhouse_region_east": return "EAST REGIONAL CHAMPION"
+    case "fieldhouse_region_west": return "WEST REGIONAL CHAMPION"
+    case "fieldhouse_region_south": return "SOUTH REGIONAL CHAMPION"
+    case "fieldhouse_region_midwest": return "MIDWEST REGIONAL CHAMPION"
     default: return type.replacingOccurrences(of: "_", with: " ").uppercased()
     }
 }
@@ -7185,6 +7212,7 @@ private func trophyFeaturePriority(_ type: String) -> Int {
     switch type.lowercased() {
     case "championship": return 100
     case "nfc_championship", "afc_championship": return 80
+    case let value where value.hasPrefix("fieldhouse_region_"): return 90
     case let value where value.contains("division"): return 70
     case "crystal_ball": return 60
     case "toilet_bowl": return 50
@@ -8199,12 +8227,19 @@ private func loadoutBackdrop<Content: View>(sportId: String, @ViewBuilder conten
 
 private struct TrophyRowIcon: View {
     let trophyType: String
+    let trophyDesignId: String?
     let size: CGFloat
+
+    init(trophyType: String, trophyDesignId: String? = nil, size: CGFloat) {
+        self.trophyType = trophyType
+        self.trophyDesignId = trophyDesignId
+        self.size = size
+    }
 
     var body: some View {
         Group {
-            if trophyType.lowercased() == "crystal_ball" {
-                Image("VillageNerdArtifact").resizable().scaledToFit()
+            if let artifactName = trophyArtifactName(trophyDesignId: trophyDesignId, trophyType: trophyType) {
+                Image(artifactName).resizable().scaledToFit()
                     .clipShape(RoundedRectangle(cornerRadius: 7))
             } else {
                 Image(systemName: trophyType.lowercased() == "toilet_bowl" ? "toilet.fill" : "trophy.fill")
