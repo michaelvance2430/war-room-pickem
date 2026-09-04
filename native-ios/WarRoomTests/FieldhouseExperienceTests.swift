@@ -63,7 +63,20 @@ final class FieldhouseExperienceTests: XCTestCase {
                 PickedGame(cardGameId: secondGameID, side: "home", confidence: 9, isBestBet: false)
             ]),
             favoriteTeam: FavoriteTeam(sportId: "ncaaw", teamId: "iowa-hawkeyes"),
-            crystalBall: CrystalBallPick(teamName: "South Carolina Gamecocks")
+            crystalBall: CrystalBallPick(teamName: "South Carolina Gamecocks"),
+            latestScorecard: RegularSeasonScorecard(
+                card: WeekCard(id: UUID(), weekNumber: 0, lockTime: "2026-11-01T00:30:00Z", propQuestion: FieldhousePropKind.teamScores90.question, propOptionA: "YES", propOptionB: "NO", propPoints: 3, cardGames: games),
+                pick: SeasonPlayerPick(id: UUID(), weekNumber: 0, propChoice: "YES", lockedAt: "2026-11-01T00:00:00Z", totalPoints: 23, isChaos: false, pickGames: [
+                    PickedGame(cardGameId: firstGameID, side: "away", confidence: 10, isBestBet: true),
+                    PickedGame(cardGameId: secondGameID, side: "home", confidence: 9, isBestBet: false)
+                ]),
+                result: CertifiedWeekResult(id: UUID(), weekNumber: 0, propResult: "YES", scoredAt: "2026-11-02T00:00:00Z", gameResults: [
+                    CertifiedGameResult(cardGameId: firstGameID, winner: "away", awayScore: 91, homeScore: 88),
+                    CertifiedGameResult(cardGameId: secondGameID, winner: "home", awayScore: 70, homeScore: 75)
+                ]),
+                seasonTotalBefore: 0,
+                seasonTotalAfter: 23
+            )
         )
 
         let state = FieldhouseStateHydrator.hydrate(
@@ -87,6 +100,12 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.propAnswer, "YES")
         XCTAssertTrue(state.picksLocked)
         XCTAssertTrue(state.hellfireDeployedOnCurrentCard)
+        XCTAssertEqual(state.scoringWindow, 0)
+        XCTAssertEqual(state.scoringGames.count, 2)
+        XCTAssertEqual(state.scoringResults[firstGameID.uuidString.lowercased()]?.awayScore, 91)
+        XCTAssertEqual(state.scoringSelections, [0: "UConn Huskies", 1: "UCLA Bruins"])
+        XCTAssertEqual(state.lastCertifiedWindow, 0)
+        XCTAssertEqual(state.lastCertifiedPoints, 23)
     }
 
     func testCardWritePlanTranslatesTeamFavoriteToSharedHomeAwayContract() throws {

@@ -207,6 +207,7 @@ struct FieldhouseAuthenticatedSnapshot {
     let pick: PlayerPick?
     let favoriteTeam: FavoriteTeam?
     let crystalBall: CrystalBallPick?
+    var latestScorecard: RegularSeasonScorecard? = nil
 }
 
 private struct FieldhouseRepositoryError: LocalizedError {
@@ -256,13 +257,20 @@ enum FieldhouseAuthenticatedRepository {
             leagueId: membership.leagueId,
             userId: userID
         )
+        async let scorecards = SupabaseAPI.regularSeasonScorecards(
+            token: token,
+            leagueId: membership.leagueId,
+            userId: userID
+        )
 
+        let loadedScorecards = try await scorecards
         return try await FieldhouseAuthenticatedSnapshot(
             membership: membership,
             card: card,
             pick: pick,
             favoriteTeam: favorite,
-            crystalBall: crystal
+            crystalBall: crystal,
+            latestScorecard: loadedScorecards.first
         )
     }
 
@@ -1234,6 +1242,39 @@ enum FieldhouseStateHydrator {
         if let trophyID = snapshot.membership.leagues.championshipTrophyId,
            FieldhouseTrophyCatalog.options(for: league).contains(where: { $0.id == trophyID }) {
             state.championshipTrophyID = trophyID
+        }
+
+        if let scorecard = snapshot.latestScorecard {
+            let orderedScoringGames = scorecard.card.cardGames.sorted { $0.sortOrder < $1.sortOrder }
+            state.scoringWindow = scorecard.weekNumber
+            state.scoringGames = orderedScoringGames.map { FieldhouseGame(cardGame: $0, window: scorecard.weekNumber) }
+            state.scoringResults = Dictionary(uniqueKeysWithValues: scorecard.result.gameResults.compactMap { result in
+                guard let game = orderedScoringGames.first(where: { $0.id == result.cardGameId }),
+                      let awayScore = result.awayScore,
+                      let homeScore = result.homeScore else { return nil }
+                let mapped = FieldhouseGameResult(
+                    gameID: game.id.uuidString.lowercased(),
+                    awayScore: awayScore,
+                    homeScore: homeScore,
+                    phase: .final
+                )
+                return (mapped.gameID, mapped)
+            })
+            let scoringIndex = Dictionary(uniqueKeysWithValues: orderedScoringGames.enumerated().map { ($0.element.id, $0.offset) })
+            state.scoringSelections = Dictionary(uniqueKeysWithValues: scorecard.pick.pickGames.compactMap { picked in
+                guard let index = scoringIndex[picked.cardGameId] else { return nil }
+                let game = orderedScoringGames[index]
+                return (index, picked.side == "home" ? game.homeTeam : game.awayTeam)
+            })
+            state.scoringConfidences = Dictionary(uniqueKeysWithValues: scorecard.pick.pickGames.compactMap { picked in
+                scoringIndex[picked.cardGameId].map { ($0, picked.confidence) }
+            })
+            state.scoringBestBetGame = scorecard.pick.pickGames.first(where: \.isBestBet).flatMap { scoringIndex[$0.cardGameId] }
+            state.scoringProp = FieldhousePropKind.allCases.first(where: { $0.question == scorecard.card.propQuestion }) ?? .teamScores90
+            state.scoringPropAnswer = scorecard.pick.propChoice ?? ""
+            state.scoringUsedHellfire = scorecard.pick.isChaos
+            state.lastCertifiedWindow = scorecard.weekNumber
+            state.lastCertifiedPoints = scorecard.totalPoints
         }
 
         guard let card = snapshot.card else {
