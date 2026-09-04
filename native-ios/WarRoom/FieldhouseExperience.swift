@@ -1724,11 +1724,15 @@ struct FieldhouseNativePreviewView: View {
         ZStack {
             FieldhouseBackdrop(leagueOverride: state.league).ignoresSafeArea()
             VStack(spacing: 0) {
-                if desk != .home && desk != .profile {
+                if desk != .home && desk != .profile && !(desk == .locker && liveContext != nil) {
                     FieldhouseHeader(state: state, canGoBack: true) { desk = .home }
                 }
                 if desk == .locker {
-                    FieldhouseLockerPage().padding(.horizontal, 14)
+                    if let liveContext {
+                        LockerRoomView(leagueOverride: liveContext.membership, onBack: { desk = .home })
+                    } else {
+                        FieldhouseLockerPage().padding(.horizontal, 14)
+                    }
                 } else if desk == .picks {
                     FieldhousePicksPage(state: $state, strikePresentation: $strikePresentation)
                 } else if desk == .profile {
@@ -3319,7 +3323,14 @@ private struct FieldhouseStandingsPage: View {
                 }
             }
             VStack(spacing: 8) {
-                if authenticatedStandings.isEmpty {
+                if authenticatedStandings.isEmpty && state.isAuthenticatedSession {
+                    FieldhouseAction(
+                        kicker: "LIVE STANDINGS",
+                        title: "No player rows available",
+                        detail: "Pull to refresh. War Room will never substitute demo names or scores in a live league.",
+                        icon: "arrow.clockwise"
+                    )
+                } else if authenticatedStandings.isEmpty {
                     ForEach(Array(players.enumerated()), id: \.offset) { index, player in
                         standingRow(
                             rank: index + 1,
@@ -3666,7 +3677,7 @@ private struct FieldhouseBracketsPage: View {
                     icon: "rectangle.split.3x3.fill"
                 )
             }.buttonStyle(.plain).disabled(state.officialPostseasonField == nil && state.isAuthenticatedSession)
-            FieldhouseRegionalRacePreview(selectedRegion: state.selectedRegion)
+            FieldhouseRegionalRacePreview(state: state, selectedRegion: state.selectedRegion)
             HStack(spacing: 8) {
                 bracketModeButton("CURRENT BRACKET", history: false)
                 bracketModeButton("HISTORY", history: true)
@@ -3735,7 +3746,9 @@ private struct FieldhouseBracketsPage: View {
 
 private struct FieldhouseRegionalRacePreview: View {
     @Environment(\.fieldhouseLeague) private var themedLeague
+    @Environment(\.fieldhouseStandings) private var standings
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
+    let state: FieldhouseSeasonState
     let selectedRegion: FieldhouseRegion
 
     private let previewScores: [(String, Int, Int)] = [
@@ -3744,6 +3757,17 @@ private struct FieldhouseRegionalRacePreview: View {
         ("BRACKET BUSTER", 82, 12),
         ("THE SIXTH MAN", 74, 20)
     ]
+    private var liveRegionalStandings: [Standing] {
+        standings
+            .filter { ($0.fieldhouseRegion ?? "").caseInsensitiveCompare(selectedRegion.rawValue) == .orderedSame }
+            .sorted {
+                let lhs = state.postseasonPoints(for: $0.userId)
+                let rhs = state.postseasonPoints(for: $1.userId)
+                return lhs == rhs
+                    ? $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                    : lhs > rhs
+            }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -3754,23 +3778,26 @@ private struct FieldhouseRegionalRacePreview: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(selectedRegion.rawValue) POSTSEASON RACE").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(accent)
                     Text(selectedRegion.regionalTrophyName.uppercased()).font(.title3.weight(.black)).fontWidth(.condensed)
-                    Text("Regular season earns entry. Highest cumulative postseason score through the Elite Eight earns this trophy.")
+                    Text("Regular season earns entry. Highest cumulative postseason score through the title game earns this trophy.")
                         .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
                 }
             }
 
-            ForEach(Array(previewScores.enumerated()), id: \.offset) { index, entry in
-                HStack(spacing: 10) {
-                    Text("\(index + 1)").font(.headline.weight(.black)).foregroundStyle(index == 0 ? .yellow : .white.opacity(0.55)).frame(width: 22)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.0).font(.caption.weight(.black))
-                        Text(entry.2 == 0 ? "POSTSEASON LEADER" : "\(entry.2) BACK · STILL ALIVE")
-                            .font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(entry.2 == 0 ? .yellow : accent)
-                    }
-                    Spacer()
-                    Text("\(entry.1)").font(.title3.weight(.black)).foregroundStyle(accent)
+            if state.isAuthenticatedSession && liveRegionalStandings.isEmpty {
+                Text("The live regional race appears after postseason scores are recorded. No demo standings are shown in authenticated leagues.")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12).background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 11))
+            } else if state.isAuthenticatedSession {
+                ForEach(Array(liveRegionalStandings.prefix(4).enumerated()), id: \.element.id) { index, standing in
+                    let score = state.postseasonPoints(for: standing.userId)
+                    let leader = liveRegionalStandings.first.map { state.postseasonPoints(for: $0.userId) } ?? score
+                    raceRow(index: index, name: standing.name, score: score, pointsBack: max(0, leader - score))
                 }
-                .padding(10).background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 11))
+            } else {
+                ForEach(Array(previewScores.enumerated()), id: \.offset) { index, entry in
+                    raceRow(index: index, name: entry.0, score: entry.1, pointsBack: entry.2)
+                }
             }
 
             HStack(spacing: 6) {
@@ -3781,11 +3808,25 @@ private struct FieldhouseRegionalRacePreview: View {
                     }.frame(maxWidth: .infinity)
                 }
             }
-            Text("FOUR POSTSEASON REGIONAL CHAMPIONS ADVANCE TO CENTER COURT")
+            Text("FOUR POSTSEASON REGIONAL CHAMPIONS CUT DOWN THEIR NETS")
                 .font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.yellow).frame(maxWidth: .infinity)
         }
         .padding(15).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.42)))
+    }
+
+    private func raceRow(index: Int, name: String, score: Int, pointsBack: Int) -> some View {
+                HStack(spacing: 10) {
+                    Text("\(index + 1)").font(.headline.weight(.black)).foregroundStyle(index == 0 ? .yellow : .white.opacity(0.55)).frame(width: 22)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(name.uppercased()).font(.caption.weight(.black))
+                        Text(pointsBack == 0 ? "POSTSEASON LEADER" : "\(pointsBack) BACK · PICKS CONTINUE")
+                            .font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(pointsBack == 0 ? .yellow : accent)
+                    }
+                    Spacer()
+                    Text("\(score)").font(.title3.weight(.black)).foregroundStyle(accent)
+                }
+                .padding(10).background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 11))
     }
 }
 

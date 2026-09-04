@@ -5683,6 +5683,15 @@ struct LockerRoomView: View {
     @State private var latestTrophyByUser: [UUID: ProfileTrophy] = [:]
     @FocusState private var composerFocused: Bool
     private var identity: SportIdentity { SportIdentity(league?.leagues.sportId ?? leagueOverride?.leagues.sportId) }
+    private var accent: Color { identity.isFieldhouse ? identity.accent : (identity.isNFL ? .cyan : .green) }
+    private var liveWireTitle: String {
+        if identity.isNCAAW { return "NCAAW FIELDHOUSE LIVE WIRE" }
+        if identity.isFieldhouse { return "NCAAM FIELDHOUSE LIVE WIRE" }
+        return identity.isNFL ? "SUNDAY LIVE WIRE" : "LIVE WIRE"
+    }
+    private var navigationTitle: String {
+        identity.isFieldhouse ? "FIELDHOUSE LOCKER ROOM" : (identity.isNFL ? "NFL LOCKER ROOM" : "LOCKER ROOM")
+    }
 
     private var cleanDraft: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var visibleMessages: [LockerMessage] {
@@ -5697,7 +5706,9 @@ struct LockerRoomView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                if identity.isNFL { NflHomeBackdrop(phase: .regularSeason) } else { LockerTunnelBackdrop() }
+                if identity.isNFL { NflHomeBackdrop(phase: .regularSeason) }
+                else if identity.isFieldhouse { FieldhouseBackdrop(leagueOverride: identity.isNCAAW ? .ncaaw : .ncaam) }
+                else { LockerTunnelBackdrop() }
                 if loading {
                     VStack(spacing: 12) {
                         ProgressView().tint(.red).scaleEffect(1.3)
@@ -5716,8 +5727,8 @@ struct LockerRoomView: View {
                             LazyVStack(spacing: 14) {
                                 VStack(alignment: .leading, spacing: 7) {
                                     HStack {
-                                        Label(identity.isNFL ? "SUNDAY LIVE WIRE" : "LIVE WIRE", systemImage: "bolt.fill")
-                                            .font(.caption2.weight(.black)).tracking(2).foregroundStyle(identity.isNFL ? .cyan : .green)
+                                        Label(liveWireTitle, systemImage: "bolt.fill")
+                                            .font(.caption2.weight(.black)).tracking(2).foregroundStyle(accent)
                                         Spacer()
                                         Text("\(messages.count) RECEIPT\(messages.count == 1 ? "" : "S")")
                                             .font(.caption2.weight(.black)).tracking(1).foregroundStyle(.white.opacity(0.45))
@@ -5781,7 +5792,7 @@ struct LockerRoomView: View {
                 }
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 1) {
-                        Text(identity.isNFL ? "NFL LOCKER ROOM" : "LOCKER ROOM").font(.caption.weight(.black)).foregroundStyle(identity.isNFL ? .cyan : .green)
+                        Text(navigationTitle).font(.caption.weight(.black)).foregroundStyle(accent)
                         Text(league?.leagues.name ?? "Your league").font(.caption2).foregroundStyle(.secondary)
                     }
                 }
@@ -5831,7 +5842,7 @@ struct LockerRoomView: View {
                 if composerFocused {
                     Button { composerFocused = false } label: {
                         Label("HIDE KEYBOARD", systemImage: "keyboard.chevron.compact.down").fontWeight(.black)
-                    }.foregroundStyle(identity.isNFL ? .cyan : .green)
+                    }.foregroundStyle(accent)
                 } else {
                     Text("POSTS TO THE WHOLE LEAGUE").fontWeight(.black)
                 }
@@ -5840,7 +5851,7 @@ struct LockerRoomView: View {
         }
         .padding(.horizontal).padding(.top, 8).padding(.bottom, 4)
         .background(.black.opacity(0.90))
-        .overlay(alignment: .top) { Rectangle().fill(LinearGradient(colors: [.red, identity.isNFL ? .cyan : .green], startPoint: .leading, endPoint: .trailing)).frame(height: 2) }
+        .overlay(alignment: .top) { Rectangle().fill(LinearGradient(colors: [.red, accent], startPoint: .leading, endPoint: .trailing)).frame(height: 2) }
     }
 
     private func load() async {
@@ -5934,8 +5945,10 @@ private struct LockerBubble: View {
 
     private let emojis = ["😂", "🔥", "💀", "🤡"]
     private var isMine: Bool { message.userId == currentUserId }
-    private var isNFL: Bool { sportId.lowercased() == "nfl" }
-    private var mineAccent: Color { isNFL ? .cyan : .green }
+    private var identity: SportIdentity { SportIdentity(sportId) }
+    private var isNFL: Bool { identity.isNFL }
+    private var mineAccent: Color { identity.isFieldhouse ? identity.accent : (isNFL ? .cyan : .green) }
+    private var otherNameAccent: Color { identity.isFieldhouse ? identity.secondaryAccent : (isNFL ? .red : .yellow) }
 
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
@@ -5947,7 +5960,7 @@ private struct LockerBubble: View {
                 HStack(spacing: 7) {
                     NavigationLink { PlayerProfileRouteView(userId: message.userId, fallbackName: message.authorName, sportId: sportId) } label: {
                         Text(isMine ? "YOU" : message.authorName.uppercased())
-                            .font(.system(size: 9, weight: .black)).tracking(1.2).foregroundStyle(isMine ? mineAccent : (isNFL ? .red : .yellow))
+                            .font(.system(size: 9, weight: .black)).tracking(1.2).foregroundStyle(isMine ? mineAccent : otherNameAccent)
                     }.buttonStyle(.plain)
                     if let trophy, let artifact = trophyArtifactName(for: trophy) {
                         Button { showingTrophy = true } label: {
