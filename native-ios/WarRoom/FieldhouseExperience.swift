@@ -394,6 +394,13 @@ enum FieldhouseTeamCatalog {
         return (renamed + ["Lindenwood Lions", "Queens University Royals", "Southern Indiana Screaming Eagles"]).sorted()
     }
 
+    static func displayName(forStoredID storedID: String, league: FieldhouseLeague) -> String? {
+        let wanted = FootballTeamCatalog.normalizedTeamId(storedID)
+        return teams(for: league).first {
+            FootballTeamCatalog.normalizedTeamId($0) == wanted
+        }
+    }
+
     private static let ncaawNamePairs: [(String, String)] = [
         ("Alabama State Hornets", "Alabama State Lady Hornets"),
         ("Alcorn State Braves", "Alcorn State Lady Braves"),
@@ -490,6 +497,44 @@ struct FieldhouseGame: Identifiable, Equatable, Codable {
     }
 
     var favoriteSpread: Double? { Double(spread.split(separator: " ").last ?? "") }
+}
+
+extension FieldhouseGame {
+    init(cardGame: CardGame, window: Int) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = FieldhouseSeasonCalendar.eastern
+        let parsedTip = footballKickoffDate(cardGame.startTime)
+        let windowStart = FieldhouseSeasonCalendar.start(of: window)
+        let dayOffset = parsedTip.map {
+            calendar.dateComponents(
+                [.day],
+                from: calendar.startOfDay(for: windowStart),
+                to: calendar.startOfDay(for: $0)
+            ).day ?? 0
+        } ?? 0
+        let hour = parsedTip.map { calendar.component(.hour, from: $0) } ?? 19
+        let minute = parsedTip.map { calendar.component(.minute, from: $0) } ?? 0
+        let tip = parsedTip.map { date in
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = FieldhouseSeasonCalendar.eastern
+            formatter.dateFormat = "EEE h:mm a z"
+            return formatter.string(from: date).uppercased()
+        } ?? "TIP TIME PENDING"
+        let favorite = cardGame.favorite.trimmingCharacters(in: .whitespacesAndNewlines)
+        let line = cardGame.spread > 0 ? -cardGame.spread : cardGame.spread
+
+        self.init(
+            id: cardGame.id.uuidString.lowercased(),
+            away: cardGame.awayTeam,
+            home: cardGame.homeTeam,
+            spread: "\(favorite) \(line.formatted(.number.precision(.fractionLength(1))))",
+            tip: tip,
+            dayOffset: dayOffset,
+            tipHour: hour,
+            tipMinute: minute
+        )
+    }
 }
 
 enum FieldhousePickVisibility {
@@ -916,6 +961,67 @@ struct FieldhouseSeasonState: Codable, Equatable {
         picksLocked = false
         hellfireDeployedOnCurrentCard = false
         return true
+    }
+}
+
+enum FieldhouseStateHydrator {
+    static func hydrate(
+        snapshot: FieldhouseAuthenticatedSnapshot,
+        userID: UUID,
+        cached: FieldhouseSeasonState? = nil,
+        now: Date = Date()
+    ) -> FieldhouseSeasonState {
+        var state = cached ?? FieldhouseSeasonState()
+        let league = FieldhouseLeague(summary: snapshot.membership.leagues)
+        if state.league != league { state.selectLeague(league) }
+
+        state.window = max(1, snapshot.membership.leagues.currentWeek)
+        state.isCommissioner = snapshot.membership.isCommissioner(userId: userID)
+        state.seasonHasStarted = snapshot.membership.leagues.currentWeek > 1 || now >= FieldhouseSeasonCalendar.openingTip
+        state.favoriteTeam = snapshot.favoriteTeam.flatMap {
+            FieldhouseTeamCatalog.displayName(forStoredID: $0.teamId, league: league)
+        }
+        state.crystalBallChampion = snapshot.crystalBall?.teamName
+
+        if let trophyID = snapshot.membership.leagues.championshipTrophyId,
+           FieldhouseTrophyCatalog.options(for: league).contains(where: { $0.id == trophyID }) {
+            state.championshipTrophyID = trophyID
+        }
+
+        guard let card = snapshot.card else {
+            state.cardIsPublished = false
+            state.publishedGames = []
+            state.publishedProp = nil
+            state.sideSelections = [:]
+            state.confidenceSelections = [:]
+            state.bestBetGame = nil
+            state.propAnswer = nil
+            state.picksLocked = false
+            state.hellfireDeployedOnCurrentCard = false
+            return state
+        }
+
+        let orderedGames = card.cardGames.sorted { $0.sortOrder < $1.sortOrder }
+        state.publishedGames = orderedGames.map { FieldhouseGame(cardGame: $0, window: state.window) }
+        state.publishedProp = FieldhousePropKind.allCases.first { $0.question == card.propQuestion }
+        state.cardIsPublished = !orderedGames.isEmpty
+
+        let gameIndex = Dictionary(uniqueKeysWithValues: orderedGames.enumerated().map {
+            ($0.element.id, $0.offset)
+        })
+        state.sideSelections = Dictionary(uniqueKeysWithValues: (snapshot.pick?.pickGames ?? []).compactMap {
+            guard let index = gameIndex[$0.cardGameId] else { return nil }
+            return (index, $0.side)
+        })
+        state.confidenceSelections = Dictionary(uniqueKeysWithValues: (snapshot.pick?.pickGames ?? []).compactMap {
+            guard let index = gameIndex[$0.cardGameId] else { return nil }
+            return (index, $0.confidence)
+        })
+        state.bestBetGame = snapshot.pick?.pickGames.first(where: \.isBestBet).flatMap { gameIndex[$0.cardGameId] }
+        state.propAnswer = snapshot.pick?.propChoice
+        state.picksLocked = snapshot.pick?.isLocked == true
+        state.hellfireDeployedOnCurrentCard = snapshot.pick?.isChaos == true
+        return state
     }
 }
 

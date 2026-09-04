@@ -2,6 +2,106 @@ import XCTest
 @testable import WarRoom
 
 final class FieldhouseExperienceTests: XCTestCase {
+    func testAuthenticatedSnapshotHydratesTheCorrectLeagueCardAndPlayerChoices() throws {
+        let userID = UUID()
+        let leagueID = UUID()
+        let firstGameID = UUID()
+        let secondGameID = UUID()
+        let membership = LeagueMembership(
+            leagueId: leagueID,
+            role: "commissioner",
+            isModerator: false,
+            isDeputy: false,
+            totalPoints: 0,
+            weeklyPoints: [],
+            weeksPlayed: 0,
+            division: "East",
+            joinedAt: nil,
+            atsCorrect: 0,
+            atsTotal: 0,
+            currentStreak: 0,
+            bestWeek: 0,
+            worstWeek: 0,
+            perfectWeeks: 0,
+            bestBetHits: 0,
+            bestBetTotal: 0,
+            propHits: 0,
+            propTotal: 0,
+            leagues: LeagueSummary(
+                name: "Women's Fieldhouse",
+                code: "WOMEN1",
+                sportId: "ncaaw",
+                currentWeek: 1,
+                commissionerId: userID,
+                crystalBallEnabled: true,
+                championshipTrophyId: "w-extra-pass",
+                mode: nil,
+                regularSeasonWeeks: 18,
+                maxHumanMembers: 100,
+                sportSettings: LeagueSportSettings(fieldhouseLeague: "ncaaw")
+            )
+        )
+        let games = [
+            CardGame(id: firstGameID, sortOrder: 0, awayTeam: "UConn Huskies", homeTeam: "South Carolina Gamecocks", spread: -4.5, favorite: "South Carolina Gamecocks", startTime: "2026-11-05T00:30:00Z", awayRank: 2, homeRank: 1, isRivalry: false),
+            CardGame(id: secondGameID, sortOrder: 1, awayTeam: "Iowa Hawkeyes", homeTeam: "UCLA Bruins", spread: -2.5, favorite: "UCLA Bruins", startTime: "2026-11-06T01:00:00Z", awayRank: 8, homeRank: 4, isRivalry: false)
+        ]
+        let snapshot = FieldhouseAuthenticatedSnapshot(
+            membership: membership,
+            card: WeekCard(id: UUID(), weekNumber: 1, lockTime: "2026-11-05T00:30:00Z", propQuestion: FieldhousePropKind.teamScores90.question, propOptionA: "YES", propOptionB: "NO", propPoints: 3, cardGames: games),
+            pick: PlayerPick(id: UUID(), propChoice: "YES", lockedAt: "2026-11-04T20:00:00Z", totalPoints: nil, isChaos: true, pickGames: [
+                PickedGame(cardGameId: firstGameID, side: "UConn Huskies", confidence: 10, isBestBet: true),
+                PickedGame(cardGameId: secondGameID, side: "UCLA Bruins", confidence: 9, isBestBet: false)
+            ]),
+            favoriteTeam: FavoriteTeam(sportId: "ncaaw", teamId: "iowa-hawkeyes"),
+            crystalBall: CrystalBallPick(teamName: "South Carolina Gamecocks")
+        )
+
+        let state = FieldhouseStateHydrator.hydrate(
+            snapshot: snapshot,
+            userID: userID,
+            now: Date(timeIntervalSince1970: 0)
+        )
+
+        XCTAssertEqual(state.league, .ncaaw)
+        XCTAssertTrue(state.isCommissioner)
+        XCTAssertEqual(state.championshipTrophyID, "w-extra-pass")
+        XCTAssertEqual(state.favoriteTeam, "Iowa Hawkeyes")
+        XCTAssertEqual(state.crystalBallChampion, "South Carolina Gamecocks")
+        XCTAssertEqual(state.publishedGames.map(\.id), [firstGameID, secondGameID].map { $0.uuidString.lowercased() })
+        XCTAssertEqual(state.publishedGames[0].tip, "WED 7:30 PM EST")
+        XCTAssertEqual(state.sideSelections, [0: "UConn Huskies", 1: "UCLA Bruins"])
+        XCTAssertEqual(state.confidenceSelections, [0: 10, 1: 9])
+        XCTAssertEqual(state.bestBetGame, 0)
+        XCTAssertEqual(state.propAnswer, "YES")
+        XCTAssertTrue(state.picksLocked)
+        XCTAssertTrue(state.hellfireDeployedOnCurrentCard)
+    }
+
+    func testAuthenticatedSnapshotWithoutACardClearsOnlyLeagueCardState() {
+        let userID = UUID()
+        var cached = FieldhouseSeasonState()
+        cached.favoriteTeam = "Duke Blue Devils"
+        cached.cardIsPublished = true
+        cached.publishedGames = Array(FieldhouseGameCatalog.windowOne.prefix(10))
+        cached.sideSelections = [0: "Duke Blue Devils"]
+        let membership = LeagueMembership(
+            leagueId: UUID(), role: "member", isModerator: false, isDeputy: false,
+            totalPoints: 0, weeklyPoints: [], weeksPlayed: 0, division: "West", joinedAt: nil,
+            atsCorrect: 0, atsTotal: 0, currentStreak: 0, bestWeek: 0, worstWeek: 0,
+            perfectWeeks: 0, bestBetHits: 0, bestBetTotal: 0, propHits: 0, propTotal: 0,
+            leagues: LeagueSummary(name: "Men's Fieldhouse", code: "MEN1", sportId: "ncaam", currentWeek: 1, commissionerId: UUID(), crystalBallEnabled: true, championshipTrophyId: nil, mode: nil, regularSeasonWeeks: 18, maxHumanMembers: 100, sportSettings: LeagueSportSettings(fieldhouseLeague: "ncaam"))
+        )
+        let snapshot = FieldhouseAuthenticatedSnapshot(membership: membership, card: nil, pick: nil, favoriteTeam: FavoriteTeam(sportId: "ncaam", teamId: "purdue-boilermakers"), crystalBall: nil)
+
+        let state = FieldhouseStateHydrator.hydrate(snapshot: snapshot, userID: userID, cached: cached, now: Date(timeIntervalSince1970: 0))
+
+        XCTAssertEqual(state.favoriteTeam, "Purdue Boilermakers")
+        XCTAssertFalse(state.cardIsPublished)
+        XCTAssertTrue(state.publishedGames.isEmpty)
+        XCTAssertTrue(state.sideSelections.isEmpty)
+        XCTAssertFalse(state.picksLocked)
+    }
+
     func testFieldhouseStateRoundTripsWithoutCrossingAccountOrLeagueBoundaries() throws {
         let suiteName = "FieldhouseStateStoreTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
