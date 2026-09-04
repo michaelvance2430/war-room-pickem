@@ -1382,6 +1382,14 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var activePostseasonRound: String? {
         officialPostseasonField.flatMap { FieldhouseBracketEngine.liveRoundKey(field: $0) }
     }
+    func postseasonRoundScheduleIsReady(_ roundKey: String) -> Bool {
+        guard let field = officialPostseasonField else { return false }
+        let formatter = ISO8601DateFormatter()
+        let games = field.games.filter { $0.roundKey == roundKey }
+        return !games.isEmpty && games.allSatisfy { game in
+            game.startsAt.flatMap(formatter.date(from:)) != nil
+        }
+    }
     func postseasonRoundIsLocked(_ roundKey: String, at now: Date = Date()) -> Bool {
         if postseasonRoundLocked.contains(roundKey) { return true }
         guard let field = officialPostseasonField else { return false }
@@ -2565,19 +2573,30 @@ private struct FieldhouseHomePage: View {
     @ViewBuilder private var playerCommand: some View {
         if state.postseasonScorecardIsActive {
             let round = state.activePostseasonRound
-            let roundComplete = round.map { state.postseasonRoundSubmitted.contains($0) } ?? true
+            let roundFiled = round.map { state.postseasonRoundSubmitted.contains($0) } ?? true
+            let roundLocked = round.map { state.postseasonRoundIsLocked($0) } ?? false
+            let scheduleReady = round.map { state.postseasonRoundScheduleIsReady($0) } ?? true
+            let needsAction = round != nil && scheduleReady && !roundLocked && !roundFiled
             Button {
                 openActivePostseasonRound = round != nil
                 desk = .standings
             } label: {
                 FieldhouseAction(
-                    kicker: roundComplete ? "POSTSEASON COMMAND · COMPLETE" : "POSTSEASON COMMAND · ACTION REQUIRED",
-                    title: round.map { roundComplete ? "\(FieldhouseBracketEngine.roundTitle($0)) Picks Filed" : "Pick the \(FieldhouseBracketEngine.roundTitle($0))" } ?? "View Tournament Command",
-                    detail: roundComplete
-                        ? "Your current-round picks are on the record. Open the bracket and live scoreboard."
-                        : "A fresh winner card is open. File every pick before the first game tips.",
-                    icon: roundComplete ? "checkmark.seal.fill" : "basketball.fill",
-                    signalColor: roundComplete ? .green : .red
+                    kicker: needsAction ? "POSTSEASON COMMAND · ACTION REQUIRED" : roundLocked && !roundFiled ? "POSTSEASON COMMAND · ROUND MISSED" : scheduleReady ? "POSTSEASON COMMAND · COMPLETE" : "POSTSEASON COMMAND · SCHEDULE PENDING",
+                    title: round.map {
+                        if !scheduleReady { return "\(FieldhouseBracketEngine.roundTitle($0)) Times Pending" }
+                        if roundLocked && !roundFiled { return "\(FieldhouseBracketEngine.roundTitle($0)) Locked" }
+                        return roundFiled ? "\(FieldhouseBracketEngine.roundTitle($0)) Picks Filed" : "Pick the \(FieldhouseBracketEngine.roundTitle($0))"
+                    } ?? "View Tournament Command",
+                    detail: !scheduleReady
+                        ? "The matchup is set. Fresh picks open when every official tip time is on file."
+                        : roundLocked && !roundFiled
+                            ? "The first game tipped before a round card was filed. Open the live board to follow the results."
+                            : roundFiled
+                                ? "Your current-round picks are on the record. Open the bracket and live scoreboard."
+                                : "A fresh winner card is open. File every pick before the first game tips.",
+                    icon: needsAction ? "basketball.fill" : roundLocked && !roundFiled ? "lock.fill" : scheduleReady ? "checkmark.seal.fill" : "clock.fill",
+                    signalColor: needsAction || (roundLocked && !roundFiled) ? .red : scheduleReady ? .green : accent
                 )
             }.buttonStyle(.plain)
         } else {
@@ -3982,6 +4001,7 @@ private struct FieldhouseBracketsPage: View {
                     ),
                     submitted: state.postseasonRoundSubmitted.contains(round),
                     locked: state.postseasonRoundIsLocked(round),
+                    scheduleReady: state.postseasonRoundScheduleIsReady(round),
                     save: {
                         state.postseasonRoundSubmitted.insert(round)
                         persist(.postseasonRound)
@@ -4075,12 +4095,17 @@ private struct FieldhouseBracketsPage: View {
             if let round = state.activePostseasonRound, let field = state.officialPostseasonField {
                 let required = field.games.filter { $0.roundKey == round }.count
                 let complete = (state.postseasonRoundPicks[round] ?? [:]).count == required
+                let filed = state.postseasonRoundSubmitted.contains(round)
+                let locked = state.postseasonRoundIsLocked(round)
+                let scheduleReady = state.postseasonRoundScheduleIsReady(round)
                 Button { showingRoundPicker = true } label: {
                     FieldhouseAction(
-                        kicker: complete ? "ROUND CARD COMPLETE" : "ACTION REQUIRED · \(FieldhouseBracketEngine.roundTitle(round))",
-                        title: complete ? "Review My Round Picks" : "Make My Round Picks",
-                        detail: "\((state.postseasonRoundPicks[round] ?? [:]).count)/\(required) winners selected · one point each · locks at first tip.",
-                        icon: "basketball.fill"
+                        kicker: !scheduleReady ? "OFFICIAL SCHEDULE PENDING" : locked && !filed ? "ROUND LOCKED · NO CARD FILED" : filed ? "ROUND CARD COMPLETE" : "ACTION REQUIRED · \(FieldhouseBracketEngine.roundTitle(round))",
+                        title: !scheduleReady ? "Tip Times Not Final" : locked ? "Open Live Round Board" : filed ? "Review My Round Picks" : "Make My Round Picks",
+                        detail: !scheduleReady
+                            ? "The matchup is ready. Picks open only after every official tip time is on file."
+                            : "\((state.postseasonRoundPicks[round] ?? [:]).count)/\(required) winners selected · one point each · \(locked ? "round is live." : "locks at first tip.")",
+                        icon: !scheduleReady ? "clock.fill" : locked ? "lock.fill" : complete ? "checkmark.seal.fill" : "basketball.fill"
                     )
                 }.buttonStyle(.plain)
             } else if state.isAuthenticatedSession {

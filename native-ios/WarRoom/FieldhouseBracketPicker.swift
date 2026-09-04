@@ -633,6 +633,7 @@ struct FieldhouseRoundPickerView: View {
     @Binding var picks: [String: String]
     let submitted: Bool
     let locked: Bool
+    let scheduleReady: Bool
     let save: () -> Void
     let close: () -> Void
 
@@ -649,7 +650,7 @@ struct FieldhouseRoundPickerView: View {
                         .frame(width: 40, height: 40).background(.white.opacity(0.10), in: Circle())
                 }.buttonStyle(.plain)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(locked ? "LIVE ROUND BOARD" : "FRESH ROUND PICKS").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(accent)
+                    Text(locked ? "LIVE ROUND BOARD" : scheduleReady ? "FRESH ROUND PICKS" : "OFFICIAL SCHEDULE PENDING").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(accent)
                     Text(FieldhouseBracketEngine.roundTitle(roundKey)).font(.headline.weight(.black)).fontWidth(.condensed)
                 }
                 Spacer()
@@ -661,14 +662,16 @@ struct FieldhouseRoundPickerView: View {
                 VStack(spacing: 12) {
                     Text(locked
                          ? "Picks are sealed. Official scores and winners update on this board as games become final."
-                         : "Pick every straight-up winner for this round. These picks are separate from your Selection Sunday bracket and score one point each.")
+                         : scheduleReady
+                            ? "Pick every straight-up winner for this round. These picks are separate from your Selection Sunday bracket and score one point each."
+                            : "Matchups are set, but picks stay closed until every official tip time is on file.")
                         .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.65))
                     ForEach(games) { game in
                         VStack(alignment: .leading, spacing: 9) {
                             Text(game.label).font(.caption2.weight(.black)).tracking(1.2).foregroundStyle(accent)
                             ForEach(game.teams) { team in
                                 Button {
-                                    guard !locked else { return }
+                                    guard scheduleReady && !locked else { return }
                                     picks[game.id] = picks[game.id] == team.id ? nil : team.id
                                 } label: {
                                     HStack {
@@ -681,17 +684,17 @@ struct FieldhouseRoundPickerView: View {
                                         Image(systemName: statusIcon(team, game: game))
                                             .foregroundStyle(statusColor(team, game: game))
                                     }.padding(12).background(picks[game.id] == team.id ? accent.opacity(0.14) : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 11))
-                                }.buttonStyle(.plain).disabled(locked)
+                                }.buttonStyle(.plain).disabled(locked || !scheduleReady)
                             }
                         }.padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
                             .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.30)))
                     }
                     Button { confirming = true } label: {
-                        Text(locked ? "ROUND PICKS LOCKED" : (submitted ? "UPDATE ROUND PICKS" : "FILE ROUND PICKS"))
+                        Text(locked ? "ROUND PICKS LOCKED" : !scheduleReady ? "WAITING FOR OFFICIAL TIP TIMES" : (submitted ? "UPDATE ROUND PICKS" : "FILE ROUND PICKS"))
                             .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(15)
                             .foregroundStyle(complete ? .black : .white.opacity(0.55))
                             .background(complete ? accent : .white.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
-                    }.buttonStyle(.plain).disabled(!complete || locked)
+                    }.buttonStyle(.plain).disabled(!complete || locked || !scheduleReady)
                 }.padding(14).padding(.bottom, 28)
             }
         }

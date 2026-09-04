@@ -186,6 +186,43 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertTrue(state.postseasonRoundIsLocked("r64", at: beforeTip))
     }
 
+    func testFreshRoundWaitsForEveryOfficialTipTime() {
+        var state = FieldhouseSeasonState()
+        var field = FieldhouseOfficialField.previewRound(for: .ncaam)
+        XCTAssertTrue(state.postseasonRoundScheduleIsReady("r64") == false)
+
+        state.officialPostseasonField = field
+        XCTAssertTrue(state.postseasonRoundScheduleIsReady("r64"))
+
+        let first = field.games[0]
+        let missingTime = FieldhouseOfficialGame(
+            gameID: first.gameID,
+            roundKey: first.roundKey,
+            roundOrder: first.roundOrder,
+            ordinal: first.ordinal,
+            region: first.region,
+            firstTeamID: first.firstTeamID,
+            secondTeamID: first.secondTeamID,
+            firstSourceGameID: first.firstSourceGameID,
+            secondSourceGameID: first.secondSourceGameID,
+            startsAt: nil,
+            winnerTeamID: first.winnerTeamID,
+            firstScore: first.firstScore,
+            secondScore: first.secondScore
+        )
+        field = FieldhouseOfficialField(
+            tournamentID: field.tournamentID,
+            sportID: field.sportID,
+            seasonKey: field.seasonKey,
+            status: field.status,
+            firstTipAt: field.firstTipAt,
+            teams: field.teams,
+            games: [missingTime] + Array(field.games.dropFirst())
+        )
+        state.officialPostseasonField = field
+        XCTAssertFalse(state.postseasonRoundScheduleIsReady("r64"))
+    }
+
     func testCardWritePlanTranslatesTeamFavoriteToSharedHomeAwayContract() throws {
         var state = FieldhouseSeasonState()
         state.isCommissioner = true

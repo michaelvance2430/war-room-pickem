@@ -872,6 +872,7 @@ declare
   v_second text;
   v_required integer;
   v_first_tip timestamptz;
+  v_missing_tips integer;
 begin
   if v_uid is null then raise exception 'Authentication required'; end if;
   select l.sport_id into v_sport from public.memberships m join public.leagues l on l.id=m.league_id
@@ -886,12 +887,15 @@ begin
     where q.tournament_id=v_tournament.id and q.league_id=p_league_id and q.user_id=v_uid
   ) then raise exception 'Selection Sunday eligibility snapshot is missing'; end if;
 
-  select count(*),min(starts_at) into v_required,v_first_tip
+  select count(*),min(starts_at),count(*) filter(where starts_at is null)
+  into v_required,v_first_tip,v_missing_tips
   from public.fieldhouse_tournament_games where tournament_id=v_tournament.id and round_key=p_round_key;
   if jsonb_typeof(p_picks)<>'object' or jsonb_object_length(p_picks)<>v_required then
     raise exception 'Every game in this round requires a pick';
   end if;
-  if v_first_tip is null then raise exception 'Official round tip times are not ready'; end if;
+  if v_first_tip is null or v_missing_tips<>0 then
+    raise exception 'Every official round tip time must be ready';
+  end if;
   if now()>=v_first_tip then raise exception 'This round is locked'; end if;
 
   for g in select * from public.fieldhouse_tournament_games

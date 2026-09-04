@@ -47,6 +47,7 @@ assert.match(sql, /create or replace function public\.record_fieldhouse_tourname
 assert.match(sql, /first_score=p_first_score,second_score=p_second_score/);
 assert.match(sql, /Winner does not match the official final score/);
 assert.match(sql, /Completed time cannot precede the official tip/);
+assert.match(sql, /Every official round tip time must be ready/);
 assert.match(sql, /raise exception 'Tournament result is already final'/);
 assert.match(sql, /'alreadyRecorded',true/);
 assert.match(sql, /create or replace function public\.finalize_fieldhouse_postseason_awards/);
@@ -132,6 +133,7 @@ assert.match(client, /CERTIFIED ROUND RECEIPT/);
 assert.match(client, /ORIGINAL BRACKET/);
 assert.match(client, /FRESH ROUND/);
 assert.match(client, /func postseasonRoundIsLocked\(_ roundKey: String/);
+assert.match(client, /func postseasonRoundScheduleIsReady\(_ roundKey: String/);
 assert.match(client, /locked: state\.postseasonRoundIsLocked\(round\)/);
 assert.match(bracketPicker, /LIVE ROUND BOARD/);
 assert.match(client, /POINTS \+ CHEEVOS · NO BRASS/);
