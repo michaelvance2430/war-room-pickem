@@ -171,6 +171,7 @@ struct ContentView: View {
     @State private var showingNotificationPrimer = false
     @State private var showingPushAnnouncements = false
     @State private var notificationDispatchTarget: NotificationDispatchTarget?
+    @State private var fieldhouseNotificationDestination: WarRoomNotificationRoute?
     @AppStorage("warroom.notifications.primer-seen") private var notificationPrimerSeen = false
     @AppStorage("warroom.activeSportId") private var activeSportId = "cfb"
 
@@ -186,10 +187,46 @@ struct ContentView: View {
     var body: some View {
         Group {
             if FieldhouseReleaseGate.shouldRoute(sportID: activeSportId) {
-                FieldhouseAuthenticatedContainer()
+                FieldhouseAuthenticatedContainer(notificationDestination: $fieldhouseNotificationDestination)
             } else {
                 standardFootballExperience
             }
+        }
+        .task(id: auth.selectedLeagueId) { await refreshActiveSport() }
+        .task(id: auth.user?.id) { await prepareNotifications() }
+        .task(id: auth.user?.id) {
+            if let destination = pendingNotificationDestination ?? WarRoomNotificationCenter.takePendingRoute() {
+                pendingNotificationDestination = nil
+                _ = WarRoomNotificationCenter.takePendingRoute()
+                await handleNotificationDestination(destination)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .warRoomNotificationDestination)) { notification in
+            guard let destination = notification.object as? WarRoomNotificationRoute else { return }
+            _ = WarRoomNotificationCenter.takePendingRoute()
+            Task { await handleNotificationDestination(destination) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .warRoomDeviceTokenChanged)) { _ in
+            Task { await registerPushToken() }
+        }
+        .sheet(isPresented: $showingPushAnnouncements) { NavigationStack { AnnouncementsView() } }
+        .sheet(item: $notificationDispatchTarget) { target in
+            NavigationStack {
+                GazetteView(membership: target.membership, initialWeek: target.week)
+            }
+        }
+        .alert("Stay ahead of the lock", isPresented: $showingNotificationPrimer) {
+            Button("Not now", role: .cancel) { notificationPrimerSeen = true }
+            Button("Enable alerts") {
+                notificationPrimerSeen = true
+                Task {
+                    if await WarRoomNotificationCenter.requestAuthorization() {
+                        await registerPushToken()
+                    }
+                }
+            }
+        } message: {
+            Text("War Room can alert you when a card or tournament round opens, before picks lock, when results are in, and when your commissioner posts an announcement. You can change this anytime in Settings.")
         }
     }
 
@@ -240,51 +277,13 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .task(id: auth.user?.id) { await recordAppOpenDiscoveries() }
-        .task(id: auth.selectedLeagueId) { await refreshActiveSport() }
         .task(id: auth.user?.id) { await refreshPlatformStatus() }
-        .task(id: auth.user?.id) { await prepareNotifications() }
-        .task(id: auth.user?.id) {
-            if let destination = pendingNotificationDestination ?? WarRoomNotificationCenter.takePendingRoute() {
-                pendingNotificationDestination = nil
-                // The in-memory launch route wins, but always clear its persisted
-                // handoff too so a later cold launch cannot replay the same tap.
-                _ = WarRoomNotificationCenter.takePendingRoute()
-                await handleNotificationDestination(destination)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .warRoomNotificationDestination)) { notification in
-            guard let destination = notification.object as? WarRoomNotificationRoute else { return }
-            _ = WarRoomNotificationCenter.takePendingRoute()
-            Task { await handleNotificationDestination(destination) }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .warRoomDeviceTokenChanged)) { _ in
-            Task { await registerPushToken() }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .warRoomProfilePhotoChanged)) { _ in
             // Keep the profile editor in place, but force every other retained
             // tab to fetch the new global account portrait on next selection.
             for index in tabRootIds.indices where index != selectedTab {
                 tabRootIds[index] = UUID()
             }
-        }
-        .sheet(isPresented: $showingPushAnnouncements) { NavigationStack { AnnouncementsView() } }
-        .sheet(item: $notificationDispatchTarget) { target in
-            NavigationStack {
-                GazetteView(membership: target.membership, initialWeek: target.week)
-            }
-        }
-        .alert("Stay ahead of the lock", isPresented: $showingNotificationPrimer) {
-            Button("Not now", role: .cancel) { notificationPrimerSeen = true }
-            Button("Enable alerts") {
-                notificationPrimerSeen = true
-                Task {
-                    if await WarRoomNotificationCenter.requestAuthorization() {
-                        await registerPushToken()
-                    }
-                }
-            }
-        } message: {
-            Text("War Room can alert you when a card is built, 12 hours before it locks, one hour before it locks, when results are in, and when your commissioner posts an announcement. You can change this anytime in Settings.")
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await refreshPlatformStatus() } }
@@ -364,11 +363,28 @@ struct ContentView: View {
     @MainActor private func handleNotificationDestination(_ route: WarRoomNotificationRoute) async {
         suppressOpeningForLaunch = true
         showOpening = false
-        if let leagueId = route.leagueId { auth.selectLeague(leagueId) }
+        if let leagueId = route.leagueId {
+            auth.selectLeague(leagueId)
+            if let token = auth.token,
+               let user = auth.user,
+               let membership = try? await SupabaseAPI.activeLeague(
+                token: token,
+                userId: user.id,
+                preferredLeagueId: leagueId
+               ), membership.leagueId == leagueId {
+                activeSportId = membership.leagues.sportId.lowercased()
+            }
+        }
         if route.destination == "announcements" {
             openTab(0)
             showingPushAnnouncements = true
-        } else if route.destination == "picks" {
+            return
+        }
+        if FieldhouseReleaseGate.shouldRoute(sportID: activeSportId) {
+            fieldhouseNotificationDestination = route
+            return
+        }
+        if route.destination == "picks" {
             openTab(1)
         } else if route.destination == "results" {
             guard let leagueId = route.leagueId,

@@ -532,6 +532,7 @@ private extension EnvironmentValues {
 
 struct FieldhouseAuthenticatedContainer: View {
     @EnvironmentObject private var auth: AuthStore
+    @Binding var notificationDestination: WarRoomNotificationRoute?
     @State private var phase: Phase = .loading
 
     private enum Phase {
@@ -550,7 +551,12 @@ struct FieldhouseAuthenticatedContainer: View {
                         .tint(.orange)
                 }
             case .ready(let state, let scope, let context):
-                FieldhouseNativePreviewView(authenticatedState: state, scope: scope, liveContext: context)
+                FieldhouseNativePreviewView(
+                    authenticatedState: state,
+                    scope: scope,
+                    liveContext: context,
+                    notificationDestination: $notificationDestination
+                )
             case .failed(let message):
                 ZStack {
                     FieldhouseBackdrop().ignoresSafeArea()
@@ -1606,6 +1612,7 @@ struct FieldhouseNativePreviewView: View {
     @State private var openActivePostseasonRound = false
     @State private var lastVerifiedState: FieldhouseSeasonState
     @State private var standings: [Standing]
+    @Binding private var notificationDestination: WarRoomNotificationRoute?
     @Environment(\.scenePhase) private var scenePhase
     private let stateStore = FieldhouseStateStore()
     private let initialLeague: FieldhouseLeague
@@ -1639,12 +1646,18 @@ struct FieldhouseNativePreviewView: View {
         _state = State(initialValue: displayState)
         _lastVerifiedState = State(initialValue: displayState)
         _standings = State(initialValue: [])
+        _notificationDestination = .constant(nil)
         _desk = State(initialValue: (reviewBracket || reviewRound) ? .standings : (reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home))))
         _strikePresentation = State(initialValue: reviewHellfire ? StrikePresentation(resourceName: initialLeague == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1") : nil)
         _showingEntrance = State(initialValue: !reviewMode)
     }
 
-    fileprivate init(authenticatedState: FieldhouseSeasonState, scope: FieldhouseStateScope, liveContext: FieldhouseLiveContext) {
+    fileprivate init(
+        authenticatedState: FieldhouseSeasonState,
+        scope: FieldhouseStateScope,
+        liveContext: FieldhouseLiveContext,
+        notificationDestination: Binding<WarRoomNotificationRoute?>
+    ) {
         self.initialLeague = authenticatedState.league
         self.authenticatedState = authenticatedState
         self.authenticatedScope = scope
@@ -1652,6 +1665,7 @@ struct FieldhouseNativePreviewView: View {
         _state = State(initialValue: authenticatedState)
         _lastVerifiedState = State(initialValue: authenticatedState)
         _standings = State(initialValue: liveContext.standings)
+        _notificationDestination = notificationDestination
         _desk = State(initialValue: .home)
         _strikePresentation = State(initialValue: nil)
         _showingEntrance = State(initialValue: true)
@@ -1760,6 +1774,8 @@ struct FieldhouseNativePreviewView: View {
         } message: {
             Text(persistenceError ?? "Try again.")
         }
+        .onAppear { routeNotificationIfNeeded() }
+        .onChange(of: notificationDestination) { _, _ in routeNotificationIfNeeded() }
         .onAppear {
             if let authenticatedState {
                 state = authenticatedState
@@ -1792,6 +1808,24 @@ struct FieldhouseNativePreviewView: View {
                 await refreshAuthenticatedScoring()
                 try? await Task.sleep(for: .seconds(60))
             }
+        }
+    }
+
+    private func routeNotificationIfNeeded() {
+        guard let route = notificationDestination else { return }
+        notificationDestination = nil
+        switch route.destination {
+        case "picks":
+            if state.activePostseasonRound != nil {
+                openActivePostseasonRound = true
+                desk = .standings
+            } else {
+                desk = .picks
+            }
+        case "announcements", "results":
+            desk = .home
+        default:
+            break
         }
     }
 
@@ -2231,6 +2265,9 @@ private struct FieldhouseHomePage: View {
     }
 
     private func scheduleCardNotifications() {
+        // Authenticated leagues use the durable server outbox so every member
+        // receives one event. Keep local scheduling confined to isolated preview.
+        guard !state.isAuthenticatedSession else { return }
         let week = state.window
         let lockAt = state.pickLockDate
         let leagueName = state.league.displayName
@@ -2432,6 +2469,9 @@ private struct FieldhouseCommissionerCommand: View {
     }
 
     private func scheduleCardNotifications() {
+        // Authenticated leagues use the durable server outbox so every member
+        // receives one event. Keep local scheduling confined to isolated preview.
+        guard !state.isAuthenticatedSession else { return }
         let week = state.window
         let lockAt = state.pickLockDate
         let leagueName = state.league.displayName

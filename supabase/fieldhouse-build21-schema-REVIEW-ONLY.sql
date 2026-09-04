@@ -215,6 +215,66 @@ grant execute on function public.create_league_with_commissioner_seat(
   text, text, boolean, boolean, integer, integer, integer, text
 ) to authenticated;
 
+-- The production notification trigger was originally hard-coded to fire when a
+-- five-game football card was complete. Fieldhouse publishes ten games, so use
+-- each league's authoritative games_per_week value instead. Event keys remain
+-- unique and delivery receipts still enforce one notification per device.
+create or replace function private.queue_card_notifications()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_card public.week_cards%rowtype;
+  v_league_name text;
+  v_games_required integer;
+  v_lock_at timestamptz;
+begin
+  select wc.* into v_card
+  from public.week_cards wc
+  where wc.id = new.week_card_id;
+  if not found then return new; end if;
+
+  select l.name, greatest(1, coalesce(l.games_per_week, 5))
+  into v_league_name, v_games_required
+  from public.leagues l
+  where l.id = v_card.league_id;
+
+  if (select count(*) from public.card_games cg where cg.week_card_id = new.week_card_id) <> v_games_required then
+    return new;
+  end if;
+
+  select min(cg.start_time::timestamptz) into v_lock_at
+  from public.card_games cg
+  where cg.week_card_id = new.week_card_id;
+
+  insert into private.push_notification_outbox(
+    event_key, league_id, kind, title, body, destination, week_number, deliver_at
+  )
+  select event_key, league_id, kind, title, body, destination, week_number, deliver_at
+  from (values
+    ('card-built:' || v_card.id, v_card.league_id, 'card_built',
+      'Week ' || v_card.week_number || ' card is live',
+      v_league_name || ' is ready. Make your picks before the card locks.',
+      'picks', v_card.week_number, clock_timestamp()),
+    ('card-lock-12h:' || v_card.id, v_card.league_id, 'card_lock_12h',
+      'Card locks in 12 hours',
+      'Week ' || v_card.week_number || ' in ' || v_league_name || ' is closing soon. Get your picks on the record.',
+      'picks', v_card.week_number, v_lock_at - interval '12 hours'),
+    ('card-lock-1h:' || v_card.id, v_card.league_id, 'card_lock_1h',
+      'FINAL WARNING · 1 HOUR',
+      'Week ' || v_card.week_number || ' in ' || v_league_name || ' locks in one hour. Finish and confirm your card.',
+      'picks', v_card.week_number, v_lock_at - interval '1 hour')
+  ) as queued(event_key, league_id, kind, title, body, destination, week_number, deliver_at)
+  where queued.kind = 'card_built' or queued.deliver_at > clock_timestamp()
+  on conflict (event_key) do nothing;
+
+  return new;
+end;
+$$;
+revoke all on function private.queue_card_notifications() from public, anon, authenticated;
+
 commit;
 
 -- Deploy in the same guarded release window, in this order:

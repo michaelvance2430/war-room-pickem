@@ -305,6 +305,90 @@ $$;
 revoke all on function public.lock_fieldhouse_brackets_at_tip() from public, anon, authenticated;
 grant execute on function public.lock_fieldhouse_brackets_at_tip() to service_role;
 
+-- One tournament-round event becomes one durable outbox job per league. The
+-- existing outbox event_key plus per-device delivery receipt prevents duplicate
+-- pushes even when the autonomous scorer safely retries the same final result.
+create or replace function private.queue_fieldhouse_round_notifications(
+  p_tournament_id uuid,
+  p_round_key text
+)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_sport text;
+  v_round_title text;
+  v_first_tip timestamptz;
+  v_count integer := 0;
+  v_inserted integer := 0;
+begin
+  if p_round_key not in ('opening','r64','r32','s16','e8','ff','title') then
+    raise exception 'Invalid Fieldhouse round';
+  end if;
+
+  select t.sport_id, min(g.starts_at)
+  into v_sport, v_first_tip
+  from public.fieldhouse_tournaments t
+  join public.fieldhouse_tournament_games g on g.tournament_id = t.id
+  where t.id = p_tournament_id and t.status <> 'draft' and g.round_key = p_round_key
+  group by t.sport_id;
+  if not found or v_first_tip is null then return 0; end if;
+
+  v_round_title := case p_round_key
+    when 'opening' then 'Opening Round'
+    when 'r64' then 'First Round'
+    when 'r32' then 'Second Round'
+    when 's16' then 'Sweet 16'
+    when 'e8' then 'Elite Eight'
+    when 'ff' then 'Final Four'
+    when 'title' then 'National Championship'
+  end;
+
+  insert into private.push_notification_outbox(
+    event_key, league_id, kind, title, body, destination, week_number, deliver_at
+  )
+  select
+    'fieldhouse-round-open:' || p_tournament_id || ':' || p_round_key || ':' || l.id,
+    l.id,
+    'card_built',
+    upper(v_round_title) || ' PICKS ARE LIVE',
+    l.name || ': make every ' || v_round_title || ' pick before the first game tips.',
+    'picks',
+    null,
+    clock_timestamp()
+  from public.leagues l
+  where l.sport_id = v_sport
+  on conflict (event_key) do nothing;
+  get diagnostics v_inserted = row_count;
+  v_count := v_count + v_inserted;
+
+  if v_first_tip - interval '1 hour' > clock_timestamp() then
+    insert into private.push_notification_outbox(
+      event_key, league_id, kind, title, body, destination, week_number, deliver_at
+    )
+    select
+      'fieldhouse-round-lock-1h:' || p_tournament_id || ':' || p_round_key || ':' || l.id,
+      l.id,
+      'card_lock_1h',
+      'FINAL WARNING · 1 HOUR',
+      l.name || ': ' || v_round_title || ' picks lock at first tip. Finish and confirm the round.',
+      'picks',
+      null,
+      v_first_tip - interval '1 hour'
+    from public.leagues l
+    where l.sport_id = v_sport
+    on conflict (event_key) do nothing;
+    get diagnostics v_inserted = row_count;
+    v_count := v_count + v_inserted;
+  end if;
+
+  return v_count;
+end;
+$$;
+revoke all on function private.queue_fieldhouse_round_notifications(uuid,text) from public,anon,authenticated;
+
 create or replace function public.import_fieldhouse_official_field(
   p_sport_id text,
   p_season_key integer,
@@ -415,6 +499,9 @@ begin
   if p_publish and not exists(
     select 1 from public.fieldhouse_tournament_games where tournament_id=v_tournament_id and starts_at is not null
   ) then raise exception 'Published field requires at least one official tip time'; end if;
+  if p_publish then
+    perform private.queue_fieldhouse_round_notifications(v_tournament_id,'opening');
+  end if;
 
   return jsonb_build_object('ok',true,'tournamentId',v_tournament_id,'published',p_publish,'teams',76,'games',75);
 end;
@@ -570,46 +657,6 @@ $$;
 revoke all on function public.score_fieldhouse_postseason(uuid) from public,anon,authenticated;
 grant execute on function public.score_fieldhouse_postseason(uuid) to service_role;
 
-create or replace function public.record_fieldhouse_tournament_result(
-  p_tournament_id uuid,
-  p_game_id text,
-  p_winner_team_id text,
-  p_away_score integer,
-  p_home_score integer,
-  p_completed_at timestamptz
-)
-returns jsonb language plpgsql security definer set search_path=public as $$
-declare g public.fieldhouse_tournament_games%rowtype; v_first text; v_second text; v_score jsonb; v_awards jsonb;
-begin
-  select * into g from public.fieldhouse_tournament_games
-  where tournament_id=p_tournament_id and game_id=p_game_id for update;
-  if not found then raise exception 'Tournament game not found'; end if;
-  v_first:=g.first_team_id;
-  if v_first is null then select winner_team_id into v_first from public.fieldhouse_tournament_games
-    where tournament_id=p_tournament_id and game_id=g.first_source_game_id; end if;
-  v_second:=g.second_team_id;
-  if v_second is null then select winner_team_id into v_second from public.fieldhouse_tournament_games
-    where tournament_id=p_tournament_id and game_id=g.second_source_game_id; end if;
-  if p_winner_team_id not in (v_first,v_second) then raise exception 'Winner is not an official participant'; end if;
-  if p_away_score<0 or p_home_score<0 or p_away_score=p_home_score then raise exception 'Invalid final basketball score'; end if;
-  if p_completed_at is null then raise exception 'Completed time required'; end if;
-  update public.fieldhouse_tournament_games set winner_team_id=p_winner_team_id,
-    away_score=p_away_score,home_score=p_home_score,completed_at=p_completed_at
-  where tournament_id=p_tournament_id and game_id=p_game_id;
-  update public.fieldhouse_tournaments set
-    status=case when p_game_id=(select game_id from public.fieldhouse_tournament_games where tournament_id=p_tournament_id and round_key='title') then 'final' else 'in_progress' end,
-    finalized_at=case when p_game_id=(select game_id from public.fieldhouse_tournament_games where tournament_id=p_tournament_id and round_key='title') then p_completed_at else finalized_at end,
-    updated_at=now() where id=p_tournament_id;
-  v_score:=public.score_fieldhouse_postseason(p_tournament_id);
-  if g.round_key='title' then
-    v_awards:=public.finalize_fieldhouse_postseason_awards(p_tournament_id);
-  end if;
-  return v_score||jsonb_build_object('awards',v_awards);
-end;
-$$;
-revoke all on function public.record_fieldhouse_tournament_result(uuid,text,text,integer,integer,timestamptz) from public,anon,authenticated;
-grant execute on function public.record_fieldhouse_tournament_result(uuid,text,text,integer,integer,timestamptz) to service_role;
-
 create or replace function public.finalize_fieldhouse_postseason_awards(p_tournament_id uuid)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare v_status text; v_count integer;
@@ -655,6 +702,71 @@ end;
 $$;
 revoke all on function public.finalize_fieldhouse_postseason_awards(uuid) from public,anon,authenticated;
 grant execute on function public.finalize_fieldhouse_postseason_awards(uuid) to service_role;
+
+create or replace function public.record_fieldhouse_tournament_result(
+  p_tournament_id uuid,
+  p_game_id text,
+  p_winner_team_id text,
+  p_away_score integer,
+  p_home_score integer,
+  p_completed_at timestamptz
+)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare
+  g public.fieldhouse_tournament_games%rowtype;
+  v_first text;
+  v_second text;
+  v_score jsonb;
+  v_awards jsonb;
+  v_next_round text;
+begin
+  select * into g from public.fieldhouse_tournament_games
+  where tournament_id=p_tournament_id and game_id=p_game_id for update;
+  if not found then raise exception 'Tournament game not found'; end if;
+  v_first:=g.first_team_id;
+  if v_first is null then select winner_team_id into v_first from public.fieldhouse_tournament_games
+    where tournament_id=p_tournament_id and game_id=g.first_source_game_id; end if;
+  v_second:=g.second_team_id;
+  if v_second is null then select winner_team_id into v_second from public.fieldhouse_tournament_games
+    where tournament_id=p_tournament_id and game_id=g.second_source_game_id; end if;
+  if p_winner_team_id not in (v_first,v_second) then raise exception 'Winner is not an official participant'; end if;
+  if p_away_score<0 or p_home_score<0 or p_away_score=p_home_score then raise exception 'Invalid final basketball score'; end if;
+  if p_completed_at is null then raise exception 'Completed time required'; end if;
+  update public.fieldhouse_tournament_games set winner_team_id=p_winner_team_id,
+    away_score=p_away_score,home_score=p_home_score,completed_at=p_completed_at
+  where tournament_id=p_tournament_id and game_id=p_game_id;
+  update public.fieldhouse_tournaments set
+    status=case when p_game_id=(select game_id from public.fieldhouse_tournament_games where tournament_id=p_tournament_id and round_key='title') then 'final' else 'in_progress' end,
+    finalized_at=case when p_game_id=(select game_id from public.fieldhouse_tournament_games where tournament_id=p_tournament_id and round_key='title') then p_completed_at else finalized_at end,
+    updated_at=now() where id=p_tournament_id;
+  v_score:=public.score_fieldhouse_postseason(p_tournament_id);
+  if not exists(
+    select 1 from public.fieldhouse_tournament_games pending
+    where pending.tournament_id=p_tournament_id
+      and pending.round_key=g.round_key
+      and pending.winner_team_id is null
+  ) then
+    v_next_round:=case g.round_key
+      when 'opening' then 'r64'
+      when 'r64' then 'r32'
+      when 'r32' then 's16'
+      when 's16' then 'e8'
+      when 'e8' then 'ff'
+      when 'ff' then 'title'
+      else null
+    end;
+    if v_next_round is not null then
+      perform private.queue_fieldhouse_round_notifications(p_tournament_id,v_next_round);
+    end if;
+  end if;
+  if g.round_key='title' then
+    v_awards:=public.finalize_fieldhouse_postseason_awards(p_tournament_id);
+  end if;
+  return v_score||jsonb_build_object('awards',v_awards);
+end;
+$$;
+revoke all on function public.record_fieldhouse_tournament_result(uuid,text,text,integer,integer,timestamptz) from public,anon,authenticated;
+grant execute on function public.record_fieldhouse_tournament_result(uuid,text,text,integer,integer,timestamptz) to service_role;
 
 -- Round submissions are one point per correct pick. Official bracket predictions
 -- retain the escalating 1/1/2/4/8/16/32 weighting above.
