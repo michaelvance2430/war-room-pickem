@@ -237,6 +237,14 @@ struct FieldhouseBracketPickerView: View {
                             ForEach(group.games) { matchup in matchupCard(matchup) }
                         }
                     }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("MOVE THROUGH THE BRACKET")
+                            .font(.system(size: 9, weight: .black))
+                            .tracking(1.5)
+                            .foregroundStyle(.white.opacity(0.52))
+                        sectionRail
+                    }
+                    .padding(.top, 4)
                     Button { showingReview = true } label: {
                         Label(progress == 75 ? "REVIEW COMPLETED BRACKET" : "REVIEW · \(75 - progress) PICKS REMAIN", systemImage: "checklist")
                             .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
@@ -280,14 +288,33 @@ struct FieldhouseBracketPickerView: View {
             HStack(spacing: 7) {
                 ForEach([FieldhouseBracketSection.buyIn] + FieldhouseRegion.allCases.map(FieldhouseBracketSection.region) + [.finalFour]) { item in
                     Button { section = item } label: {
-                        Text(item.title).font(.system(size: 9, weight: .black)).tracking(0.6)
-                            .padding(.horizontal, 12).padding(.vertical, 10)
-                            .foregroundStyle(section == item ? .black : .white.opacity(0.70))
-                            .background(section == item ? accent : Color.white.opacity(0.07), in: Capsule())
+                        HStack(spacing: 5) {
+                            Image(systemName: isComplete(item) ? "checkmark.circle.fill" : "circle.fill")
+                            Text(item.title)
+                        }
+                        .font(.system(size: 9, weight: .black))
+                        .tracking(0.6)
+                        .padding(.horizontal, 12).padding(.vertical, 10)
+                        .foregroundStyle(.white)
+                        .background(sectionColor(item), in: Capsule())
+                        .overlay {
+                            if section == item {
+                                Capsule().stroke(.white.opacity(0.92), lineWidth: 2)
+                            }
+                        }
                     }.buttonStyle(.plain)
                 }
             }
         }
+    }
+
+    private func isComplete(_ item: FieldhouseBracketSection) -> Bool {
+        let games = FieldhouseBracketEngine.matchups(for: item, league: league, picks: picks).flatMap(\.games)
+        return !games.isEmpty && games.allSatisfy { picks[$0.id] != nil }
+    }
+
+    private func sectionColor(_ item: FieldhouseBracketSection) -> Color {
+        isComplete(item) ? Color.green.opacity(section == item ? 0.95 : 0.72) : Color.red.opacity(section == item ? 0.95 : 0.72)
     }
 
     private var sectionIntro: some View {
