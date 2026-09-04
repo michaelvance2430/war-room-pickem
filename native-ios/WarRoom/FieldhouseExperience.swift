@@ -265,6 +265,76 @@ enum FieldhouseAuthenticatedRepository {
             crystalBall: crystal
         )
     }
+
+    static func saveSetup(
+        token: String,
+        userID: UUID,
+        membership: LeagueMembership,
+        favoriteTeam: String,
+        crystalBallChampion: String
+    ) async throws {
+        let league = FieldhouseLeague(summary: membership.leagues)
+        try await SupabaseAPI.saveFavoriteTeam(
+            token: token,
+            userId: userID,
+            sportId: league.favoriteSportID,
+            teamId: favoriteTeam
+        )
+        try await SupabaseAPI.saveCrystalBallPick(
+            token: token,
+            leagueId: membership.leagueId,
+            userId: userID,
+            teamName: crystalBallChampion
+        )
+    }
+
+    static func savePicks(
+        token: String,
+        membership: LeagueMembership,
+        state: FieldhouseSeasonState
+    ) async throws -> SavedPickResponse {
+        let plan = try FieldhousePickWritePlan(state: state)
+        return try await SupabaseAPI.saveWeekPicks(
+            token: token,
+            leagueId: membership.leagueId,
+            weekNumber: membership.leagues.currentWeek,
+            picks: plan.picks,
+            bestBetGameId: plan.bestBetGameID,
+            propChoice: plan.propChoice,
+            isChaos: plan.usedHellfire
+        )
+    }
+}
+
+struct FieldhousePickWritePlan {
+    let picks: [PickSubmission]
+    let bestBetGameID: UUID
+    let propChoice: String
+    let usedHellfire: Bool
+
+    init(state: FieldhouseSeasonState) throws {
+        let required = FieldhouseGameCatalog.weeklyCardSize
+        guard state.cardIsComplete, state.publishedGames.count == required,
+              let bestBetIndex = state.bestBetGame,
+              state.publishedGames.indices.contains(bestBetIndex),
+              let bestBetID = UUID(uuidString: state.publishedGames[bestBetIndex].id),
+              let propChoice = state.propAnswer else {
+            throw FieldhouseRepositoryError(message: "Complete all ten picks, confidence points, Best Bet, and the prop before locking the card.")
+        }
+
+        let picks = try state.publishedGames.enumerated().map { index, game -> PickSubmission in
+            guard let gameID = UUID(uuidString: game.id),
+                  let side = state.sideSelections[index],
+                  let confidence = state.confidenceSelections[index] else {
+                throw FieldhouseRepositoryError(message: "This card contains a game that cannot be saved. Pull a fresh card and try again.")
+            }
+            return PickSubmission(gameId: gameID, side: side, confidence: confidence)
+        }
+        self.picks = picks
+        self.bestBetGameID = bestBetID
+        self.propChoice = propChoice
+        self.usedHellfire = state.hellfireDeployedOnCurrentCard
+    }
 }
 
 struct FieldhouseTrophyOption: Identifiable, Equatable {

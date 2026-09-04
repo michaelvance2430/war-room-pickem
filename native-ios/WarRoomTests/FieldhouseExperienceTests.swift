@@ -102,6 +102,45 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertFalse(state.picksLocked)
     }
 
+    func testAuthenticatedPickWritePlanUsesAllTenStableGameIDsAndHellfireReceipt() throws {
+        var state = FieldhouseSeasonState()
+        state.publishedGames = (0..<10).map { index in
+            FieldhouseGame(
+                id: UUID().uuidString.lowercased(),
+                away: "Away \(index)",
+                home: "Home \(index)",
+                spread: "Home \(index) -2.5",
+                tip: "SAT 7:00 PM EST"
+            )
+        }
+        state.cardIsPublished = true
+        state.publishedProp = .teamScores90
+        state.sideSelections = Dictionary(uniqueKeysWithValues: state.publishedGames.enumerated().map { ($0.offset, $0.element.home) })
+        state.confidenceSelections = Dictionary(uniqueKeysWithValues: (0..<10).map { ($0, $0 + 1) })
+        state.bestBetGame = 4
+        state.propAnswer = "NO"
+        state.hellfireDeployedOnCurrentCard = true
+
+        let plan = try FieldhousePickWritePlan(state: state)
+
+        XCTAssertEqual(plan.picks.count, 10)
+        XCTAssertEqual(plan.bestBetGameID.uuidString.lowercased(), state.publishedGames[4].id)
+        XCTAssertEqual(plan.propChoice, "NO")
+        XCTAssertTrue(plan.usedHellfire)
+        XCTAssertEqual(plan.picks.map(\.confidence), Array(1...10))
+    }
+
+    func testAuthenticatedPickWritePlanRejectsPreviewOnlyGameIDs() {
+        var state = FieldhouseSeasonState()
+        XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: .teamScores90))
+        state.sideSelections = Dictionary(uniqueKeysWithValues: state.publishedGames.enumerated().map { ($0.offset, $0.element.home) })
+        state.confidenceSelections = Dictionary(uniqueKeysWithValues: (0..<10).map { ($0, $0 + 1) })
+        state.bestBetGame = 0
+        state.propAnswer = "YES"
+
+        XCTAssertThrowsError(try FieldhousePickWritePlan(state: state))
+    }
+
     func testFieldhouseStateRoundTripsWithoutCrossingAccountOrLeagueBoundaries() throws {
         let suiteName = "FieldhouseStateStoreTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
