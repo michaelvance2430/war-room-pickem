@@ -33,12 +33,12 @@ struct LeagueManagementView: View {
     private var identity: SportIdentity { SportIdentity(membership.leagues.sportId) }
     private var accent: Color {
         if identity.isNFL { return .cyan }
-        if identity.sportId == "cbb" { return .orange }
+        if identity.isFieldhouse { return identity.accent }
         return .green
     }
     private var groupNoun: String {
         if identity.isNFL { return "PRO CONFERENCES" }
-        if identity.sportId == "cbb" { return "FIELDHOUSE REGIONS" }
+        if identity.isFieldhouse { return "FIELDHOUSE REGIONS" }
         return "COLLEGE CONFERENCES"
     }
 
@@ -109,7 +109,7 @@ struct LeagueManagementView: View {
     @ViewBuilder private var managementBackdrop: some View {
         if identity.isNFL {
             NflHomeBackdrop(phase: NflSeasonPhase.phase(week: membership.leagues.currentWeek))
-        } else if identity.sportId == "cbb" {
+        } else if identity.isFieldhouse {
             LinearGradient(colors: [.black, .purple.opacity(0.28), .orange.opacity(0.14), .black], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
         } else {
             LinearGradient(colors: [.black, Color(red: 0.02, green: 0.13, blue: 0.08), .black], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()

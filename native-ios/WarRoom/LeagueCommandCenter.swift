@@ -78,12 +78,12 @@ struct LeagueCommandCenterView: View {
                                 }
                             } label: {
                                 HStack {
-                                    Text(sportId == "cbb" ? "FIELDHOUSE · COMING SOON" : sportId.uppercased()).font(.caption.weight(.black)).tracking(2)
+                                    Text(sportLabel(sportId)).font(.caption.weight(.black)).tracking(2)
                                     Spacer()
                                     Text("\(sportRooms.count)").font(.caption.weight(.black))
                                     Image(systemName: expandedSports.contains(sportId) ? "chevron.up" : "chevron.down")
                                 }
-                                .foregroundStyle(sportId == "cbb" ? .orange : .yellow)
+                                .foregroundStyle(fieldhouseSportIDs.contains(sportId) ? SportIdentity(sportId).accent : .yellow)
                                 .padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 14))
                             }.buttonStyle(.plain)
                             if expandedSports.contains(sportId) {
@@ -140,8 +140,19 @@ struct LeagueCommandCenterView: View {
 
     private var sportIds: [String] {
         let ids = Set(attention.map { $0.membership.leagues.sportId.lowercased() })
-        let preferred = ["cfb", "nfl", "cbb"]
-        return preferred + ids.filter { !preferred.contains($0) }.sorted()
+        let preferred = ["cfb", "nfl", "ncaam", "ncaaw", "cbb"]
+        return preferred.filter(ids.contains) + ids.filter { !preferred.contains($0) }.sorted()
+    }
+
+    private let fieldhouseSportIDs: Set<String> = ["cbb", "ncaam", "ncaaw"]
+
+    private func sportLabel(_ sportID: String) -> String {
+        switch sportID {
+        case "ncaam": return "THE FIELDHOUSE · NCAAM"
+        case "ncaaw": return "THE FIELDHOUSE · NCAAW"
+        case "cbb": return "FIELDHOUSE · LEGACY"
+        default: return sportID.uppercased()
+        }
     }
 
     private func loadAttention() async {

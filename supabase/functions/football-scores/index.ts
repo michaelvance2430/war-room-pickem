@@ -43,7 +43,8 @@ Deno.serve(async (req: Request) => {
   const authorization = req.headers.get("Authorization") || "";
   if (!authorization.startsWith("Bearer ")) return reply({ error: "Authentication required" }, 401);
   const { leagueId, sport: requestedSport, daysFrom: requestedDays } = await req.json().catch(() => ({}));
-  const sport = requestedSport === "nfl" ? "nfl" : "cfb";
+  const normalizedSport = String(requestedSport || "").toLowerCase();
+  const sport = ["cfb", "nfl", "ncaam", "ncaaw"].includes(normalizedSport) ? normalizedSport : "cfb";
   const daysFrom = Math.min(3, Math.max(1, Number(requestedDays) || 3));
   if (!leagueId) return reply({ error: "League required" }, 400);
 
@@ -53,13 +54,14 @@ Deno.serve(async (req: Request) => {
   if (!secret) return reply({ error: "Server database secret is unavailable" }, 503);
   const callerHeaders = { apikey: publishable, Authorization: authorization };
   const [membershipResponse, authResponse] = await Promise.all([
-    fetch(`${supabaseUrl}/rest/v1/memberships?select=role&league_id=eq.${encodeURIComponent(leagueId)}&limit=1`, { headers: callerHeaders }),
+    fetch(`${supabaseUrl}/rest/v1/memberships?select=role,leagues!inner(sport_id)&league_id=eq.${encodeURIComponent(leagueId)}&limit=1`, { headers: callerHeaders }),
     fetch(`${supabaseUrl}/auth/v1/user`, { headers: callerHeaders }),
   ]);
   if (!membershipResponse.ok || !authResponse.ok) return reply({ error: "Could not verify league membership" }, 403);
   const membership = (await membershipResponse.json())?.[0];
   const user = await authResponse.json();
-  if (!membership || !user?.id) return reply({ error: "League membership required" }, 403);
+  const league = Array.isArray(membership?.leagues) ? membership.leagues[0] : membership?.leagues;
+  if (!membership || !user?.id || league?.sport_id !== sport) return reply({ error: "League membership required" }, 403);
 
   const serviceHeaders = { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json" };
   const cacheUrl = `${supabaseUrl}/rest/v1/live_football_score_cache?sport=eq.${sport}&select=*`;
@@ -82,7 +84,10 @@ Deno.serve(async (req: Request) => {
 
   const apiKey = (Deno.env.get("ODDS_API_KEY") || "").trim();
   if (!apiKey) return reply({ error: "Odds API secret is not configured in Supabase" }, 503);
-  const sportKey = sport === "nfl" ? "americanfootball_nfl" : "americanfootball_ncaaf";
+  const sportKey = sport === "nfl" ? "americanfootball_nfl"
+    : sport === "ncaam" ? "basketball_ncaab"
+    : sport === "ncaaw" ? "basketball_wncaab"
+    : "americanfootball_ncaaf";
   const providerUrl = new URL(`https://api.the-odds-api.com/v4/sports/${sportKey}/scores`);
   providerUrl.searchParams.set("apiKey", apiKey); providerUrl.searchParams.set("daysFrom", String(Math.min(daysFrom, plan.daysFrom))); providerUrl.searchParams.set("dateFormat", "iso");
   const started = Date.now();

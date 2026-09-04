@@ -49,7 +49,8 @@ assert.match(api, /foundryMode \? "process_foundry_week" : "score_league_week_at
 
 assert.match(scores, /if \(!authorization\.startsWith\("Bearer "\)\)/);
 assert.match(scores, /League membership required/);
-assert.match(scores, /if \(!membership \|\| !user\?\.id\)/);
+assert.match(scores, /if \(!membership \|\| !user\?\.id \|\| league\?\.sport_id !== sport\)/);
+assert.match(scores, /\["cfb", "nfl", "ncaam", "ncaaw"\]\.includes\(normalizedSport\)/);
 assert.match(scores, /claim_live_football_score_refresh/);
 assert.match(scores, /platform_odds_api_usage/);
 assert.match(scores, /cacheHit: true/);
@@ -64,7 +65,9 @@ assert.match(autonomous, /row\.homeTeam/);
 assert.doesNotMatch(autonomous, /row\.home_team/);
 assert.match(autonomous, /isScheduleEligible/);
 assert.match(autonomous, /SCORE_LOOKAHEAD_MS/);
-assert.match(autonomous, /starts\.length!==5/);
+assert.match(autonomous, /const cardSize=\(sport:string\)=>\["ncaam","ncaaw"\]\.includes\(sport\)\?10:5/);
+assert.match(autonomous, /starts\.length!==cardSize\(sportForCard\(card\)\)/);
+assert.match(autonomous, /sport==="ncaam"\?"basketball_ncaab":sport==="ncaaw"\?"basketball_wncaab"/);
 assert.doesNotMatch(autonomous, /\.gte\("published_at",cutoff\)/);
 assert.match(autonomous, /order\("published_at",\{ascending:false\}\)\.limit\(100\)/);
 

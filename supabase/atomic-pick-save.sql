@@ -23,6 +23,7 @@ declare
   v_existing_is_chaos boolean := false;
   v_authorizing_weapon boolean := false;
   v_game_count integer;
+  v_expected_count integer;
   v_payload_count integer;
   v_weapon_uses integer := 0;
   v_bad_weapon_picks integer := 0;
@@ -63,8 +64,9 @@ begin
   from public.card_games
   where week_card_id = v_card.id;
 
-  if v_game_count <> 5 then
-    raise exception 'Week card must contain exactly five games';
+  v_expected_count := case when lower(v_league.sport_id) in ('cbb','ncaam','ncaaw') then 10 else 5 end;
+  if v_game_count <> v_expected_count then
+    raise exception 'Week card must contain exactly % games', v_expected_count;
   end if;
   if v_first_kickoff is null then
     raise exception 'Week card kickoff time is missing';
@@ -134,7 +136,7 @@ begin
   end if;
 
   if coalesce(p_is_chaos, false) then
-    if lower(v_league.sport_id) not in ('cfb','nfl','cbb') then
+    if lower(v_league.sport_id) not in ('cfb','nfl','cbb','ncaam','ncaaw') then
       raise exception 'This regular-season weapon is not available in this sport';
     end if;
     if p_week_number > v_league.regular_season_weeks then
@@ -214,11 +216,14 @@ begin
       v_uid,p_league_id,v_league.name,lower(v_league.sport_id),extract(year from now())::integer,p_week_number,
       case
         when lower(v_league.sport_id)='nfl' then 'jdam'
-        when lower(v_league.sport_id)='cbb' then 'hellfire'
+        when lower(v_league.sport_id) in ('cbb','ncaam','ncaaw') then 'hellfire'
         else 'tactical_nuke'
       end,
       'regular_season','regular-weapon-'||p_league_id||'-'||v_uid||'-'||p_week_number,v_game_count,
-      jsonb_build_object('bonusPercent',50,'selectionMode','posted_favorites','penaltyPoints',0)
+      jsonb_build_object(
+        'bonusPercent', case when lower(v_league.sport_id) in ('cbb','ncaam','ncaaw') then 100 else 50 end,
+        'selectionMode','posted_favorites','penaltyPoints',0
+      )
     ) on conflict(source_event_id) do nothing;
   end if;
 

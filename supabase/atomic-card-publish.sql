@@ -1,4 +1,4 @@
--- Publish a complete five-game card atomically.
+-- Publish a complete sport-sized card atomically (five football, ten Fieldhouse).
 -- Once any player has a pick row, the card is immutable so republishing cannot
 -- cascade-delete pick_games or detach Best Bets.
 
@@ -19,6 +19,8 @@ as $$
 declare
   v_card_id uuid;
   v_game_count integer;
+  v_expected_count integer;
+  v_sport_id text;
   v_games jsonb;
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
@@ -31,23 +33,29 @@ begin
     raise exception 'Complete the weekly prop';
   end if;
   if p_prop_points < 0 or p_prop_points > 25 then raise exception 'Invalid prop points'; end if;
+  select lower(coalesce(sport_id, 'cfb')) into v_sport_id
+  from public.leagues where id = p_league_id;
+  if v_sport_id is null then raise exception 'League not found'; end if;
+  v_expected_count := case when v_sport_id in ('cbb', 'ncaam', 'ncaaw') then 10 else 5 end;
   if jsonb_typeof(p_games)<>'array' then raise exception 'Games payload must be an array'; end if;
   select count(*) into v_game_count from jsonb_array_elements(p_games);
-  if v_game_count<>5 then raise exception 'Select exactly five games'; end if;
+  if v_game_count<>v_expected_count then
+    raise exception 'Select exactly % games', v_expected_count;
+  end if;
 
   if exists (
     select 1 from jsonb_to_recordset(p_games) as g(
       sort_order integer, away_team text, home_team text, spread numeric,
       favorite text, start_time text, bookmaker text, away_rank integer, home_rank integer
     )
-    where g.sort_order is null or g.sort_order<0 or g.sort_order>4
+    where g.sort_order is null or g.sort_order<0 or g.sort_order>=v_expected_count
        or coalesce(btrim(g.away_team),'')='' or coalesce(btrim(g.home_team),'')=''
        or g.away_team=g.home_team or g.spread is null
        or mod(abs(g.spread), 1) <> 0.5
        or g.favorite is null or g.favorite not in ('home','away')
        or coalesce(btrim(g.start_time),'')=''
   ) then raise exception 'Every game needs valid teams, a half-point spread, favorite, and kickoff'; end if;
-  if (select count(distinct g.sort_order) from jsonb_to_recordset(p_games) as g(sort_order integer))<>5 then
+  if (select count(distinct g.sort_order) from jsonb_to_recordset(p_games) as g(sort_order integer))<>v_expected_count then
     raise exception 'Game order must be unique';
   end if;
   if exists (

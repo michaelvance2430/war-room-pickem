@@ -12,7 +12,8 @@ enum WeaponStrikeCatalog {
         switch sportId.lowercased() {
         case "cfb": names = ["nuke-football-1", "nuke-football-3"]
         case "nfl": names = ["nuke-football-2"]
-        case "cbb": names = ["hellfire-fieldhouse-1"]
+        case "cbb", "ncaam": names = ["hellfire-fieldhouse-1"]
+        case "ncaaw": names = ["hellfire-fieldhouse-ncaaw-1"]
         default: names = []
         }
         return names.randomElement().map { StrikePresentation(resourceName: $0) }

@@ -209,6 +209,8 @@ struct FieldhouseAuthenticatedSnapshot {
     let crystalBall: CrystalBallPick?
     var latestScorecard: RegularSeasonScorecard? = nil
     var standings: [Standing] = []
+    var scoringCard: WeekCard? = nil
+    var scoringPick: PlayerPick? = nil
 }
 
 private struct FieldhouseRepositoryError: LocalizedError {
@@ -264,6 +266,13 @@ enum FieldhouseAuthenticatedRepository {
             userId: userID
         )
         async let standings = SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
+        let scoringWeek = membership.leagues.currentWeek - 1
+        async let scoringCard: WeekCard? = scoringWeek > 0
+            ? SupabaseAPI.weekCard(token: token, leagueId: membership.leagueId, weekNumber: scoringWeek)
+            : nil
+        async let scoringPick: PlayerPick? = scoringWeek > 0
+            ? SupabaseAPI.playerPick(token: token, leagueId: membership.leagueId, userId: userID, weekNumber: scoringWeek)
+            : nil
 
         let loadedScorecards = try await scorecards
         return try await FieldhouseAuthenticatedSnapshot(
@@ -273,7 +282,9 @@ enum FieldhouseAuthenticatedRepository {
             favoriteTeam: favorite,
             crystalBall: crystal,
             latestScorecard: loadedScorecards.first,
-            standings: standings
+            standings: standings,
+            scoringCard: scoringCard,
+            scoringPick: scoringPick
         )
     }
 
@@ -308,7 +319,7 @@ enum FieldhouseAuthenticatedRepository {
         return try await SupabaseAPI.saveWeekPicks(
             token: token,
             leagueId: membership.leagueId,
-            weekNumber: membership.leagues.currentWeek,
+            weekNumber: state.window,
             picks: plan.picks,
             bestBetGameId: plan.bestBetGameID,
             propChoice: plan.propChoice,
@@ -325,7 +336,7 @@ enum FieldhouseAuthenticatedRepository {
         try await SupabaseAPI.publishWeekCard(
             token: token,
             leagueId: membership.leagueId,
-            weekNumber: membership.leagues.currentWeek,
+            weekNumber: state.window,
             games: plan.games,
             propQuestion: plan.prop.question,
             propA: "YES",
@@ -770,6 +781,36 @@ struct FieldhouseGame: Identifiable, Equatable, Codable {
 }
 
 extension FieldhouseGame {
+    init?(oddsGame: OddsGame, window: Int) {
+        guard let rawTip = oddsGame.commenceTime,
+              let tipDate = footballKickoffDate(rawTip),
+              ["home", "away"].contains(oddsGame.favorite.lowercased()) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = FieldhouseSeasonCalendar.eastern
+        let windowStart = FieldhouseSeasonCalendar.start(of: window)
+        let dayOffset = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: windowStart),
+            to: calendar.startOfDay(for: tipDate)
+        ).day ?? -1
+        guard (0...6).contains(dayOffset) else { return nil }
+        let favorite = oddsGame.favorite.lowercased() == "away" ? oddsGame.awayTeam : oddsGame.homeTeam
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = FieldhouseSeasonCalendar.eastern
+        formatter.dateFormat = "EEE · h:mm a"
+        self.init(
+            id: oddsGame.id,
+            away: oddsGame.awayTeam,
+            home: oddsGame.homeTeam,
+            spread: "\(favorite) \((-abs(oddsGame.spread)).formatted(.number.precision(.fractionLength(1))))",
+            tip: formatter.string(from: tipDate).uppercased(),
+            dayOffset: dayOffset,
+            tipHour: calendar.component(.hour, from: tipDate),
+            tipMinute: calendar.component(.minute, from: tipDate)
+        )
+    }
+
     init(cardGame: CardGame, window: Int) {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = FieldhouseSeasonCalendar.eastern
@@ -1271,7 +1312,8 @@ enum FieldhouseStateHydrator {
             state.championshipTrophyID = trophyID
         }
 
-        if let scorecard = snapshot.latestScorecard {
+        if let scorecard = snapshot.latestScorecard,
+           snapshot.scoringCard == nil || snapshot.scoringCard?.weekNumber == scorecard.weekNumber {
             let orderedScoringGames = scorecard.card.cardGames.sorted { $0.sortOrder < $1.sortOrder }
             state.scoringWindow = scorecard.weekNumber
             state.scoringGames = orderedScoringGames.map { FieldhouseGame(cardGame: $0, window: scorecard.weekNumber) }
@@ -1302,6 +1344,24 @@ enum FieldhouseStateHydrator {
             state.scoringUsedHellfire = scorecard.pick.isChaos
             state.lastCertifiedWindow = scorecard.weekNumber
             state.lastCertifiedPoints = scorecard.totalPoints
+        } else if let scoringCard = snapshot.scoringCard, let scoringPick = snapshot.scoringPick {
+            let orderedScoringGames = scoringCard.cardGames.sorted { $0.sortOrder < $1.sortOrder }
+            state.scoringWindow = scoringCard.weekNumber
+            state.scoringGames = orderedScoringGames.map { FieldhouseGame(cardGame: $0, window: scoringCard.weekNumber) }
+            state.scoringResults = [:]
+            let scoringIndex = Dictionary(uniqueKeysWithValues: orderedScoringGames.enumerated().map { ($0.element.id, $0.offset) })
+            state.scoringSelections = Dictionary(uniqueKeysWithValues: scoringPick.pickGames.compactMap { picked in
+                guard let index = scoringIndex[picked.cardGameId] else { return nil }
+                let game = orderedScoringGames[index]
+                return (index, picked.side == "home" ? game.homeTeam : game.awayTeam)
+            })
+            state.scoringConfidences = Dictionary(uniqueKeysWithValues: scoringPick.pickGames.compactMap { picked in
+                scoringIndex[picked.cardGameId].map { ($0, picked.confidence) }
+            })
+            state.scoringBestBetGame = scoringPick.pickGames.first(where: \.isBestBet).flatMap { scoringIndex[$0.cardGameId] }
+            state.scoringProp = FieldhousePropKind.allCases.first(where: { $0.question == scoringCard.propQuestion }) ?? .teamScores90
+            state.scoringPropAnswer = scoringPick.propChoice ?? ""
+            state.scoringUsedHellfire = scoringPick.isChaos
         }
 
         guard let card = snapshot.card else {
@@ -1386,6 +1446,7 @@ struct FieldhouseStateStore: FieldhouseStatePersisting {
 }
 
 struct FieldhouseNativePreviewView: View {
+    @EnvironmentObject private var auth: AuthStore
     private var accent: Color { FieldhouseTheme.accent(for: state.league) }
     @State private var desk: FieldhouseDesk = .home
     @State private var state: FieldhouseSeasonState
@@ -1550,11 +1611,82 @@ struct FieldhouseNativePreviewView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { refreshLifecycle(at: Date()) }
         }
+        .task(id: liveContext?.membership.leagueId) {
+            guard liveContext != nil else { return }
+            while !Task.isCancelled {
+                await refreshAuthenticatedScoring()
+                try? await Task.sleep(for: .seconds(60))
+            }
+        }
     }
 
     private func refreshLifecycle(at date: Date) {
         state.enforcePickDeadline(at: date)
         _ = state.advanceToNextWindow(at: date)
+    }
+
+    @MainActor private func refreshAuthenticatedScoring() async {
+        guard let liveContext else { return }
+        do {
+            let token = try await auth.validAccessToken()
+            let feed = try await SupabaseAPI.footballScores(
+                token: token,
+                leagueId: liveContext.membership.leagueId,
+                sportId: liveContext.membership.leagues.sportId,
+                daysFrom: 3
+            )
+            var refreshed: [String: FieldhouseGameResult] = [:]
+            for game in state.scoringGames {
+                guard let event = feed.events.first(where: {
+                    normalizedFieldhouseTeam($0.homeTeam) == normalizedFieldhouseTeam(game.home)
+                        && normalizedFieldhouseTeam($0.awayTeam) == normalizedFieldhouseTeam(game.away)
+                }),
+                let home = fieldhouseScoreValue(game.home, event: event),
+                let away = fieldhouseScoreValue(game.away, event: event) else { continue }
+                refreshed[game.id] = FieldhouseGameResult(
+                    gameID: game.id,
+                    awayScore: away,
+                    homeScore: home,
+                    phase: event.completed ? .final : .live(period: "LIVE")
+                )
+            }
+            state.scoringResults.merge(refreshed) { _, new in new }
+
+            let verified = try await FieldhouseAuthenticatedRepository.load(
+                token: token,
+                userID: liveContext.userID,
+                preferredLeagueID: liveContext.membership.leagueId
+            )
+            if let certified = verified.latestScorecard, certified.weekNumber >= state.scoringWindow {
+                let hydrated = FieldhouseStateHydrator.hydrate(snapshot: verified, userID: liveContext.userID, cached: state)
+                state.scoringWindow = hydrated.scoringWindow
+                state.scoringGames = hydrated.scoringGames
+                state.scoringResults = hydrated.scoringResults
+                state.scoringSelections = hydrated.scoringSelections
+                state.scoringConfidences = hydrated.scoringConfidences
+                state.scoringBestBetGame = hydrated.scoringBestBetGame
+                state.scoringProp = hydrated.scoringProp
+                state.scoringPropAnswer = hydrated.scoringPropAnswer
+                state.scoringUsedHellfire = hydrated.scoringUsedHellfire
+                state.lastCertifiedWindow = hydrated.lastCertifiedWindow
+                state.lastCertifiedPoints = hydrated.lastCertifiedPoints
+                standings = verified.standings
+            }
+            refreshLifecycle(at: Date())
+        } catch {
+            // Keep the last trustworthy board and retry on the next tick.
+        }
+    }
+
+    private func normalizedFieldhouseTeam(_ value: String) -> String {
+        value.lowercased().unicodeScalars
+            .map { CharacterSet.alphanumerics.contains($0) ? Character(String($0)) : " " }
+            .reduce(into: "") { $0.append($1) }
+            .split(separator: " ").joined(separator: " ")
+    }
+
+    private func fieldhouseScoreValue(_ team: String, event: FootballScoreEvent) -> Int? {
+        event.scores.first(where: { normalizedFieldhouseTeam($0.name) == normalizedFieldhouseTeam(team) }).flatMap { Int($0.score) }
     }
 
     private func persist(_ event: FieldhousePersistenceEvent) {
@@ -2042,15 +2174,19 @@ private struct FieldhouseCommissionerCommand: View {
 }
 
 private struct FieldhouseCardBuilder: View {
+    @EnvironmentObject private var auth: AuthStore
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     let window: Int
     let publish: ([FieldhouseGame], FieldhousePropKind) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var oddsLoaded = false
+    @State private var loadingOdds = false
+    @State private var oddsError: String?
+    @State private var loadedGames: [FieldhouseGame] = []
     @State private var selectedIDs: Set<String> = []
     @State private var selectedProp: FieldhousePropKind?
-    private var availableGames: [FieldhouseGame] { FieldhouseGameCatalog.games(for: themedLeague) }
+    private var availableGames: [FieldhouseGame] { loadedGames }
     private var selectedGames: [FieldhouseGame] { availableGames.filter { selectedIDs.contains($0.id) } }
     private let cardSize = FieldhouseGameCatalog.weeklyCardSize
     private var ready: Bool { selectedGames.count == cardSize && selectedProp != nil }
@@ -2064,9 +2200,7 @@ private struct FieldhouseCardBuilder: View {
                         Text("BUILD THE CARD").font(.system(size: 36, weight: .black)).fontWidth(.condensed)
                         Text("Pull the Division I board for this Monday–Sunday window, select exactly ten games, confirm the spreads, then choose an automatically scored three-point floor prop.")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
-                        Button {
-                            oddsLoaded = true
-                        } label: {
+                        Button { Task { await pullOdds() } } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: oddsLoaded ? "checkmark.circle.fill" : "arrow.down.circle.fill")
                                     .font(.title2.weight(.black))
@@ -2076,7 +2210,8 @@ private struct FieldhouseCardBuilder: View {
                                         .font(.caption.weight(.bold)).opacity(0.72)
                                 }
                                 Spacer()
-                                if oddsLoaded { Text("READY").font(.caption2.weight(.black)) }
+                                if loadingOdds { ProgressView().tint(.black) }
+                                else if oddsLoaded { Text("READY").font(.caption2.weight(.black)) }
                             }
                             .frame(maxWidth: .infinity).padding(16)
                             .foregroundStyle(oddsLoaded ? Color.green : Color.black)
@@ -2084,7 +2219,12 @@ private struct FieldhouseCardBuilder: View {
                             .overlay(RoundedRectangle(cornerRadius: 15).stroke(oddsLoaded ? Color.green.opacity(0.55) : accent))
                         }
                         .buttonStyle(.plain)
-                        .disabled(oddsLoaded)
+                        .disabled(oddsLoaded || loadingOdds)
+
+                        if let oddsError {
+                            Label(oddsError, systemImage: "exclamationmark.triangle.fill")
+                                .font(.footnote.weight(.bold)).foregroundStyle(.red)
+                        }
 
                         if oddsLoaded {
                             ForEach(availableGames) { game in
@@ -2139,6 +2279,37 @@ private struct FieldhouseCardBuilder: View {
             }.navigationTitle("Commissioner Command").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("CANCEL") { dismiss() }.font(.caption.weight(.black)) } }
         }.preferredColorScheme(.dark)
+    }
+
+    @MainActor private func pullOdds() async {
+        oddsError = nil
+        loadingOdds = true
+        defer { loadingOdds = false }
+
+        // The isolated preview has no authenticated league. It intentionally
+        // uses fixtures so UI review never spends provider credits.
+        guard auth.user != nil, let leagueID = auth.selectedLeagueId else {
+            loadedGames = FieldhouseGameCatalog.games(for: themedLeague)
+            oddsLoaded = true
+            return
+        }
+        do {
+            let token = try await auth.validAccessToken()
+            let feed = try await SupabaseAPI.fieldhouseOdds(
+                token: token,
+                leagueId: leagueID,
+                sportId: themedLeague.favoriteSportID,
+                window: window
+            )
+            let games = feed.games.compactMap { FieldhouseGame(oddsGame: $0, window: window) }
+            guard games.count >= cardSize else {
+                throw FieldhouseRepositoryError(message: "Only \(games.count) eligible spread games are posted for this week. Try again when sportsbooks publish more lines.")
+            }
+            loadedGames = games
+            oddsLoaded = true
+        } catch {
+            oddsError = error.localizedDescription
+        }
     }
 
     private var cardSelectionProgress: some View {
@@ -2207,34 +2378,115 @@ private struct FieldhouseHomeButton: View {
 }
 
 private struct FieldhouseLeagueSwitcher: View {
+    @EnvironmentObject private var auth: AuthStore
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var league: FieldhouseLeague
     let dismiss: () -> Void
+    @State private var memberships: [LeagueMembership] = []
+    @State private var loading = true
+    @State private var loadError: String?
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 10) {
-                ForEach([("CFB", "football.fill", "Saturday Situation Room"), ("NFL", "football.fill", "Sunday War Room")], id: \.0) { sport, icon, title in
-                    Button(action: dismiss) {
-                        HStack {
-                            Image(systemName: icon).foregroundStyle(.green).frame(width: 30)
-                            VStack(alignment: .leading) { Text(sport).font(.caption.weight(.black)); Text(title).font(.headline.weight(.black)) }
-                            Spacer(); Image(systemName: "chevron.right")
-                        }.padding(14).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
-                    }.buttonStyle(.plain)
-                }
-                ForEach(FieldhouseLeague.allCases) { option in
-                    Button { league = option; dismiss() } label: {
-                        HStack {
-                            Image(systemName: "basketball.fill").foregroundStyle(accent).frame(width: 30)
-                            VStack(alignment: .leading) { Text(option.rawValue).font(.caption.weight(.black)); Text(option.displayName).font(.headline.weight(.black)) }
-                            Spacer(); Image(systemName: league == option ? "checkmark.circle.fill" : "chevron.right")
-                        }.padding(14).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
-                    }.buttonStyle(.plain)
+            ScrollView {
+                VStack(spacing: 10) {
+                    if loading {
+                        ProgressView("Loading your leagues…").tint(accent).padding(28)
+                    } else if auth.user == nil {
+                        previewLeagueChoices
+                    } else if memberships.isEmpty {
+                        ContentUnavailableView("No leagues found", systemImage: "person.3.fill", description: Text(loadError ?? "Join or create a league from The Muster."))
+                    } else {
+                        ForEach(sportIDs, id: \.self) { sportID in
+                            sectionLabel(sportID)
+                            ForEach(memberships.filter { $0.leagues.sportId.lowercased() == sportID }) { membership in
+                                membershipButton(membership)
+                            }
+                        }
+                    }
+                }.padding()
+            }
+            .navigationTitle("Switch League")
+            .navigationBarTitleDisplayMode(.inline)
+            .task { await loadMemberships() }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var previewLeagueChoices: some View {
+        ForEach(FieldhouseLeague.allCases) { option in
+            Button { league = option; dismiss() } label: {
+                HStack {
+                    Image(systemName: "basketball.fill").foregroundStyle(FieldhouseTheme.accent(for: option)).frame(width: 30)
+                    VStack(alignment: .leading) {
+                        Text(option.rawValue).font(.caption.weight(.black))
+                        Text(option.displayName).font(.headline.weight(.black))
+                    }
+                    Spacer()
+                    Image(systemName: league == option ? "checkmark.circle.fill" : "chevron.right")
+                }.padding(14).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+            }.buttonStyle(.plain)
+        }
+    }
+
+    private var sportIDs: [String] {
+        let ids = Set(memberships.map { $0.leagues.sportId.lowercased() })
+        let preferred = ["cfb", "nfl", "ncaam", "ncaaw", "cbb"]
+        return preferred.filter(ids.contains) + ids.filter { !preferred.contains($0) }.sorted()
+    }
+
+    private func sectionLabel(_ sportID: String) -> some View {
+        Text(sportTitle(sportID))
+            .font(.system(size: 10, weight: .black)).tracking(1.8)
+            .foregroundStyle(SportIdentity(sportID).accent)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 8)
+    }
+
+    private func membershipButton(_ membership: LeagueMembership) -> some View {
+        let selected = auth.selectedLeagueId == membership.leagueId
+        let identity = SportIdentity(membership.leagues.sportId)
+        return Button {
+            auth.selectLeague(membership.leagueId)
+            dismiss()
+        } label: {
+            HStack {
+                Image(systemName: identity.isFieldhouse ? "basketball.fill" : "football.fill")
+                    .foregroundStyle(identity.accent).frame(width: 30)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(membership.leagues.name).font(.headline.weight(.black))
+                    Text("\(sportTitle(identity.sportId)) · WEEK \(membership.leagues.currentWeek)")
+                        .font(.caption2.weight(.black)).foregroundStyle(.white.opacity(0.48))
                 }
                 Spacer()
-            }.padding().navigationTitle("Switch League").navigationBarTitleDisplayMode(.inline)
-        }.preferredColorScheme(.dark)
+                Image(systemName: selected ? "checkmark.circle.fill" : "chevron.right")
+                    .foregroundStyle(selected ? identity.accent : .white.opacity(0.55))
+            }
+            .padding(14)
+            .background(.white.opacity(selected ? 0.10 : 0.06), in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(selected ? identity.accent.opacity(0.55) : .clear))
+        }.buttonStyle(.plain)
+    }
+
+    private func sportTitle(_ sportID: String) -> String {
+        switch sportID {
+        case "ncaam": "FIELDHOUSE · NCAAM"
+        case "ncaaw": "FIELDHOUSE · NCAAW"
+        case "cbb": "FIELDHOUSE · LEGACY"
+        default: sportID.uppercased()
+        }
+    }
+
+    @MainActor private func loadMemberships() async {
+        guard let user = auth.user else { loading = false; return }
+        do {
+            let token = try await auth.validAccessToken()
+            memberships = try await SupabaseAPI.leagueMemberships(token: token, userId: user.id)
+        } catch {
+            loadError = error.localizedDescription
+        }
+        loading = false
     }
 }
 

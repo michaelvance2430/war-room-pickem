@@ -811,12 +811,14 @@ struct CreateLeagueView: View {
                     }.createLeaguePanel()
 
                     VStack(alignment: .leading, spacing: 11) {
-                        createLabel("FOOTBALL DESK")
+                        createLabel("SPORT DESK")
                         Picker("Sport", selection: $sportId) {
                             Text("CFB · SATURDAY").tag("cfb")
                             Text("NFL · SUNDAY").tag("nfl")
-                        }.pickerStyle(.segmented)
-                        Text(sportId == "nfl" ? "Starts at NFL Week 1. No preseason." : "Starts at the CFB opening week.")
+                            Text("FIELDHOUSE · NCAAM").tag("ncaam")
+                            Text("FIELDHOUSE · NCAAW").tag("ncaaw")
+                        }.pickerStyle(.menu).tint(SportIdentity(sportId).accent)
+                        Text(sportDetail)
                             .font(.caption).foregroundStyle(.white.opacity(0.45))
                     }.createLeaguePanel()
 
@@ -861,6 +863,14 @@ struct CreateLeagueView: View {
     }
 
     private var canCreate: Bool { !cleanName.isEmpty && cleanName.count <= 80 }
+    private var sportDetail: String {
+        switch sportId {
+        case "nfl": return "Starts at NFL Week 1. No preseason."
+        case "ncaam": return "Men’s Division I basketball · ten-game Monday–Sunday cards."
+        case "ncaaw": return "Women’s Division I basketball · ten-game Monday–Sunday cards."
+        default: return "Starts at the CFB opening week."
+        }
+    }
     private func createLabel(_ text: String) -> some View {
         Text(text).font(.system(size: 8, weight: .black)).tracking(1.6).foregroundStyle(.green)
     }

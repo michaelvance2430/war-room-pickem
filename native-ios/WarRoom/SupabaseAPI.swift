@@ -1543,6 +1543,25 @@ enum SupabaseAPI {
         return try await send(request, as: OddsFeed.self)
     }
 
+    static func fieldhouseOdds(token: String, leagueId: UUID, sportId: String, window: Int) async throws -> OddsFeed {
+        let start = FieldhouseSeasonCalendar.start(of: window)
+        let end = Calendar(identifier: .gregorian).date(byAdding: .day, value: 7, to: start)!
+        let formatter = ISO8601DateFormatter()
+        var request = URLRequest(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/fieldhouse-odds"))
+        request.httpMethod = "POST"
+        request.setValue(SupabaseConfiguration.publishableKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "leagueId": leagueId.uuidString.lowercased(),
+            "sport": sportId.lowercased(),
+            "window": window,
+            "commenceTimeFrom": formatter.string(from: start),
+            "commenceTimeTo": formatter.string(from: end),
+        ])
+        return try await send(request, as: OddsFeed.self)
+    }
+
     static func footballScores(token: String, leagueId: UUID, sportId: String, daysFrom: Int = 3) async throws -> FootballScoreFeed {
         var request = URLRequest(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/football-scores"))
         request.httpMethod = "POST"
@@ -1551,7 +1570,7 @@ enum SupabaseAPI {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "leagueId": leagueId.uuidString.lowercased(),
-            "sport": sportId.lowercased() == "nfl" ? "nfl" : "cfb",
+            "sport": ["nfl", "ncaam", "ncaaw"].contains(sportId.lowercased()) ? sportId.lowercased() : "cfb",
             "daysFrom": min(3, max(1, daysFrom)),
         ])
         return try await send(request, as: FootballScoreFeed.self)

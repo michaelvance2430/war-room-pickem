@@ -104,8 +104,8 @@ struct SportIdentity {
         if isFieldhouse { return Color(red: 1.0, green: 0.32, blue: 0.08) }
         return isNFL ? .blue : .green
     }
-    var gameDay: String { isNFL ? "SUNDAY" : "SATURDAY" }
-    var openingWeek: Int { isNFL ? 1 : 0 }
+    var gameDay: String { isFieldhouse ? "MONDAY–SUNDAY" : (isNFL ? "SUNDAY" : "SATURDAY") }
+    var openingWeek: Int { isFieldhouse || isNFL ? 1 : 0 }
 
     var boardKicker: String { isNFL ? "SUNDAY INTELLIGENCE" : "DECLASSIFIED" }
     var boardTitle: String { isNFL ? "THE SUNDAY BOARD" : "THE BOARD" }
@@ -126,7 +126,7 @@ struct SportIdentity {
             case "west": return "NFC WEST"
             default: return "AFC EAST"
             }
-        case "cbb":
+        case "cbb", "ncaam", "ncaaw":
             switch stored {
             case "south": return "SOUTH"
             case "east": return "EAST"
