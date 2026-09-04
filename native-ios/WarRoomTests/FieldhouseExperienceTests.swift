@@ -2,6 +2,16 @@ import XCTest
 @testable import WarRoom
 
 final class FieldhouseExperienceTests: XCTestCase {
+    func testFieldhouseLiveRouteRecognizesBothBasketballLeaguesButRemainsDark() {
+        XCTAssertTrue(FieldhouseReleaseGate.supports(sportID: "ncaam"))
+        XCTAssertTrue(FieldhouseReleaseGate.supports(sportID: "NCAAW"))
+        XCTAssertTrue(FieldhouseReleaseGate.supports(sportID: "cbb"))
+        XCTAssertFalse(FieldhouseReleaseGate.supports(sportID: "cfb"))
+        XCTAssertFalse(FieldhouseReleaseGate.supports(sportID: "nfl"))
+        XCTAssertFalse(FieldhouseReleaseGate.shouldRoute(sportID: "ncaam"))
+        XCTAssertFalse(FieldhouseReleaseGate.shouldRoute(sportID: "ncaaw"))
+    }
+
     func testAuthenticatedSnapshotHydratesTheCorrectLeagueCardAndPlayerChoices() throws {
         let userID = UUID()
         let leagueID = UUID()

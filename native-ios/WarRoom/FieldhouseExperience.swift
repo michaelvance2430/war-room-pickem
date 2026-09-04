@@ -306,6 +306,83 @@ enum FieldhouseAuthenticatedRepository {
     }
 }
 
+enum FieldhouseReleaseGate {
+    // Keep the live route dark until authenticated writes, scoring, and the
+    // complete NCAAM/NCAAW release checklist have all passed.
+    static let isEnabled = false
+
+    static func supports(sportID: String) -> Bool {
+        ["cbb", "ncaam", "ncaaw"].contains(sportID.lowercased())
+    }
+
+    static func shouldRoute(sportID: String) -> Bool {
+        isEnabled && supports(sportID: sportID)
+    }
+}
+
+struct FieldhouseAuthenticatedContainer: View {
+    @EnvironmentObject private var auth: AuthStore
+    @State private var phase: Phase = .loading
+
+    private enum Phase {
+        case loading
+        case ready(FieldhouseSeasonState, FieldhouseStateScope)
+        case failed(String)
+    }
+
+    var body: some View {
+        Group {
+            switch phase {
+            case .loading:
+                ZStack {
+                    FieldhouseBackdrop().ignoresSafeArea()
+                    ProgressView("Opening the Fieldhouse…")
+                        .tint(.orange)
+                }
+            case .ready(let state, let scope):
+                FieldhouseNativePreviewView(authenticatedState: state, scope: scope)
+            case .failed(let message):
+                ZStack {
+                    FieldhouseBackdrop().ignoresSafeArea()
+                    ContentUnavailableView {
+                        Label("Can’t open the Fieldhouse", systemImage: "basketball.fill")
+                    } description: {
+                        Text(message)
+                    } actions: {
+                        Button("TRY AGAIN") { Task { await load() } }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.orange)
+                    }
+                }
+            }
+        }
+        .task(id: "\(auth.user?.id.uuidString ?? "signed-out")|\(auth.selectedLeagueId?.uuidString ?? "none")") {
+            await load()
+        }
+    }
+
+    @MainActor private func load() async {
+        guard let user = auth.user else { return }
+        phase = .loading
+        do {
+            let token = try await auth.validAccessToken()
+            let snapshot = try await FieldhouseAuthenticatedRepository.load(
+                token: token,
+                userID: user.id,
+                preferredLeagueID: auth.selectedLeagueId
+            )
+            let scope = FieldhouseStateScope(userID: user.id, leagueID: snapshot.membership.leagueId)
+            let cached = FieldhouseStateStore().load(scope: scope)
+            phase = .ready(
+                FieldhouseStateHydrator.hydrate(snapshot: snapshot, userID: user.id, cached: cached),
+                scope
+            )
+        } catch {
+            phase = .failed(error.localizedDescription)
+        }
+    }
+}
+
 struct FieldhousePickWritePlan {
     let picks: [PickSubmission]
     let bestBetGameID: UUID
@@ -1144,8 +1221,10 @@ struct FieldhouseNativePreviewView: View {
     @Environment(\.scenePhase) private var scenePhase
     private let stateStore = FieldhouseStateStore()
     private let initialLeague: FieldhouseLeague
+    private let authenticatedState: FieldhouseSeasonState?
+    private let authenticatedScope: FieldhouseStateScope?
     private var stateScope: FieldhouseStateScope {
-        FieldhouseStateScope(
+        authenticatedScope ?? FieldhouseStateScope(
             userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,
             leagueID: FieldhousePreviewIdentity.leagueID(for: state.league)
         )
@@ -1153,6 +1232,8 @@ struct FieldhouseNativePreviewView: View {
 
     init(initialLeague: FieldhouseLeague = .activeBuild) {
         self.initialLeague = initialLeague
+        self.authenticatedState = nil
+        self.authenticatedScope = nil
         let initialState = Self.makePreviewState(for: initialLeague)
         let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
         let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
@@ -1164,6 +1245,16 @@ struct FieldhouseNativePreviewView: View {
         _desk = State(initialValue: reviewBracket ? .standings : (reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home))))
         _strikePresentation = State(initialValue: reviewHellfire ? StrikePresentation(resourceName: initialLeague == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1") : nil)
         _showingEntrance = State(initialValue: !reviewMode)
+    }
+
+    init(authenticatedState: FieldhouseSeasonState, scope: FieldhouseStateScope) {
+        self.initialLeague = authenticatedState.league
+        self.authenticatedState = authenticatedState
+        self.authenticatedScope = scope
+        _state = State(initialValue: authenticatedState)
+        _desk = State(initialValue: .home)
+        _strikePresentation = State(initialValue: nil)
+        _showingEntrance = State(initialValue: true)
     }
 
     private static func makePreviewState(for league: FieldhouseLeague) -> FieldhouseSeasonState {
@@ -1244,6 +1335,11 @@ struct FieldhouseNativePreviewView: View {
             FieldhouseSeasonSetupView(state: $state) { showingSetup = false }
         }
         .onAppear {
+            if let authenticatedState {
+                state = authenticatedState
+                refreshLifecycle(at: Date())
+                return
+            }
             let initialState = Self.makePreviewState(for: initialLeague)
             let initialScope = FieldhouseStateScope(
                 userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,

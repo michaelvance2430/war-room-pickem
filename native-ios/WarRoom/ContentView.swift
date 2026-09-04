@@ -184,6 +184,16 @@ struct ContentView: View {
     }
 
     var body: some View {
+        Group {
+            if FieldhouseReleaseGate.shouldRoute(sportID: activeSportId) {
+                FieldhouseAuthenticatedContainer()
+            } else {
+                standardFootballExperience
+            }
+        }
+    }
+
+    private var standardFootballExperience: some View {
         ZStack {
             VStack(spacing: 0) {
                 if let status = platformStatus, status.incidentActive {
@@ -323,7 +333,7 @@ struct ContentView: View {
         guard let token = auth.token, let user = auth.user,
               let active = try? await SupabaseAPI.activeLeague(token: token, userId: user.id, preferredLeagueId: auth.selectedLeagueId)
         else { return }
-        activeSportId = active.leagues.sportId.lowercased() == "nfl" ? "nfl" : "cfb"
+        activeSportId = active.leagues.sportId.lowercased()
         guard !suppressOpeningForLaunch else { return }
         let openingKey = [
             "warroom", "opening", "seen",
