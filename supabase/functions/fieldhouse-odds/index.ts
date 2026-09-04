@@ -3,6 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const headers = { "Content-Type": "application/json", "Cache-Control": "no-store" };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const numericHeader = (value: string | null) => value == null || value === "" ? null : Number(value);
+const isHalfPointSpread = (value: number) => Math.abs((Math.abs(value) % 1) - 0.5) < 0.0001;
 const defaultKey = (jsonName: string, legacyName: string) => {
   try {
     const value = JSON.parse(Deno.env.get(jsonName) || "{}").default;
@@ -85,7 +86,9 @@ Deno.serve(async (req: Request) => {
       const away = market?.outcomes?.find((item: any) => item.name === game.away_team);
       if (home?.point == null && away?.point == null) continue;
       const homeSpread = Number(home?.point ?? -(away?.point ?? 0));
-      if (!Number.isFinite(homeSpread) || homeSpread === 0) continue;
+      // Fieldhouse has no push state. Only a real sportsbook half-point line
+      // can enter a card; do not invent a hook or silently alter the market.
+      if (!Number.isFinite(homeSpread) || !isHalfPointSpread(homeSpread)) continue;
       return [{
         id: String(game.id), awayTeam: String(game.away_team), homeTeam: String(game.home_team),
         spread: homeSpread, favorite: homeSpread < 0 ? "home" : "away",

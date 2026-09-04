@@ -3,7 +3,12 @@ import { readFileSync } from "node:fs";
 
 const sql = readFileSync(new URL("../supabase/fieldhouse-postseason-build21-REVIEW-ONLY.sql", import.meta.url), "utf8");
 const schema = readFileSync(new URL("../supabase/fieldhouse-build21-schema-REVIEW-ONLY.sql", import.meta.url), "utf8");
+const liveStandings = readFileSync(new URL("../supabase/fieldhouse-live-standings-build21-REVIEW-ONLY.sql", import.meta.url), "utf8");
 const worker = readFileSync(new URL("../supabase/functions/fieldhouse-tournament-results/index.ts", import.meta.url), "utf8");
+const weeklyWorker = readFileSync(new URL("../supabase/functions/autonomous-football-results/index.ts", import.meta.url), "utf8");
+const fieldhouseOdds = readFileSync(new URL("../supabase/functions/fieldhouse-odds/index.ts", import.meta.url), "utf8");
+const atomicScoring = readFileSync(new URL("../supabase/atomic-week-scoring.sql", import.meta.url), "utf8");
+const api = readFileSync(new URL("../native-ios/WarRoom/SupabaseAPI.swift", import.meta.url), "utf8");
 const client = readFileSync(new URL("../native-ios/WarRoom/FieldhouseExperience.swift", import.meta.url), "utf8");
 const content = readFileSync(new URL("../native-ios/WarRoom/ContentView.swift", import.meta.url), "utf8");
 
@@ -76,6 +81,34 @@ assert.match(worker, /tip <= now \+ 2 \* 60_000/);
 assert.match(worker, /tip >= now - 24 \* 60 \* 60_000/);
 assert.match(worker, /hasLiveWindow \? 50 : 900/);
 assert.match(worker, /official-tip-missing/);
+assert.match(liveStandings, /create or replace function public\.get_fieldhouse_live_board/);
+assert.match(liveStandings, /not in \('cbb', 'ncaam', 'ncaaw'\)/);
+assert.match(liveStandings, /nullif\(cg\.start_time, ''\)::timestamptz <= now\(\)/);
+assert.match(liveStandings, /coalesce\(p\.is_chaos, false\) as is_hellfire/);
+assert.match(liveStandings, /grant execute on function public\.get_fieldhouse_live_board\(uuid, integer\) to authenticated/);
+assert.match(api, /static func fieldhouseLiveBoard/);
+assert.match(client, /FieldhouseLiveStandingsEngine\.projectedTotals/);
+assert.match(client, /LIVE PROJECTION/);
+assert.match(client, /liveProjectionWeek != state\.scoringWindow/);
+assert.match(client, /resetLiveProjectionIfWeekChanged\(\)/);
+for (const phrase of [
+  "any team score 90 or more",
+  "any game finish within 3 points",
+  "any underdog win outright",
+  "any game reach 150 combined points",
+  "any team score 100 or more",
+  "both teams score 75 or more in any game",
+  "any game finish with a 20 point margin",
+  "at least three underdogs win outright",
+  "at least six favorites cover the spread",
+  "every game reach 130 combined points",
+]) assert.match(weeklyWorker, new RegExp(phrase));
+assert.match(fieldhouseOdds, /isHalfPointSpread/);
+assert.match(fieldhouseOdds, /do not invent a hook or silently alter the market/);
+assert.match(client, /FieldhouseSpreadRule\.isHalfPoint/);
+assert.match(weeklyWorker, /away_score:game\.awayScore,home_score:game\.homeScore/);
+assert.match(atomicScoring, /add column if not exists away_score integer/);
+assert.match(atomicScoring, /x\.away_score,\s*x\.home_score,\s*case when x\.away_score is not null then 'odds_api'/);
 assert.match(client, /TOURNAMENT SCORECARD · LIVE/);
 assert.match(client, /state\.postseasonPoints\(for: standing\.userId\)/);
 assert.match(client, /activeStandings\.map\(\\\.totalPoints\)/);

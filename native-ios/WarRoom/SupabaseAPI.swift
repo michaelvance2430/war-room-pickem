@@ -736,6 +736,24 @@ struct BoardPick: Decodable, Identifiable, Sendable {
     }
 }
 
+struct FieldhouseLiveBoardPick: Decodable, Identifiable, Sendable {
+    let id: UUID
+    let userId: UUID
+    let totalPoints: Int?
+    let propChoice: String?
+    let isHellfire: Bool
+    let pickGames: [PickedGame]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case totalPoints = "total_points"
+        case propChoice = "prop_choice"
+        case isHellfire = "is_hellfire"
+        case pickGames = "pick_games"
+    }
+}
+
 struct PlayerPick: Decodable, Identifiable, Sendable {
     let id: UUID
     let propChoice: String?
@@ -1249,6 +1267,17 @@ enum SupabaseAPI {
             "p_week_number": weekNumber
         ])
         return try await send(request, as: [BoardPick].self)
+    }
+
+    static func fieldhouseLiveBoard(token: String, leagueId: UUID, weekNumber: Int) async throws -> [FieldhouseLiveBoardPick] {
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/get_fieldhouse_live_board"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "p_league_id": leagueId.uuidString.lowercased(),
+            "p_week_number": weekNumber
+        ])
+        return try await send(request, as: [FieldhouseLiveBoardPick].self)
     }
 
     static func crystalBallPick(token: String, leagueId: UUID, userId: UUID) async throws -> CrystalBallPick? {

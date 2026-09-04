@@ -148,7 +148,7 @@ Deno.serve(async(request:Request)=>{
       }
       if(finals.length!==expected){waiting.push(`${card.league_id}:${card.week_number}:finals-${finals.length}`);continue;}
       const yes=settleAutomaticProp(card.prop_question||"",finals);if(yes==null){waiting.push(`${card.league_id}:${card.week_number}:unsupported-prop`);continue;}
-      const {data:receipt,error:scoreError}=await db.rpc("score_league_week_atomic",{p_league_id:card.league_id,p_week_number:card.week_number,p_results:finals.map((game)=>({game_id:game.id,winner:game.ats})),p_prop_result:yes?card.prop_option_a:card.prop_option_b});
+      const {data:receipt,error:scoreError}=await db.rpc("score_league_week_atomic",{p_league_id:card.league_id,p_week_number:card.week_number,p_results:finals.map((game)=>({game_id:game.id,winner:game.ats,away_score:game.awayScore,home_score:game.homeScore})),p_prop_result:yes?card.prop_option_a:card.prop_option_b});
       if(scoreError||!receipt?.ok){waiting.push(`${card.league_id}:${card.week_number}:score-error:${scoreError?.message||"no-receipt"}`);continue;}scoredCount+=1;
     }
     return Response.json({ok:true,inspected:pending.length,scored:scoredCount,waiting});

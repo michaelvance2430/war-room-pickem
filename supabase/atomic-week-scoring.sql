@@ -1,6 +1,12 @@
 -- Score a complete weekly card and rebuild league standings in one transaction.
 -- Client-side scoring remains presentation-only; this function is authoritative.
 
+alter table public.game_results
+  add column if not exists away_score integer,
+  add column if not exists home_score integer,
+  add column if not exists score_source text,
+  add column if not exists finalized_at timestamptz;
+
 create or replace function public.score_league_week_atomic(
   p_league_id uuid,
   p_week_number integer,
@@ -65,14 +71,23 @@ begin
   end if;
 
   with supplied as (
-    select game_id, winner
-    from jsonb_to_recordset(p_results) as x(game_id uuid, winner text)
+    select game_id, winner, away_score, home_score
+    from jsonb_to_recordset(p_results) as x(
+      game_id uuid,
+      winner text,
+      away_score integer,
+      home_score integer
+    )
   )
   select count(*) into v_bad_count
   from supplied s
   left join public.card_games cg
     on cg.id = s.game_id and cg.week_card_id = v_card.id
-  where cg.id is null or s.winner not in ('home', 'away');
+  where cg.id is null
+     or s.winner not in ('home', 'away')
+     or ((s.away_score is null) <> (s.home_score is null))
+     or s.away_score < 0
+     or s.home_score < 0;
 
   if v_bad_count > 0
      or jsonb_array_length(p_results) <> v_game_count
@@ -132,9 +147,29 @@ begin
   returning id into v_week_result_id;
 
   delete from public.game_results where week_result_id = v_week_result_id;
-  insert into public.game_results (week_result_id, card_game_id, winner)
-  select v_week_result_id, x.game_id, x.winner
-  from jsonb_to_recordset(p_results) as x(game_id uuid, winner text);
+  insert into public.game_results (
+    week_result_id,
+    card_game_id,
+    winner,
+    away_score,
+    home_score,
+    score_source,
+    finalized_at
+  )
+  select
+    v_week_result_id,
+    x.game_id,
+    x.winner,
+    x.away_score,
+    x.home_score,
+    case when x.away_score is not null then 'odds_api' else null end,
+    case when x.away_score is not null then now() else null end
+  from jsonb_to_recordset(p_results) as x(
+    game_id uuid,
+    winner text,
+    away_score integer,
+    home_score integer
+  );
 
   -- Recalculate this week's locked slips from authoritative card/results rows.
   with game_points as (

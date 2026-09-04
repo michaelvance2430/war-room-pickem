@@ -506,6 +506,26 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertFalse(state.cardIsPublished)
     }
 
+    func testFieldhouseRejectsWholeNumberSpreadsSoAWeeklyGameCannotPush() {
+        XCTAssertTrue(FieldhouseSpreadRule.isHalfPoint(-7.5))
+        XCTAssertFalse(FieldhouseSpreadRule.isHalfPoint(-7.0))
+
+        var games = Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize))
+        let original = games[0]
+        games[0] = FieldhouseGame(
+            id: original.id,
+            away: original.away,
+            home: original.home,
+            spread: "\(original.home) -7.0",
+            tip: original.tip,
+            dayOffset: original.dayOffset,
+            tipHour: original.tipHour,
+            tipMinute: original.tipMinute
+        )
+        var state = FieldhouseSeasonState()
+        XCTAssertFalse(state.publishCard(games: games, prop: .teamScores90))
+    }
+
     func testPlayerCannotLockUntilEveryRequiredDecisionIsComplete() {
         var state = FieldhouseSeasonState()
         XCTAssertTrue(state.publishCard(games: Array(FieldhouseGameCatalog.windowOne.prefix(10)), prop: .teamScores90))
@@ -689,6 +709,46 @@ final class FieldhouseExperienceTests: XCTestCase {
             gameMultiplier: 2
         )
         XCTAssertEqual(points, 40)
+    }
+
+    func testLiveStandingsProjectionUsesRevealedPicksAndFieldhouseHellfireWithoutChangingCertifiedTotal() {
+        let userID = UUID()
+        let gameID = UUID()
+        let game = FieldhouseGame(
+            id: gameID.uuidString.lowercased(),
+            away: "Team A",
+            home: "Team B",
+            spread: "Team B -3.5",
+            tip: "MON · 7:00 PM"
+        )
+        let standing = Standing(
+            id: UUID(), userId: userID, totalPoints: 40, weeklyPoints: [40], weeksPlayed: 1,
+            displayNameOverride: "Riley V.", division: "East", fieldhouseRegion: "East", profiles: nil,
+            atsCorrect: 1, atsTotal: 1, currentStreak: 1, bestWeek: 40, worstWeek: 40,
+            perfectWeeks: 0, bestBetHits: 1, bestBetTotal: 1, propHits: 0, propTotal: 0, isBot: false
+        )
+        let liveSlip = FieldhouseLiveBoardPick(
+            id: UUID(), userId: userID, totalPoints: nil, propChoice: nil, isHellfire: true,
+            pickGames: [PickedGame(cardGameId: gameID, side: "home", confidence: 5, isBestBet: true)]
+        )
+        let liveResult = FieldhouseGameResult(
+            gameID: game.id, awayScore: 60, homeScore: 75, phase: .live(period: "2H")
+        )
+
+        let projected = FieldhouseLiveStandingsEngine.projectedTotals(
+            standings: [standing], board: [liveSlip], games: [game], results: [game.id: liveResult], prop: nil
+        )
+        XCTAssertEqual(projected[userID], 60)
+        XCTAssertEqual(standing.totalPoints, 40)
+
+        let certifiedSlip = FieldhouseLiveBoardPick(
+            id: liveSlip.id, userId: userID, totalPoints: 20, propChoice: nil, isHellfire: true,
+            pickGames: liveSlip.pickGames
+        )
+        let certified = FieldhouseLiveStandingsEngine.projectedTotals(
+            standings: [standing], board: [certifiedSlip], games: [game], results: [game.id: liveResult], prop: nil
+        )
+        XCTAssertEqual(certified[userID], 40)
     }
 
     func testPostseasonHellfireUsesSixtyPercentRiskRewardRule() {

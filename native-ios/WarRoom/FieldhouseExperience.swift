@@ -476,6 +476,7 @@ struct FieldhouseCardWritePlan {
             guard let favorite = game.favoriteTeam,
                   let spread = game.favoriteSpread,
                   spread < 0,
+                  FieldhouseSpreadRule.isHalfPoint(spread),
                   favorite == game.away || favorite == game.home else {
                 throw FieldhouseRepositoryError(message: "Every Fieldhouse game needs a valid favorite and half-point spread.")
             }
@@ -888,11 +889,19 @@ struct FieldhouseGame: Identifiable, Equatable, Codable {
     var favoriteSpread: Double? { Double(spread.split(separator: " ").last ?? "") }
 }
 
+enum FieldhouseSpreadRule {
+    static func isHalfPoint(_ spread: Double) -> Bool {
+        let magnitude = abs(spread)
+        return abs((magnitude - floor(magnitude)) - 0.5) < 0.000_1
+    }
+}
+
 extension FieldhouseGame {
     init?(oddsGame: OddsGame, window: Int) {
         guard let rawTip = oddsGame.commenceTime,
               let tipDate = footballKickoffDate(rawTip),
-              ["home", "away"].contains(oddsGame.favorite.lowercased()) else { return nil }
+              ["home", "away"].contains(oddsGame.favorite.lowercased()),
+              FieldhouseSpreadRule.isHalfPoint(oddsGame.spread) else { return nil }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = FieldhouseSeasonCalendar.eastern
         let windowStart = FieldhouseSeasonCalendar.start(of: window)
@@ -989,6 +998,16 @@ struct FieldhouseGameResult: Equatable, Codable {
     func coverWinner(in game: FieldhouseGame) -> String? {
         guard isFinal, let favorite = game.favoriteTeam, let line = game.favoriteSpread,
               let underdog = game.underdogTeam else { return nil }
+        return coverLeader(in: game, favorite: favorite, line: line, underdog: underdog)
+    }
+
+    func projectedCoverWinner(in game: FieldhouseGame) -> String? {
+        guard let favorite = game.favoriteTeam, let line = game.favoriteSpread,
+              let underdog = game.underdogTeam else { return nil }
+        return coverLeader(in: game, favorite: favorite, line: line, underdog: underdog)
+    }
+
+    private func coverLeader(in game: FieldhouseGame, favorite: String, line: Double, underdog: String) -> String? {
         let favoriteScore = favorite == game.away ? awayScore : homeScore
         let underdogScore = underdog == game.away ? awayScore : homeScore
         let adjustedFavoriteScore = Double(favoriteScore) + line
@@ -1053,6 +1072,46 @@ enum FieldhouseScoreEngine {
             total += 3
         }
         return total
+    }
+}
+
+enum FieldhouseLiveStandingsEngine {
+    static func projectedTotals(
+        standings: [Standing],
+        board: [FieldhouseLiveBoardPick],
+        games: [FieldhouseGame],
+        results: [String: FieldhouseGameResult],
+        prop: FieldhousePropKind?
+    ) -> [UUID: Int] {
+        let indexedGames = Dictionary(uniqueKeysWithValues: games.enumerated().compactMap { index, game in
+            UUID(uuidString: game.id).map { ($0, (index, game)) }
+        })
+
+        return Dictionary(uniqueKeysWithValues: standings.map { standing in
+            guard let slip = board.first(where: { $0.userId == standing.userId }),
+                  slip.totalPoints == nil else {
+                return (standing.userId, standing.totalPoints)
+            }
+
+            var liveWeek = 0
+            for pick in slip.pickGames {
+                guard let (_, game) = indexedGames[pick.cardGameId],
+                      let result = results[game.id],
+                      let leader = result.projectedCoverWinner(in: game) else { continue }
+                let selectedTeam = pick.side.lowercased() == "away" ? game.away : game.home
+                guard selectedTeam == leader else { continue }
+                liveWeek += pick.confidence * (pick.isBestBet ? 2 : 1)
+            }
+            if slip.isHellfire { liveWeek *= 2 }
+
+            if let prop,
+               let choice = slip.propChoice,
+               let answer = FieldhousePropEvaluator.answer(for: prop, games: games, results: results),
+               choice.uppercased() == (answer ? "YES" : "NO") {
+                liveWeek += 3
+            }
+            return (standing.userId, standing.totalPoints + liveWeek)
+        })
     }
 }
 
@@ -1408,7 +1467,8 @@ struct FieldhouseSeasonState: Codable, Equatable {
                   (0...23).contains($0.tipHour) &&
                   (0...59).contains($0.tipMinute) &&
                   $0.favoriteTeam != nil &&
-                  ($0.favoriteSpread ?? 0) < 0
+                  ($0.favoriteSpread ?? 0) < 0 &&
+                  FieldhouseSpreadRule.isHalfPoint($0.favoriteSpread ?? 0)
               }) else { return false }
         publishedGames = games
         publishedProp = prop
@@ -1625,6 +1685,10 @@ struct FieldhouseNativePreviewView: View {
     @State private var openActivePostseasonRound = false
     @State private var lastVerifiedState: FieldhouseSeasonState
     @State private var standings: [Standing]
+    @State private var liveProjectionByUser: [UUID: Int] = [:]
+    @State private var liveProjectionWeek: Int?
+    @State private var liveProjectionActive = false
+    @State private var liveProjectionStale = false
     @Binding private var notificationDestination: WarRoomNotificationRoute?
     @Environment(\.scenePhase) private var scenePhase
     private let stateStore = FieldhouseStateStore()
@@ -1747,7 +1811,13 @@ struct FieldhouseNativePreviewView: View {
                         }
                     }
                 } else if desk == .standings {
-                    FieldhouseStandingsPage(state: $state, openActivePostseasonRound: $openActivePostseasonRound)
+                    FieldhouseStandingsPage(
+                        state: $state,
+                        openActivePostseasonRound: $openActivePostseasonRound,
+                        liveProjectionByUser: liveProjectionByUser,
+                        liveProjectionActive: liveProjectionActive,
+                        liveProjectionStale: liveProjectionStale
+                    )
                         .padding(14).padding(.bottom, 30)
                 } else {
                     ScrollView {
@@ -1857,6 +1927,7 @@ struct FieldhouseNativePreviewView: View {
 
     @MainActor private func refreshAuthenticatedScoring() async {
         guard let liveContext else { return }
+        resetLiveProjectionIfWeekChanged()
         do {
             let token = try await auth.validAccessToken()
             let feed = try await SupabaseAPI.footballScores(
@@ -1916,10 +1987,49 @@ struct FieldhouseNativePreviewView: View {
             state.postseasonLeaderboardTotals = hydrated.postseasonLeaderboardTotals
             state.postseasonScoreUpdatedAt = hydrated.postseasonScoreUpdatedAt
             standings = verified.standings
+            let projectionWeek = state.scoringWindow
+            do {
+                let board = try await SupabaseAPI.fieldhouseLiveBoard(
+                    token: token,
+                    leagueId: liveContext.membership.leagueId,
+                    weekNumber: projectionWeek
+                )
+                liveProjectionByUser = FieldhouseLiveStandingsEngine.projectedTotals(
+                    standings: verified.standings,
+                    board: board,
+                    games: state.scoringGames,
+                    results: state.scoringResults,
+                    prop: state.scoringProp
+                )
+                liveProjectionWeek = projectionWeek
+                liveProjectionActive = !board.isEmpty
+                    && !state.scoringResults.isEmpty
+                    && state.lastCertifiedWindow != projectionWeek
+                liveProjectionStale = feed.stale == true
+            } catch {
+                if liveProjectionWeek == projectionWeek, liveProjectionActive {
+                    liveProjectionStale = true
+                } else {
+                    clearLiveProjection()
+                }
+            }
             refreshLifecycle(at: Date())
+            resetLiveProjectionIfWeekChanged()
         } catch {
             // Keep the last trustworthy board and retry on the next tick.
         }
+    }
+
+    private func resetLiveProjectionIfWeekChanged() {
+        guard let liveProjectionWeek, liveProjectionWeek != state.scoringWindow else { return }
+        clearLiveProjection()
+    }
+
+    private func clearLiveProjection() {
+        liveProjectionByUser = [:]
+        liveProjectionWeek = nil
+        liveProjectionActive = false
+        liveProjectionStale = false
     }
 
     private func normalizedFieldhouseTeam(_ value: String) -> String {
@@ -3245,6 +3355,9 @@ private struct FieldhouseStandingsPage: View {
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @Binding var openActivePostseasonRound: Bool
+    let liveProjectionByUser: [UUID: Int]
+    let liveProjectionActive: Bool
+    let liveProjectionStale: Bool
     private var sportID: String { state.league == .ncaaw ? "ncaaw" : "ncaam" }
     @State private var showingOverall = false
     @State private var showingPostseason = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
@@ -3260,7 +3373,9 @@ private struct FieldhouseStandingsPage: View {
     private var players: [String] { [playerName, "Full Court Mess", "Bracket Buster", "The Sixth Man", "Baseline Bandit", "March Sadness", "Bank Shot", "Coach's Favorite", "Paint Patrol", "Buzzer Beater", "Zone Defense", "Heat Check", "One Shining Mistake", "Fast Break", "The Transfer Portal", "Double Bonus", "Shot Clock", "Backboard Damage", "Cinderella Story", "Technical Foul", "Bubble Trouble", "Air Ball", "Traveling", "Bench Mob", "Wooden Spoon"] }
     private var usesPostseasonScores: Bool { state.postseasonScorecardIsActive }
     private func displayedPoints(for standing: Standing) -> Int {
-        usesPostseasonScores ? state.postseasonPoints(for: standing.userId) : standing.totalPoints
+        if usesPostseasonScores { return state.postseasonPoints(for: standing.userId) }
+        if liveProjectionActive, let projected = liveProjectionByUser[standing.userId] { return projected }
+        return standing.totalPoints
     }
     private var visibleStandings: [Standing] {
         let sorted = authenticatedStandings.sorted { lhs, rhs in
@@ -3308,7 +3423,9 @@ private struct FieldhouseStandingsPage: View {
                 title: usesPostseasonScores ? "TOURNAMENT SCOREBOARD" : "REGIONAL SEED LINES",
                 detail: usesPostseasonScores
                     ? "Bracket and fresh-round points from the same live total shown on every player’s homepage."
-                    : "Live points, regional position, and both postseason cuts in the same format used across War Room.",
+                    : (liveProjectionActive
+                        ? "Projected points move with the live board. Certified season totals remain untouched until the final horn."
+                        : "Certified points, regional position, and both postseason cuts in the same format used across War Room."),
                 icon: usesPostseasonScores ? "chart.line.uptrend.xyaxis" : "list.number"
             )
             if usesPostseasonScores { postseasonRaceSummary } else { regionalCutSummary }
@@ -3398,7 +3515,14 @@ private struct FieldhouseStandingsPage: View {
                         .font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.52))
                 }
                 Spacer()
-                Text("#\(state.rank)").font(.title2.weight(.black)).foregroundStyle(accent)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("#\(currentRegionalRank)").font(.title2.weight(.black)).foregroundStyle(accent)
+                    if liveProjectionActive {
+                        Text(liveProjectionStale ? "LIVE · LAST UPDATE" : "LIVE PROJECTION")
+                            .font(.system(size: 7, weight: .black)).tracking(0.8)
+                            .foregroundStyle(liveProjectionStale ? .orange : accent)
+                    }
+                }
             }
             HStack(spacing: 8) {
                 cutMetric("TOP", regionalCounts.championship, "CHAMPIONSHIP", .yellow)
@@ -3490,7 +3614,14 @@ private struct FieldhouseStandingsPage: View {
                     .font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.44))
             }
             Spacer()
-            Text("\(displayedPoints(for: standing))").font(.title2.weight(.black)).foregroundStyle(accent)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(displayedPoints(for: standing))").font(.title2.weight(.black)).foregroundStyle(accent)
+                if liveProjectionActive && !usesPostseasonScores {
+                    Text(liveProjectionStale ? "LAST LIVE" : "PROJECTED")
+                        .font(.system(size: 6, weight: .black)).tracking(0.8)
+                        .foregroundStyle(liveProjectionStale ? .orange : .white.opacity(0.45))
+                }
+            }
         }
         .padding(12).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(standing.userId == auth.user?.id ? accent : accent.opacity(0.18), lineWidth: standing.userId == auth.user?.id ? 2 : 1))
@@ -3498,6 +3629,12 @@ private struct FieldhouseStandingsPage: View {
 
     private func cutLine(_ title: String, color: Color) -> some View {
         HStack { Rectangle().fill(color).frame(height: 1); Text(title).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(color); Rectangle().fill(color).frame(height: 1) }
+    }
+
+    private var currentRegionalRank: Int {
+        guard let userID = auth.user?.id,
+              let index = visibleStandings.firstIndex(where: { $0.userId == userID }) else { return state.rank }
+        return index + 1
     }
 }
 
