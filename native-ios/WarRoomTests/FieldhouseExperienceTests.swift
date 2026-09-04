@@ -2,6 +2,20 @@ import XCTest
 @testable import WarRoom
 
 final class FieldhouseExperienceTests: XCTestCase {
+    func testSelectionSundayEligibilityLabelsKeepHardwarePathsExplicit() {
+        var state = FieldhouseSeasonState()
+        XCTAssertEqual(state.postseasonEligibilityLabel, "SELECTION SUNDAY PENDING")
+
+        state.postseasonEligibilityPath = "championship"
+        XCTAssertEqual(state.postseasonEligibilityLabel, "CHAMPIONSHIP FIELD")
+
+        state.postseasonEligibilityPath = "toilet_bowl"
+        XCTAssertEqual(state.postseasonEligibilityLabel, "TOILET BOWL FIELD")
+
+        state.postseasonEligibilityPath = "no_brass"
+        XCTAssertEqual(state.postseasonEligibilityLabel, "POINTS + CHEEVOS · NO BRASS")
+    }
+
     func testFieldhouseLiveRouteRecognizesBothBasketballLeaguesButRemainsDark() {
         XCTAssertTrue(FieldhouseReleaseGate.supports(sportID: "ncaam"))
         XCTAssertTrue(FieldhouseReleaseGate.supports(sportID: "NCAAW"))

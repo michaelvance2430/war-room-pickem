@@ -100,17 +100,37 @@ create table if not exists public.fieldhouse_postseason_totals (
   primary key (tournament_id, league_id, user_id)
 );
 
+-- Selection Sunday freezes who is actually eligible for brass. Everybody may
+-- keep picking and earning points, but a later standings change can never move
+-- a player into or out of the Championship or Toilet Bowl field.
+create table if not exists public.fieldhouse_postseason_qualifiers (
+  tournament_id uuid not null references public.fieldhouse_tournaments(id) on delete restrict,
+  league_id uuid not null references public.leagues(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete restrict,
+  fieldhouse_region text not null check (fieldhouse_region in ('East','West','South','Midwest')),
+  path text not null check (path in ('championship','toilet_bowl','no_brass')),
+  regular_rank integer not null check (regular_rank > 0),
+  regular_points integer not null,
+  frozen_at timestamptz not null default now(),
+  primary key (tournament_id, league_id, user_id)
+);
+
 create table if not exists public.fieldhouse_postseason_awards (
   id uuid primary key default gen_random_uuid(),
   tournament_id uuid not null references public.fieldhouse_tournaments(id) on delete restrict,
   league_id uuid not null references public.leagues(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete restrict,
-  award_key text not null check (award_key in ('league_champion','regional_champion')),
+  award_key text not null check (award_key in ('league_champion','regional_champion','toilet_champion')),
   player_region text check (player_region is null or player_region in ('East','West','South','Midwest')),
   trophy_id text not null,
   total_points integer not null,
   awarded_at timestamptz not null default now()
 );
+alter table public.fieldhouse_postseason_awards
+  drop constraint if exists fieldhouse_postseason_awards_award_key_check;
+alter table public.fieldhouse_postseason_awards
+  add constraint fieldhouse_postseason_awards_award_key_check
+  check (award_key in ('league_champion','regional_champion','toilet_champion'));
 
 create index if not exists fieldhouse_games_event_idx
   on public.fieldhouse_tournament_games (odds_event_id) where odds_event_id is not null;
@@ -120,12 +140,17 @@ create index if not exists fieldhouse_round_entries_league_idx
   on public.fieldhouse_round_entries (league_id, tournament_id, round_key);
 create index if not exists fieldhouse_postseason_totals_leaderboard_idx
   on public.fieldhouse_postseason_totals (tournament_id, league_id, total_points desc, user_id);
+create index if not exists fieldhouse_postseason_qualifiers_path_idx
+  on public.fieldhouse_postseason_qualifiers (tournament_id, league_id, path, fieldhouse_region, regular_rank);
 create unique index if not exists fieldhouse_one_league_champion_idx
   on public.fieldhouse_postseason_awards(tournament_id,league_id,award_key)
   where award_key='league_champion';
 create unique index if not exists fieldhouse_one_regional_champion_idx
   on public.fieldhouse_postseason_awards(tournament_id,league_id,award_key,player_region)
   where award_key='regional_champion';
+create unique index if not exists fieldhouse_one_toilet_champion_idx
+  on public.fieldhouse_postseason_awards(tournament_id,league_id,award_key)
+  where award_key='toilet_champion';
 
 alter table public.fieldhouse_tournaments enable row level security;
 alter table public.fieldhouse_tournament_teams enable row level security;
@@ -133,6 +158,7 @@ alter table public.fieldhouse_tournament_games enable row level security;
 alter table public.fieldhouse_bracket_entries enable row level security;
 alter table public.fieldhouse_round_entries enable row level security;
 alter table public.fieldhouse_postseason_totals enable row level security;
+alter table public.fieldhouse_postseason_qualifiers enable row level security;
 alter table public.fieldhouse_postseason_awards enable row level security;
 
 -- Published fields are universal public game facts. Draft fields remain service-only.
@@ -166,6 +192,13 @@ create policy "League members read Fieldhouse postseason totals"
     where m.league_id = fieldhouse_postseason_totals.league_id
       and m.user_id = (select auth.uid())
   ));
+create policy "League members read Fieldhouse postseason qualifiers"
+  on public.fieldhouse_postseason_qualifiers for select to authenticated
+  using (exists (
+    select 1 from public.memberships m
+    where m.league_id = fieldhouse_postseason_qualifiers.league_id
+      and m.user_id = (select auth.uid())
+  ));
 create policy "League members read Fieldhouse awards"
   on public.fieldhouse_postseason_awards for select to authenticated
   using (exists (
@@ -180,6 +213,7 @@ grant select on public.fieldhouse_tournaments,
   public.fieldhouse_bracket_entries,
   public.fieldhouse_round_entries,
   public.fieldhouse_postseason_totals,
+  public.fieldhouse_postseason_qualifiers,
   public.fieldhouse_postseason_awards to authenticated;
 revoke insert, update, delete on public.fieldhouse_tournaments,
   public.fieldhouse_tournament_teams,
@@ -187,6 +221,7 @@ revoke insert, update, delete on public.fieldhouse_tournaments,
   public.fieldhouse_bracket_entries,
   public.fieldhouse_round_entries,
   public.fieldhouse_postseason_totals,
+  public.fieldhouse_postseason_qualifiers,
   public.fieldhouse_postseason_awards from anon, authenticated;
 
 create or replace function public.fieldhouse_round_weight(p_round text)
@@ -196,6 +231,72 @@ returns integer language sql immutable as $$
     when 's16' then 4 when 'e8' then 8 when 'ff' then 16 when 'title' then 32
     else 0 end;
 $$;
+
+create or replace function public.freeze_fieldhouse_postseason_qualifiers(p_tournament_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_sport text;
+  league_row record;
+  v_leagues integer := 0;
+  v_players integer := 0;
+  v_inserted integer := 0;
+begin
+  if auth.role() <> 'service_role'
+     and v_uid <> '09544d2b-6eca-4131-a321-c000586c9029'::uuid then
+    raise exception 'War Room owner or service access required';
+  end if;
+  select sport_id into v_sport from public.fieldhouse_tournaments
+  where id=p_tournament_id and status<>'draft';
+  if not found then raise exception 'Published Fieldhouse tournament required'; end if;
+
+  for league_row in
+    select id from public.leagues where sport_id=v_sport
+  loop
+    if exists(
+      select 1 from public.fieldhouse_postseason_qualifiers
+      where tournament_id=p_tournament_id and league_id=league_row.id
+    ) then continue; end if;
+    if exists(
+      select 1 from public.memberships
+      where league_id=league_row.id and coalesce(is_bot,false)=false and fieldhouse_region is null
+    ) then raise exception 'Every Fieldhouse player needs a region before Selection Sunday'; end if;
+
+    with regional_order as (
+      select m.user_id,m.fieldhouse_region,m.total_points,
+        row_number() over(
+          partition by m.fieldhouse_region order by m.total_points desc,m.user_id
+        )::integer regular_rank,
+        count(*) over(partition by m.fieldhouse_region)::integer region_count
+      from public.memberships m
+      where m.league_id=league_row.id and coalesce(m.is_bot,false)=false
+    ), classified as (
+      select *,least(4,region_count/2)::integer as brass_size from regional_order
+    )
+    insert into public.fieldhouse_postseason_qualifiers(
+      tournament_id,league_id,user_id,fieldhouse_region,path,regular_rank,regular_points,frozen_at
+    )
+    select p_tournament_id,league_row.id,user_id,fieldhouse_region,
+      case
+        when regular_rank<=brass_size then 'championship'
+        when regular_rank>region_count-brass_size then 'toilet_bowl'
+        else 'no_brass'
+      end,
+      regular_rank,total_points,now()
+    from classified;
+    get diagnostics v_inserted=row_count;
+    v_players:=v_players+v_inserted;
+    v_leagues:=v_leagues+1;
+  end loop;
+  return jsonb_build_object('ok',true,'leaguesFrozen',v_leagues,'playersFrozen',v_players);
+end;
+$$;
+revoke all on function public.freeze_fieldhouse_postseason_qualifiers(uuid) from public,anon,authenticated;
+grant execute on function public.freeze_fieldhouse_postseason_qualifiers(uuid) to service_role;
 
 create or replace function public.validate_fieldhouse_bracket_picks(
   p_tournament_id uuid,
@@ -260,6 +361,10 @@ begin
   if v_tournament.first_tip_at is not null and now() >= v_tournament.first_tip_at then
     raise exception 'The bracket is locked';
   end if;
+  if not exists(
+    select 1 from public.fieldhouse_postseason_qualifiers q
+    where q.tournament_id=v_tournament.id and q.league_id=p_league_id and q.user_id=v_uid
+  ) then raise exception 'Selection Sunday eligibility snapshot is missing'; end if;
   select * into v_entry from public.fieldhouse_bracket_entries
   where tournament_id = v_tournament.id and league_id = p_league_id and user_id = v_uid;
   if found and v_entry.locked_at is not null then raise exception 'The bracket is permanently locked'; end if;
@@ -611,6 +716,7 @@ begin
     where tournament_id=v_tournament_id and round_key in ('opening','r64') and starts_at is null
   ) then raise exception 'Published field requires every Opening and First Round tip time'; end if;
   if p_publish then
+    perform public.freeze_fieldhouse_postseason_qualifiers(v_tournament_id);
     perform private.queue_fieldhouse_round_notifications(v_tournament_id,'opening');
   end if;
 
@@ -771,6 +877,10 @@ begin
   where sport_id=v_sport and season_key=p_season_key and status in ('published','in_progress');
   if not found then raise exception 'Official Fieldhouse tournament is not open'; end if;
   if p_round_key not in ('opening','r64','r32','s16','e8','ff','title') then raise exception 'Invalid round'; end if;
+  if not exists(
+    select 1 from public.fieldhouse_postseason_qualifiers q
+    where q.tournament_id=v_tournament.id and q.league_id=p_league_id and q.user_id=v_uid
+  ) then raise exception 'Selection Sunday eligibility snapshot is missing'; end if;
 
   select count(*),min(starts_at) into v_required,v_first_tip
   from public.fieldhouse_tournament_games where tournament_id=v_tournament.id and round_key=p_round_key;
@@ -850,12 +960,13 @@ begin
   ) s where e.id=s.id;
   get diagnostics v_rounds=row_count;
 
+  -- The frozen Selection Sunday field is the participant authority. A player
+  -- who files nothing still owns a permanent zero-point postseason receipt;
+  -- silently dropping them would corrupt regional awards and tie resolution.
   with players as (
-    select tournament_id,league_id,user_id from public.fieldhouse_bracket_entries
-    where tournament_id=p_tournament_id and submitted_at is not null
-    union
-    select tournament_id,league_id,user_id from public.fieldhouse_round_entries
-    where tournament_id=p_tournament_id and submitted_at is not null
+    select tournament_id,league_id,user_id
+    from public.fieldhouse_postseason_qualifiers
+    where tournament_id=p_tournament_id
   ), bracket as (
     select tournament_id,league_id,user_id,correct_picks,raw_points,adjusted_points
     from public.fieldhouse_bracket_entries
@@ -895,18 +1006,20 @@ declare
   v_status text;
   v_region_awards integer := 0;
   v_league_awards integer := 0;
+  v_toilet_awards integer := 0;
 begin
   select status into v_status from public.fieldhouse_tournaments where id=p_tournament_id;
   if v_status<>'final' then raise exception 'Tournament is not final'; end if;
   perform public.score_fieldhouse_postseason(p_tournament_id);
 
   with totals as (
-    select p.league_id,p.user_id,m.fieldhouse_region,p.total_points,
-      m.total_points regular_points,l.championship_trophy_id
+    select p.league_id,p.user_id,q.fieldhouse_region,p.total_points,
+      q.regular_points,l.championship_trophy_id
     from public.fieldhouse_postseason_totals p
-    join public.memberships m on m.league_id=p.league_id and m.user_id=p.user_id
+    join public.fieldhouse_postseason_qualifiers q
+      on q.tournament_id=p.tournament_id and q.league_id=p.league_id and q.user_id=p.user_id
     join public.leagues l on l.id=p.league_id
-    where p.tournament_id=p_tournament_id
+    where p.tournament_id=p_tournament_id and q.path='championship'
   ), regional as (
     select *,row_number() over(partition by league_id,fieldhouse_region order by total_points desc,regular_points desc,user_id) place
     from totals where fieldhouse_region is not null
@@ -919,11 +1032,12 @@ begin
   get diagnostics v_region_awards=row_count;
 
   with totals as (
-    select p.league_id,p.user_id,p.total_points,m.total_points regular_points,l.championship_trophy_id
+    select p.league_id,p.user_id,p.total_points,q.regular_points,l.championship_trophy_id
     from public.fieldhouse_postseason_totals p
-    join public.memberships m on m.league_id=p.league_id and m.user_id=p.user_id
+    join public.fieldhouse_postseason_qualifiers q
+      on q.tournament_id=p.tournament_id and q.league_id=p.league_id and q.user_id=p.user_id
     join public.leagues l on l.id=p.league_id
-    where p.tournament_id=p_tournament_id
+    where p.tournament_id=p_tournament_id and q.path='championship'
   ), ranked as (
     select *,row_number() over(partition by league_id order by total_points desc,regular_points desc,user_id) place from totals
   )
@@ -933,6 +1047,23 @@ begin
   on conflict(tournament_id,league_id,award_key) where award_key='league_champion' do update set
     user_id=excluded.user_id,trophy_id=excluded.trophy_id,total_points=excluded.total_points,awarded_at=now();
   get diagnostics v_league_awards=row_count;
+
+  with totals as (
+    select p.league_id,p.user_id,p.total_points,q.regular_points
+    from public.fieldhouse_postseason_totals p
+    join public.fieldhouse_postseason_qualifiers q
+      on q.tournament_id=p.tournament_id and q.league_id=p.league_id and q.user_id=p.user_id
+    where p.tournament_id=p_tournament_id and q.path='toilet_bowl'
+  ), ranked as (
+    select *,row_number() over(partition by league_id order by total_points desc,regular_points desc,user_id) place
+    from totals
+  )
+  insert into public.fieldhouse_postseason_awards(tournament_id,league_id,user_id,award_key,player_region,trophy_id,total_points)
+  select p_tournament_id,league_id,user_id,'toilet_champion',null,'toilet_bowl',total_points
+  from ranked where place=1
+  on conflict(tournament_id,league_id,award_key) where award_key='toilet_champion' do update set
+    user_id=excluded.user_id,trophy_id=excluded.trophy_id,total_points=excluded.total_points,awarded_at=now();
+  get diagnostics v_toilet_awards=row_count;
 
   -- The postseason awards table is the scoring receipt. The shared
   -- league_trophies table is the permanent public hardware shelf consumed by
@@ -983,11 +1114,34 @@ begin
     awarded_at=excluded.awarded_at,
     trophy_design_id=excluded.trophy_design_id;
 
+  insert into public.league_trophies(
+    league_id,season_year,trophy_type,winner_name,winner_user_id,
+    subtitle,notes,awarded_at,trophy_design_id
+  )
+  select
+    a.league_id,t.season_key,'toilet_bowl',
+    coalesce(nullif(trim(p.display_name),''),'Player'),a.user_id,
+    'Fieldhouse Toilet Bowl Champion · '||t.season_key::text,
+    'Won the bottom-field bracket race with '||a.total_points||' official tournament points.',
+    a.awarded_at,a.trophy_id
+  from public.fieldhouse_postseason_awards a
+  join public.fieldhouse_tournaments t on t.id=a.tournament_id
+  left join public.profiles p on p.id=a.user_id
+  where a.tournament_id=p_tournament_id and a.award_key='toilet_champion'
+  on conflict(league_id,season_year,trophy_type) do update set
+    winner_name=excluded.winner_name,
+    winner_user_id=excluded.winner_user_id,
+    subtitle=excluded.subtitle,
+    notes=excluded.notes,
+    awarded_at=excluded.awarded_at,
+    trophy_design_id=excluded.trophy_design_id;
+
   return jsonb_build_object(
     'ok',true,
     'regionalAwards',v_region_awards,
     'leagueAwards',v_league_awards,
-    'permanentHardware',v_region_awards+v_league_awards
+    'toiletAwards',v_toilet_awards,
+    'permanentHardware',v_region_awards+v_league_awards+v_toilet_awards
   );
 end;
 $$;

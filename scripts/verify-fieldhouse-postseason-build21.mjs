@@ -19,6 +19,7 @@ for (const table of [
   "fieldhouse_bracket_entries",
   "fieldhouse_round_entries",
   "fieldhouse_postseason_totals",
+  "fieldhouse_postseason_qualifiers",
   "fieldhouse_postseason_awards",
 ]) assert.match(sql, new RegExp(`create table if not exists public\\.${table}`));
 
@@ -50,6 +51,14 @@ assert.match(sql, /League members read Fieldhouse postseason totals/);
 assert.match(sql, /insert into public\.fieldhouse_postseason_totals/);
 assert.match(sql, /row_number\(\) over\(partition by league_id,fieldhouse_region order by total_points desc,regular_points desc,user_id\)/);
 assert.match(sql, /insert into public\.league_trophies\(/);
+assert.match(sql, /create or replace function public\.freeze_fieldhouse_postseason_qualifiers/);
+assert.match(sql, /when regular_rank<=brass_size then 'championship'/);
+assert.match(sql, /when regular_rank>region_count-brass_size then 'toilet_bowl'/);
+assert.match(sql, /else 'no_brass'/);
+assert.match(sql, /where p\.tournament_id=p_tournament_id and q\.path='championship'/);
+assert.match(sql, /where p\.tournament_id=p_tournament_id and q\.path='toilet_bowl'/);
+assert.match(sql, /a\.award_key='toilet_champion'/);
+assert.match(sql, /with players as \(\s*select tournament_id,league_id,user_id\s*from public\.fieldhouse_postseason_qualifiers/);
 assert.match(sql, /'fieldhouse_region_'\|\|lower\(a\.player_region\)/);
 assert.match(sql, /a\.awarded_at,a\.trophy_id/);
 assert.match(schema, /'fieldhouse_region_east','fieldhouse_region_west'/);
@@ -87,6 +96,7 @@ assert.match(liveStandings, /nullif\(cg\.start_time, ''\)::timestamptz <= now\(\
 assert.match(liveStandings, /coalesce\(p\.is_chaos, false\) as is_hellfire/);
 assert.match(liveStandings, /grant execute on function public\.get_fieldhouse_live_board\(uuid, integer\) to authenticated/);
 assert.match(api, /static func fieldhouseLiveBoard/);
+assert.match(api, /static func fieldhousePostseasonQualifier/);
 assert.match(client, /FieldhouseLiveStandingsEngine\.projectedTotals/);
 assert.match(client, /LIVE PROJECTION/);
 assert.match(client, /liveProjectionWeek != state\.scoringWindow/);
@@ -111,6 +121,7 @@ assert.match(atomicScoring, /add column if not exists away_score integer/);
 assert.match(atomicScoring, /x\.away_score,\s*x\.home_score,\s*case when x\.away_score is not null then 'odds_api'/);
 assert.match(client, /TOURNAMENT SCORECARD · LIVE/);
 assert.match(client, /ROUND-BY-ROUND LEDGER/);
+assert.match(client, /POINTS \+ CHEEVOS · NO BRASS/);
 assert.match(client, /postseasonRoundReceipt\(for:/);
 assert.match(client, /case "title": 32/);
 assert.match(client, /state\.postseasonPoints\(for: standing\.userId\)/);

@@ -217,6 +217,7 @@ struct FieldhouseAuthenticatedSnapshot {
     var bracketEntry: FieldhouseBracketEntryRecord? = nil
     var roundEntries: [FieldhouseRoundEntryRecord] = []
     var postseasonTotals: [FieldhousePostseasonTotalRecord] = []
+    var postseasonQualifier: FieldhousePostseasonQualifierRecord? = nil
 }
 
 private struct FieldhouseRepositoryError: LocalizedError {
@@ -289,6 +290,7 @@ enum FieldhouseAuthenticatedRepository {
         let loadedBracket: FieldhouseBracketEntryRecord?
         let loadedRounds: [FieldhouseRoundEntryRecord]
         let loadedPostseasonTotals: [FieldhousePostseasonTotalRecord]
+        let loadedPostseasonQualifier: FieldhousePostseasonQualifierRecord?
         if let loadedField {
             async let bracket = SupabaseAPI.fieldhouseBracketEntry(
                 token: token,
@@ -307,13 +309,21 @@ enum FieldhouseAuthenticatedRepository {
                 tournamentId: loadedField.tournamentID,
                 leagueId: membership.leagueId
             )
+            async let qualifier = SupabaseAPI.fieldhousePostseasonQualifier(
+                token: token,
+                tournamentId: loadedField.tournamentID,
+                leagueId: membership.leagueId,
+                userId: userID
+            )
             loadedBracket = try await bracket
             loadedRounds = try await rounds
             loadedPostseasonTotals = try await totals
+            loadedPostseasonQualifier = try await qualifier
         } else {
             loadedBracket = nil
             loadedRounds = []
             loadedPostseasonTotals = []
+            loadedPostseasonQualifier = nil
         }
         return try await FieldhouseAuthenticatedSnapshot(
             membership: membership,
@@ -328,7 +338,8 @@ enum FieldhouseAuthenticatedRepository {
             officialField: loadedField,
             bracketEntry: loadedBracket,
             roundEntries: loadedRounds,
-            postseasonTotals: loadedPostseasonTotals
+            postseasonTotals: loadedPostseasonTotals,
+            postseasonQualifier: loadedPostseasonQualifier
         )
     }
 
@@ -1274,6 +1285,8 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var postseasonTotalPoints = 0
     var postseasonLeaderboardTotals: [UUID: Int] = [:]
     var postseasonScoreUpdatedAt: String?
+    var postseasonEligibilityPath: String?
+    var postseasonEligibilityRank: Int?
     var selectedRegion: FieldhouseRegion = .midwest
     var favoriteTeam: String?
     var crystalBallChampion: String?
@@ -1290,6 +1303,14 @@ struct FieldhouseSeasonState: Codable, Equatable {
     }
     func postseasonPoints(for userID: UUID) -> Int {
         postseasonLeaderboardTotals[userID] ?? 0
+    }
+    var postseasonEligibilityLabel: String {
+        switch postseasonEligibilityPath {
+        case "championship": "CHAMPIONSHIP FIELD"
+        case "toilet_bowl": "TOILET BOWL FIELD"
+        case "no_brass": "POINTS + CHEEVOS · NO BRASS"
+        default: "SELECTION SUNDAY PENDING"
+        }
     }
     func postseasonRoundReceipt(for roundKey: String) -> FieldhousePostseasonRoundReceipt? {
         guard let field = officialPostseasonField else { return nil }
@@ -1563,6 +1584,8 @@ enum FieldhouseStateHydrator {
         state.postseasonRoundPicks = Dictionary(uniqueKeysWithValues: snapshot.roundEntries.map { ($0.roundKey, $0.picks) })
         state.postseasonRoundSubmitted = Set(snapshot.roundEntries.compactMap { $0.submittedAt == nil ? nil : $0.roundKey })
         state.postseasonLeaderboardTotals = Dictionary(uniqueKeysWithValues: snapshot.postseasonTotals.map { ($0.userId, $0.totalPoints) })
+        state.postseasonEligibilityPath = snapshot.postseasonQualifier?.path
+        state.postseasonEligibilityRank = snapshot.postseasonQualifier?.regularRank
         if let ownTotal = snapshot.postseasonTotals.first(where: { $0.userId == userID }) {
             state.postseasonBracketCorrectPicks = ownTotal.bracketCorrectPicks
             state.postseasonBracketRawPoints = ownTotal.bracketRawPoints
@@ -2030,6 +2053,8 @@ struct FieldhouseNativePreviewView: View {
             state.postseasonTotalPoints = hydrated.postseasonTotalPoints
             state.postseasonLeaderboardTotals = hydrated.postseasonLeaderboardTotals
             state.postseasonScoreUpdatedAt = hydrated.postseasonScoreUpdatedAt
+            state.postseasonEligibilityPath = hydrated.postseasonEligibilityPath
+            state.postseasonEligibilityRank = hydrated.postseasonEligibilityRank
             standings = verified.standings
             let projectionWeek = state.scoringWindow
             do {
@@ -2388,8 +2413,8 @@ private struct FieldhouseHomePage: View {
                 Button { showingTournamentScorecard = true } label: {
                     FieldhouseAction(
                         kicker: "TOURNAMENT SCORECARD · LIVE",
-                        title: "\(state.postseasonTotalPoints) POSTSEASON POINTS",
-                        detail: "Bracket \(state.postseasonBracketAdjustedPoints) · round picks \(state.postseasonFreshRoundPoints). Tap for the permanent receipt.",
+                            title: "\(state.postseasonTotalPoints) POSTSEASON POINTS",
+                            detail: "\(state.postseasonEligibilityLabel) · bracket \(state.postseasonBracketAdjustedPoints) · round picks \(state.postseasonFreshRoundPoints). Tap for the permanent receipt.",
                         icon: "chart.line.uptrend.xyaxis"
                     )
                 }.buttonStyle(.plain)
@@ -2524,7 +2549,7 @@ private struct FieldhouseTournamentScorecardView: View {
                 ScrollView {
                     VStack(spacing: 14) {
                         FieldhouseHero(
-                            kicker: "PERMANENT TOURNAMENT RECEIPT",
+                            kicker: "\(state.postseasonEligibilityLabel) · PERMANENT RECEIPT",
                             title: "\(state.postseasonTotalPoints) POINTS",
                             detail: "One authoritative total for your homepage, standings, regional race, and championship result.",
                             icon: "checklist.checked"
