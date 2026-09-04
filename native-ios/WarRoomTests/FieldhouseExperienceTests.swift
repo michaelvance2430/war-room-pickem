@@ -165,12 +165,43 @@ final class FieldhouseExperienceTests: XCTestCase {
         state.officialPostseasonField = .previewRound(for: .ncaam)
         state.postseasonTotalPoints = 47
 
+        XCTAssertTrue(state.postseasonIsActive)
         XCTAssertFalse(state.postseasonScorecardIsActive)
 
         state.bracketSubmitted = true
         XCTAssertTrue(state.postseasonScorecardIsActive)
         let now = ISO8601DateFormatter().date(from: "2027-03-17T16:00:00Z")!
         XCTAssertTrue(state.postseasonLockLabel(at: now).hasPrefix("FIRST ROUND LOCKS IN"))
+    }
+
+    func testSelectionSundayCountsBracketAndFreshRoundAsTwoPickTasks() {
+        var state = FieldhouseSeasonState()
+        state.officialPostseasonField = .previewRound(for: .ncaam)
+        let beforeTip = ISO8601DateFormatter().date(from: "2027-03-18T15:59:59Z")!
+
+        XCTAssertEqual(state.outstandingPickTaskCount(at: beforeTip), 2)
+        XCTAssertTrue(state.hasOutstandingPickTask(at: beforeTip))
+
+        state.bracketSubmitted = true
+        XCTAssertEqual(state.outstandingPickTaskCount(at: beforeTip), 1)
+
+        state.postseasonRoundSubmitted.insert("r64")
+        XCTAssertEqual(state.outstandingPickTaskCount(at: beforeTip), 0)
+        XCTAssertFalse(state.hasOutstandingPickTask(at: beforeTip))
+    }
+
+    func testPostseasonTasksAndBracketLockCloseExactlyAtFirstTip() {
+        var state = FieldhouseSeasonState()
+        state.officialPostseasonField = .previewRound(for: .ncaam)
+        let beforeTip = ISO8601DateFormatter().date(from: "2027-03-18T15:59:59Z")!
+        let atTip = ISO8601DateFormatter().date(from: "2027-03-18T16:00:00Z")!
+
+        XCTAssertFalse(state.postseasonBracketIsLocked(at: beforeTip))
+        XCTAssertTrue(state.postseasonBracketIsLocked(at: atTip))
+        XCTAssertEqual(state.outstandingPickTaskCount(at: atTip), 0)
+
+        state.bracketLocked = true
+        XCTAssertTrue(state.postseasonBracketIsLocked(at: beforeTip))
     }
 
     func testFreshRoundBecomesReadOnlyBoardAtFirstTip() {
@@ -405,6 +436,7 @@ final class FieldhouseExperienceTests: XCTestCase {
         let games = Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize))
         XCTAssertTrue(state.publishCard(games: games, prop: .teamScores90))
         let beforeTip = state.pickLockDate.addingTimeInterval(-1)
+        XCTAssertEqual(state.outstandingPickTaskCount(at: beforeTip), 1)
         XCTAssertTrue(state.hasOutstandingPickTask(at: beforeTip))
 
         for index in games.indices {
@@ -414,6 +446,7 @@ final class FieldhouseExperienceTests: XCTestCase {
         state.bestBetGame = 0
         state.propAnswer = "YES"
         XCTAssertTrue(state.lockPicks(at: beforeTip))
+        XCTAssertEqual(state.outstandingPickTaskCount(at: beforeTip), 0)
         XCTAssertFalse(state.hasOutstandingPickTask(at: beforeTip))
         XCTAssertTrue(state.playerPicksAreComplete)
 

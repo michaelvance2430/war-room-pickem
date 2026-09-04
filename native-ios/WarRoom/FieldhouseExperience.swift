@@ -1320,8 +1320,9 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var hellfireDeployedOnCurrentCard = false
 
     var regularHellfiresRemaining: Int { max(0, 2 - regularHellfiresUsed) }
+    var postseasonIsActive: Bool { officialPostseasonField != nil }
     var postseasonScorecardIsActive: Bool {
-        officialPostseasonField != nil && (bracketSubmitted || !postseasonRoundSubmitted.isEmpty)
+        postseasonIsActive && (bracketSubmitted || !postseasonRoundSubmitted.isEmpty)
     }
     func postseasonPoints(for userID: UUID) -> Int {
         postseasonLeaderboardTotals[userID] ?? 0
@@ -1379,8 +1380,17 @@ struct FieldhouseSeasonState: Codable, Equatable {
             }
         )
     }
+    func activePostseasonRound(at date: Date = Date()) -> String? {
+        officialPostseasonField.flatMap { FieldhouseBracketEngine.liveRoundKey(field: $0, now: date) }
+    }
     var activePostseasonRound: String? {
-        officialPostseasonField.flatMap { FieldhouseBracketEngine.liveRoundKey(field: $0) }
+        activePostseasonRound()
+    }
+    func postseasonBracketIsLocked(at now: Date = Date()) -> Bool {
+        if bracketLocked { return true }
+        guard let firstTipAt = officialPostseasonField?.firstTipAt,
+              let firstTip = ISO8601DateFormatter().date(from: firstTipAt) else { return false }
+        return now >= firstTip
     }
     func postseasonRoundScheduleIsReady(_ roundKey: String) -> Bool {
         guard let field = officialPostseasonField else { return false }
@@ -1460,8 +1470,22 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var canSelectChampionshipTrophy: Bool { !seasonHasStarted }
     var canBuildCard: Bool { isCommissioner && !cardIsPublished }
     var playerPicksAreComplete: Bool { cardIsPublished && picksLocked }
+    func outstandingPickTaskCount(at date: Date) -> Int {
+        if postseasonIsActive {
+            var count = 0
+            if !bracketSubmitted && !postseasonBracketIsLocked(at: date) { count += 1 }
+            if let round = activePostseasonRound(at: date),
+               postseasonRoundScheduleIsReady(round),
+               !postseasonRoundIsLocked(round, at: date),
+               !postseasonRoundSubmitted.contains(round) {
+                count += 1
+            }
+            return count
+        }
+        return cardIsPublished && !picksLocked && canEditPicks(at: date) ? 1 : 0
+    }
     func hasOutstandingPickTask(at date: Date) -> Bool {
-        cardIsPublished && !picksLocked && canEditPicks(at: date)
+        outstandingPickTaskCount(at: date) > 0
     }
     var postseasonStatus: WarRoomPostseasonStatus {
         WarRoomPostseasonRule.status(rank: rank, playerCount: regionPlayerCount)
@@ -1929,7 +1953,16 @@ struct FieldhouseNativePreviewView: View {
                         FieldhouseLockerPage().padding(.horizontal, 14)
                     }
                 } else if desk == .picks {
-                    FieldhousePicksPage(state: $state, strikePresentation: $strikePresentation)
+                    if state.postseasonIsActive {
+                        FieldhouseBracketsPage(
+                            state: $state,
+                            strikePresentation: $strikePresentation,
+                            openActivePostseasonRound: $openActivePostseasonRound,
+                            overviewHorizontalPadding: 14
+                        )
+                    } else {
+                        FieldhousePicksPage(state: $state, strikePresentation: $strikePresentation)
+                    }
                 } else if desk == .profile {
                     if auth.user != nil && auth.token != nil {
                         YouView(onBack: { desk = .home })
@@ -1968,7 +2001,10 @@ struct FieldhouseNativePreviewView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             TimelineView(.periodic(from: .now, by: 15)) { context in
-                FieldhouseBottomNavigation(selection: $desk, hasOutstandingPickTask: state.hasOutstandingPickTask(at: context.date))
+                FieldhouseBottomNavigation(
+                    selection: $desk,
+                    outstandingPickTaskCount: state.outstandingPickTaskCount(at: context.date)
+                )
             }
         }
         .environment(\.fieldhouseLeague, state.league)
@@ -2040,10 +2076,8 @@ struct FieldhouseNativePreviewView: View {
         case "picks":
             if state.activePostseasonRound != nil {
                 openActivePostseasonRound = true
-                desk = .standings
-            } else {
-                desk = .picks
             }
+            desk = .picks
         case "announcements", "results":
             desk = .home
         default:
@@ -2394,7 +2428,7 @@ private struct FieldhouseBottomNavigation: View {
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var selection: FieldhouseDesk
-    let hasOutstandingPickTask: Bool
+    let outstandingPickTaskCount: Int
     var body: some View {
         HStack(spacing: 0) {
             ForEach(FieldhouseDesk.allCases) { desk in
@@ -2402,15 +2436,15 @@ private struct FieldhouseBottomNavigation: View {
                     VStack(spacing: 4) {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: desk.icon).font(.system(size: 21, weight: .bold))
-                            if desk == .picks && hasOutstandingPickTask {
-                                Text("1")
+                            if desk == .picks && outstandingPickTaskCount > 0 {
+                                Text("\(outstandingPickTaskCount)")
                                     .font(.system(size: 8, weight: .black))
                                     .foregroundStyle(.black)
                                     .frame(width: 16, height: 16)
                                     .background(accent, in: Circle())
                                     .overlay(Circle().stroke(.black, lineWidth: 2))
                                     .offset(x: 10, y: -7)
-                                    .accessibilityLabel("One pick task remaining")
+                                    .accessibilityLabel("\(outstandingPickTaskCount) pick tasks remaining")
                             }
                         }
                         Text(desk.rawValue).font(.system(size: 10, weight: .bold))
@@ -2571,32 +2605,49 @@ private struct FieldhouseHomePage: View {
     }
 
     @ViewBuilder private var playerCommand: some View {
-        if state.postseasonScorecardIsActive {
-            let round = state.activePostseasonRound
+        if state.postseasonIsActive {
+            let now = Date()
+            let round = state.activePostseasonRound(at: now)
+            let bracketLocked = state.postseasonBracketIsLocked(at: now)
+            let bracketNeedsAction = !state.bracketSubmitted && !bracketLocked
+            let bracketMissed = !state.bracketSubmitted && bracketLocked
             let roundFiled = round.map { state.postseasonRoundSubmitted.contains($0) } ?? true
-            let roundLocked = round.map { state.postseasonRoundIsLocked($0) } ?? false
+            let roundLocked = round.map { state.postseasonRoundIsLocked($0, at: now) } ?? false
             let scheduleReady = round.map { state.postseasonRoundScheduleIsReady($0) } ?? true
-            let needsAction = round != nil && scheduleReady && !roundLocked && !roundFiled
+            let roundNeedsAction = round != nil && scheduleReady && !roundLocked && !roundFiled
+            let roundMissed = round != nil && roundLocked && !roundFiled
+            let taskCount = state.outstandingPickTaskCount(at: now)
+            let roundTitle = FieldhouseBracketEngine.roundTitle(round ?? "opening")
             Button {
-                openActivePostseasonRound = round != nil
-                desk = .standings
+                openActivePostseasonRound = taskCount == 1 && roundNeedsAction
+                desk = .picks
             } label: {
                 FieldhouseAction(
-                    kicker: needsAction ? "POSTSEASON COMMAND · ACTION REQUIRED" : roundLocked && !roundFiled ? "POSTSEASON COMMAND · ROUND MISSED" : scheduleReady ? "POSTSEASON COMMAND · COMPLETE" : "POSTSEASON COMMAND · SCHEDULE PENDING",
-                    title: round.map {
-                        if !scheduleReady { return "\(FieldhouseBracketEngine.roundTitle($0)) Times Pending" }
-                        if roundLocked && !roundFiled { return "\(FieldhouseBracketEngine.roundTitle($0)) Locked" }
-                        return roundFiled ? "\(FieldhouseBracketEngine.roundTitle($0)) Picks Filed" : "Pick the \(FieldhouseBracketEngine.roundTitle($0))"
-                    } ?? "View Tournament Command",
-                    detail: !scheduleReady
-                        ? "The matchup is set. Fresh picks open when every official tip time is on file."
-                        : roundLocked && !roundFiled
-                            ? "The first game tipped before a round card was filed. Open the live board to follow the results."
-                            : roundFiled
-                                ? "Your current-round picks are on the record. Open the bracket and live scoreboard."
-                                : "A fresh winner card is open. File every pick before the first game tips.",
-                    icon: needsAction ? "basketball.fill" : roundLocked && !roundFiled ? "lock.fill" : scheduleReady ? "checkmark.seal.fill" : "clock.fill",
-                    signalColor: needsAction || (roundLocked && !roundFiled) ? .red : scheduleReady ? .green : accent
+                    kicker: taskCount > 0
+                        ? "POSTSEASON COMMAND · \(taskCount) ACTION\(taskCount == 1 ? "" : "S") REQUIRED"
+                        : (bracketMissed || roundMissed ? "POSTSEASON COMMAND · WINDOW MISSED" : scheduleReady ? "POSTSEASON COMMAND · COMPLETE" : "POSTSEASON COMMAND · SCHEDULE PENDING"),
+                    title: taskCount == 2
+                        ? "Complete Selection Sunday"
+                        : bracketNeedsAction
+                            ? "Fill Out Your 76-Team Bracket"
+                            : round.map {
+                                if !scheduleReady { return "\(FieldhouseBracketEngine.roundTitle($0)) Times Pending" }
+                                if roundMissed { return "\(FieldhouseBracketEngine.roundTitle($0)) Locked" }
+                                return roundFiled ? "\(FieldhouseBracketEngine.roundTitle($0)) Picks Filed" : "Pick the \(FieldhouseBracketEngine.roundTitle($0))"
+                            } ?? "View Tournament Command",
+                    detail: taskCount == 2
+                        ? "File all 75 bracket decisions and your fresh \(roundTitle) card before first tip."
+                        : bracketNeedsAction
+                            ? "Your permanent bracket is still blank. Complete all 75 decisions before the tournament begins."
+                            : !scheduleReady
+                                ? "The matchup is set. Fresh picks open when every official tip time is on file."
+                                : bracketMissed || roundMissed
+                                    ? "A required pick window closed before a card was filed. Open Picks to follow the live tournament."
+                                    : roundFiled
+                                        ? "Your current-round picks are on the record. Open Picks for the bracket and live board."
+                                        : "The tournament command center is ready.",
+                    icon: taskCount > 0 ? "basketball.fill" : bracketMissed || roundMissed ? "lock.fill" : scheduleReady ? "checkmark.seal.fill" : "clock.fill",
+                    signalColor: taskCount > 0 || bracketMissed || roundMissed ? .red : scheduleReady ? .green : accent
                 )
             }.buttonStyle(.plain)
         } else {
@@ -3669,7 +3720,7 @@ private struct FieldhouseStandingsPage: View {
         return name.isEmpty ? "Riley V." : name
     }
     private var players: [String] { [playerName, "Full Court Mess", "Bracket Buster", "The Sixth Man", "Baseline Bandit", "March Sadness", "Bank Shot", "Coach's Favorite", "Paint Patrol", "Buzzer Beater", "Zone Defense", "Heat Check", "One Shining Mistake", "Fast Break", "The Transfer Portal", "Double Bonus", "Shot Clock", "Backboard Damage", "Cinderella Story", "Technical Foul", "Bubble Trouble", "Air Ball", "Traveling", "Bench Mob", "Wooden Spoon"] }
-    private var usesPostseasonScores: Bool { state.postseasonScorecardIsActive }
+    private var usesPostseasonScores: Bool { state.postseasonIsActive }
     private func displayedPoints(for standing: Standing) -> Int {
         if usesPostseasonScores { return state.postseasonPoints(for: standing.userId) }
         if liveProjectionActive, let projected = liveProjectionByUser[standing.userId] { return projected }
@@ -3978,6 +4029,7 @@ private struct FieldhouseBracketsPage: View {
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
     @Binding var openActivePostseasonRound: Bool
+    var overviewHorizontalPadding: CGFloat = 0
     @State private var confirmingBracketHellfire = false
     @State private var showingHistory = false
     @State private var showingBracketPicker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
@@ -4014,13 +4066,17 @@ private struct FieldhouseBracketsPage: View {
                     officialField: state.officialPostseasonField,
                     picks: $state.postseasonBracketPicks,
                     submitted: $state.bracketSubmitted,
-                    locked: state.bracketLocked,
+                    locked: state.postseasonBracketIsLocked(),
                     hellfireUsed: state.bracketHellfireUsed,
                     save: { persist(.bracket) },
                     close: { showingBracketPicker = false }
                 )
             } else {
-                overview
+                ScrollView {
+                    overview
+                        .padding(.horizontal, overviewHorizontalPadding)
+                        .padding(.bottom, 30)
+                }
             }
         }
         .alert("Launch Bracket Hellfire?", isPresented: $confirmingBracketHellfire) {
@@ -4079,7 +4135,7 @@ private struct FieldhouseBracketsPage: View {
         VStack(spacing: 13) {
             Button { confirmingBracketHellfire = true } label: {
                 FieldhouseAction(kicker: "BRACKET HELLFIRE · 1/1", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch the AI Crazy Pick", detail: state.bracketHellfireUsed ? "All 75 decisions are sealed. No reroll." : "One-way door. AI fills an erratic 76-team bracket and seals all 75 decisions. Hit 60% for 1.5×; miss it and raw points are cut in half.", icon: "wand.and.stars")
-            }.buttonStyle(.plain).disabled(state.bracketHellfireUsed || (state.officialPostseasonField == nil && state.isAuthenticatedSession))
+            }.buttonStyle(.plain).disabled(state.bracketHellfireUsed || state.postseasonBracketIsLocked() || (state.officialPostseasonField == nil && state.isAuthenticatedSession))
             FieldhouseHero(kicker: "MARCH COMMAND · 76 TEAMS · 75 DECISIONS", title: "ROAD TO CENTER COURT", detail: "Twelve Opening Round games feed the familiar field of 64. Every winner advances through the real bracket path.", icon: "point.3.connected.trianglepath.dotted")
             if state.isCreator {
                 VStack(spacing: 10) {
@@ -4113,8 +4169,8 @@ private struct FieldhouseBracketsPage: View {
             }
             Button { showingBracketPicker = true } label: {
                 FieldhouseAction(
-                    kicker: state.bracketLocked ? "PERMANENT BRACKET RECEIPT" : state.bracketSubmitted ? "BRACKET FILED · EDITABLE UNTIL TIP" : "SELECTION SUNDAY · PICKS OPEN",
-                    title: state.bracketLocked ? "View My Locked Bracket" : state.bracketSubmitted ? "Review or Change My Bracket" : "Fill Out My 76-Team Bracket",
+                    kicker: state.postseasonBracketIsLocked() ? "PERMANENT BRACKET RECEIPT" : state.bracketSubmitted ? "BRACKET FILED · EDITABLE UNTIL TIP" : "SELECTION SUNDAY · PICKS OPEN",
+                    title: state.postseasonBracketIsLocked() ? "View My Locked Bracket" : state.bracketSubmitted ? "Review or Change My Bracket" : "Fill Out My 76-Team Bracket",
                     detail: bracketDetail,
                     icon: "rectangle.split.3x3.fill"
                 )
@@ -4168,7 +4224,7 @@ private struct FieldhouseBracketsPage: View {
     }
 
     private func deployBracketHellfire() {
-        guard !state.bracketHellfireUsed else { return }
+        guard !state.bracketHellfireUsed, !state.postseasonBracketIsLocked() else { return }
         state.postseasonBracketPicks = FieldhouseBracketEngine.hellfirePicks(league: state.league, field: state.officialPostseasonField)
         state.bracketSubmitted = true
         state.bracketHellfireUsed = true
