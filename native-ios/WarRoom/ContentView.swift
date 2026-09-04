@@ -2659,7 +2659,6 @@ struct HomeView: View {
                             .background(.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 16))
                             .overlay(RoundedRectangle(cornerRadius: 16).stroke(moreAccent.opacity(0.42), lineWidth: 1))
                         }
-
                         if isNFL {
                             NflScoreboardStrip(
                                 players: standings.count,
@@ -3152,7 +3151,6 @@ private struct CompactWeekReadyCard: View {
         .overlay(RoundedRectangle(cornerRadius: isNFL ? 9 : 16).stroke(accent.opacity(0.52)))
     }
 }
-
 private struct PatreonSupportCard: View {
     let sportId: String
 

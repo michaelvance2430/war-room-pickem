@@ -44,7 +44,6 @@ async function fcmAccessToken() {
   })));
   const signature = new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, encoder.encode(`${header}.${claim}`)));
   const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: `${header}.${claim}.${base64url(signature)}` }),
   });
   const payload = await response.json();
@@ -60,7 +59,7 @@ Deno.serve(async (request) => {
     });
     const { data: jobs, error: claimError } = await supabase.rpc("claim_push_notification_batch", { p_limit: 20 });
     if (claimError) return Response.json({ error: claimError.message }, { status: 500 });
-    const jwt = await providerToken();
+    const apnsJwt = await providerToken();
     const androidConfigured = Boolean(Deno.env.get("FCM_PROJECT_ID") && Deno.env.get("FCM_CLIENT_EMAIL") && Deno.env.get("FCM_PRIVATE_KEY"));
     const fcmToken = androidConfigured ? await fcmAccessToken() : null;
     let sent = 0;
@@ -121,7 +120,7 @@ Deno.serve(async (request) => {
       const response = await fetch(`https://${host}/3/device/${device.device_token}`, {
         method: "POST",
         headers: {
-          authorization: `bearer ${jwt}`,
+          authorization: `bearer ${apnsJwt}`,
           "apns-topic": "com.warroompicks.WarRoom",
           "apns-push-type": "alert",
           "apns-priority": "10",
