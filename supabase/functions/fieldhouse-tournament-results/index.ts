@@ -34,11 +34,13 @@ Deno.serve(async (request: Request) => {
       const games = new Map(tournament.fieldhouse_tournament_games.map((game) => [game.game_id, game]));
       const now = Date.now();
       const readyPending = tournament.fieldhouse_tournament_games.filter((game) => {
-        if (game.winner_team_id || !game.starts_at) return false;
+        if (game.winner_team_id) return false;
         const firstID = game.first_team_id || (game.first_source_game_id ? games.get(game.first_source_game_id)?.winner_team_id : null);
         const secondID = game.second_team_id || (game.second_source_game_id ? games.get(game.second_source_game_id)?.winner_team_id : null);
         return Boolean(firstID && secondID);
       });
+      const missingSchedule = readyPending.filter((game) => !game.starts_at);
+      if (missingSchedule.length) waiting.push(...missingSchedule.map((game) => `${tournament.id}:${game.game_id}:official-tip-missing`));
       const pollingGames = readyPending.filter((game) => {
         const tip = Date.parse(game.starts_at || "");
         return Number.isFinite(tip) && tip <= now + 2 * 60_000 && tip >= now - 24 * 60 * 60_000;

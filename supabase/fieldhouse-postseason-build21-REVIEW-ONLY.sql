@@ -321,6 +321,7 @@ declare
   v_sport text;
   v_round_title text;
   v_first_tip timestamptz;
+  v_missing_tips integer;
   v_count integer := 0;
   v_inserted integer := 0;
 begin
@@ -328,13 +329,13 @@ begin
     raise exception 'Invalid Fieldhouse round';
   end if;
 
-  select t.sport_id, min(g.starts_at)
-  into v_sport, v_first_tip
+  select t.sport_id, min(g.starts_at), count(*) filter(where g.starts_at is null)
+  into v_sport, v_first_tip, v_missing_tips
   from public.fieldhouse_tournaments t
   join public.fieldhouse_tournament_games g on g.tournament_id = t.id
   where t.id = p_tournament_id and t.status <> 'draft' and g.round_key = p_round_key
   group by t.sport_id;
-  if not found or v_first_tip is null then return 0; end if;
+  if not found or v_first_tip is null or v_missing_tips<>0 then return 0; end if;
 
   v_round_title := case p_round_key
     when 'opening' then 'Opening Round'
@@ -638,6 +639,7 @@ declare
   v_input_count integer;
   v_updated integer;
   schedule_round record;
+  v_active_round text;
 begin
   if v_uid <> '09544d2b-6eca-4131-a321-c000586c9029'::uuid then
     raise exception 'War Room owner access required';
@@ -699,6 +701,39 @@ begin
     where event_key like 'fieldhouse-round-lock-1h:'||v_tournament_id||':'||schedule_round.round_key||':%'
       and status in ('pending','failed') and schedule_round.first_tip-interval '1 hour'>clock_timestamp();
   end loop;
+
+  -- A later round can become structurally ready before television publishes
+  -- its tip time. Once this sync supplies that time, queue the active round now.
+  select candidate.round_key into v_active_round
+  from (
+    select round_key,min(round_order) round_order,min(starts_at) first_tip,
+      count(*) filter(where starts_at is null) missing_tips
+    from public.fieldhouse_tournament_games
+    where tournament_id=v_tournament_id and winner_team_id is null
+    group by round_key
+  ) candidate
+  where candidate.first_tip is not null and candidate.missing_tips=0
+    and not exists(
+      select 1 from public.fieldhouse_tournament_games game
+      where game.tournament_id=v_tournament_id and game.round_key=candidate.round_key
+        and game.winner_team_id is null
+        and (
+          (game.first_team_id is null and not exists(
+            select 1 from public.fieldhouse_tournament_games source
+            where source.tournament_id=game.tournament_id and source.game_id=game.first_source_game_id and source.winner_team_id is not null
+          ))
+          or
+          (game.second_team_id is null and not exists(
+            select 1 from public.fieldhouse_tournament_games source
+            where source.tournament_id=game.tournament_id and source.game_id=game.second_source_game_id and source.winner_team_id is not null
+          ))
+        )
+    )
+  order by candidate.round_order
+  limit 1;
+  if v_active_round is not null then
+    perform private.queue_fieldhouse_round_notifications(v_tournament_id,v_active_round);
+  end if;
 
   return jsonb_build_object('ok',true,'tournamentId',v_tournament_id,'updatedGames',v_updated);
 end;
