@@ -227,31 +227,39 @@ struct FieldhouseBracketPickerView: View {
     var body: some View {
         VStack(spacing: 0) {
             pinnedHeader
-            ScrollView {
-                VStack(spacing: 13) {
-                    sectionRail
-                    sectionIntro
-                    ForEach(FieldhouseBracketEngine.matchups(for: section, league: league, picks: picks), id: \.round) { group in
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(group.round).font(.caption.weight(.black)).tracking(1.5).foregroundStyle(accent)
-                            ForEach(group.games) { matchup in matchupCard(matchup) }
-                        }
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("MOVE THROUGH THE BRACKET")
-                            .font(.system(size: 9, weight: .black))
-                            .tracking(1.5)
-                            .foregroundStyle(.white.opacity(0.52))
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 13) {
                         sectionRail
+                            .id("bracket-section-top")
+                        sectionIntro
+                        ForEach(FieldhouseBracketEngine.matchups(for: section, league: league, picks: picks), id: \.round) { group in
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(group.round).font(.caption.weight(.black)).tracking(1.5).foregroundStyle(accent)
+                                ForEach(group.games) { matchup in matchupCard(matchup) }
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("MOVE THROUGH THE BRACKET")
+                                .font(.system(size: 9, weight: .black))
+                                .tracking(1.5)
+                                .foregroundStyle(.white.opacity(0.52))
+                            sectionRail
+                        }
+                        .padding(.top, 4)
+                        Button { showingReview = true } label: {
+                            Label(progress == 75 ? "REVIEW COMPLETED BRACKET" : "REVIEW · \(75 - progress) PICKS REMAIN", systemImage: "checklist")
+                                .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
+                                .foregroundStyle(progress == 75 ? .black : .white)
+                                .background(progress == 75 ? accent : Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                        }.buttonStyle(.plain)
+                    }.padding(14).padding(.bottom, 28)
+                }
+                .onChange(of: section) { _, _ in
+                    withAnimation(.easeOut(duration: 0.24)) {
+                        proxy.scrollTo("bracket-section-top", anchor: .top)
                     }
-                    .padding(.top, 4)
-                    Button { showingReview = true } label: {
-                        Label(progress == 75 ? "REVIEW COMPLETED BRACKET" : "REVIEW · \(75 - progress) PICKS REMAIN", systemImage: "checklist")
-                            .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
-                            .foregroundStyle(progress == 75 ? .black : .white)
-                            .background(progress == 75 ? accent : Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
-                    }.buttonStyle(.plain)
-                }.padding(14).padding(.bottom, 28)
+                }
             }
         }
         .background(Color.black.opacity(0.34))
