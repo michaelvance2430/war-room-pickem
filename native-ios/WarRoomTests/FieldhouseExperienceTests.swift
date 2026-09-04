@@ -155,6 +155,8 @@ final class FieldhouseExperienceTests: XCTestCase {
 
         state.bracketSubmitted = true
         XCTAssertTrue(state.postseasonScorecardIsActive)
+        let now = ISO8601DateFormatter().date(from: "2027-03-17T16:00:00Z")!
+        XCTAssertTrue(state.postseasonLockLabel(at: now).hasPrefix("FIRST ROUND LOCKS IN"))
     }
 
     func testCardWritePlanTranslatesTeamFavoriteToSharedHomeAwayContract() throws {

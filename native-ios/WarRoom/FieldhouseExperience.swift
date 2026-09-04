@@ -1194,6 +1194,19 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var activePostseasonRound: String? {
         officialPostseasonField.flatMap { FieldhouseBracketEngine.liveRoundKey(field: $0) }
     }
+    func postseasonLockLabel(at now: Date) -> String {
+        guard let field = officialPostseasonField,
+              let round = activePostseasonRound else { return "TOURNAMENT COMPLETE" }
+        let formatter = ISO8601DateFormatter()
+        let firstTip = field.games
+            .filter { $0.roundKey == round }
+            .compactMap { $0.startsAt.flatMap(formatter.date(from:)) }
+            .min()
+        guard let firstTip else { return "\(FieldhouseBracketEngine.roundTitle(round)) · TIP PENDING" }
+        guard now < firstTip else { return "\(FieldhouseBracketEngine.roundTitle(round)) PICKS LOCKED" }
+        let parts = Calendar.current.dateComponents([.day, .hour, .minute], from: now, to: firstTip)
+        return "\(FieldhouseBracketEngine.roundTitle(round)) LOCKS IN \(max(0, parts.day ?? 0))D \(max(0, parts.hour ?? 0))H \(max(0, parts.minute ?? 0))M"
+    }
     var scoringFinalGames: Int {
         scoringGames.filter { scoringResults[$0.id]?.isFinal == true }.count
     }
@@ -1419,6 +1432,7 @@ enum FieldhouseStateHydrator {
         }
         state.crystalBallChampion = snapshot.crystalBall?.teamName
         state.officialPostseasonField = snapshot.officialField
+        if snapshot.officialField != nil { state.phase = .postseason }
         state.postseasonBracketPicks = snapshot.bracketEntry?.picks ?? state.postseasonBracketPicks
         state.bracketSubmitted = snapshot.bracketEntry?.submittedAt != nil
         state.bracketLocked = snapshot.bracketEntry?.lockedAt != nil
@@ -1589,6 +1603,7 @@ struct FieldhouseNativePreviewView: View {
     @State private var showingEntrance = true
     @State private var showingSetup = false
     @State private var persistenceError: String?
+    @State private var openActivePostseasonRound = false
     @State private var lastVerifiedState: FieldhouseSeasonState
     @State private var standings: [Standing]
     @Environment(\.scenePhase) private var scenePhase
@@ -1668,6 +1683,7 @@ struct FieldhouseNativePreviewView: View {
 
     private static func seedPostseasonScorecardPreview(_ state: inout FieldhouseSeasonState, league: FieldhouseLeague) {
         state.officialPostseasonField = .previewRound(for: league)
+        state.phase = .postseason
         state.bracketSubmitted = true
         state.bracketLocked = true
         state.postseasonBracketCorrectPicks = 27
@@ -1696,13 +1712,13 @@ struct FieldhouseNativePreviewView: View {
                         }
                     }
                 } else if desk == .standings {
-                    FieldhouseStandingsPage(state: $state)
+                    FieldhouseStandingsPage(state: $state, openActivePostseasonRound: $openActivePostseasonRound)
                         .padding(14).padding(.bottom, 30)
                 } else {
                     ScrollView {
                         Group {
                             switch desk {
-                            case .home: FieldhouseHomePage(state: $state, desk: $desk)
+                            case .home: FieldhouseHomePage(state: $state, desk: $desk, openActivePostseasonRound: $openActivePostseasonRound)
                             case .picks: EmptyView()
                             case .standings: EmptyView()
                             case .locker: EmptyView()
@@ -2125,6 +2141,7 @@ private struct FieldhouseHomePage: View {
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @Binding var desk: FieldhouseDesk
+    @Binding var openActivePostseasonRound: Bool
     @State private var showingLeagueSwitcher = false
     @State private var showingCardBuilder = false
     @State private var showingCommissionerCommand = false
@@ -2227,31 +2244,50 @@ private struct FieldhouseHomePage: View {
         }
     }
 
-    private var playerCommand: some View {
-        let commandColor: Color = state.playerPicksAreComplete ? .green : (state.cardIsPublished ? .red : accent)
-        return Button {
-            if state.cardIsPublished { desk = .picks }
-            else if state.canBuildCard { showingCardBuilder = true }
-        } label: {
-            FieldhouseAction(
-                kicker: state.playerPicksAreComplete
-                    ? "PLAYER COMMAND · WEEK \(state.window) · COMPLETE"
-                    : (state.cardIsPublished ? "PLAYER COMMAND · WEEK \(state.window) · PICKS OPEN" : "PLAYER COMMAND · WEEK \(state.window)"),
-                title: state.playerPicksAreComplete
-                    ? "Week \(state.window) Picks Complete"
-                    : (state.cardIsPublished ? "Make Your 10 Picks" : (state.isCommissioner ? "Build Next Week's Card" : "Card Not Posted Yet")),
-                detail: state.playerPicksAreComplete
-                    ? "Your ten picks are on the record. Tap to view your locked board."
-                    : (state.cardIsPublished
-                    ? "Ten shared games. One card. Locks at the first selected tip."
-                    : (state.isCommissioner ? "Pull the odds and publish the next board." : "The commissioner is building the next ten-game board.")),
-                icon: state.playerPicksAreComplete ? "checkmark.seal.fill" : (state.cardIsPublished ? "list.bullet.clipboard.fill" : (state.isCommissioner ? "hammer.fill" : "hourglass")),
-                signalColor: commandColor
-            )
+    @ViewBuilder private var playerCommand: some View {
+        if state.postseasonScorecardIsActive {
+            let round = state.activePostseasonRound
+            let roundComplete = round.map { state.postseasonRoundSubmitted.contains($0) } ?? true
+            Button {
+                openActivePostseasonRound = round != nil
+                desk = .standings
+            } label: {
+                FieldhouseAction(
+                    kicker: roundComplete ? "POSTSEASON COMMAND · COMPLETE" : "POSTSEASON COMMAND · ACTION REQUIRED",
+                    title: round.map { roundComplete ? "\(FieldhouseBracketEngine.roundTitle($0)) Picks Filed" : "Pick the \(FieldhouseBracketEngine.roundTitle($0))" } ?? "View Tournament Command",
+                    detail: roundComplete
+                        ? "Your current-round picks are on the record. Open the bracket and live scoreboard."
+                        : "A fresh winner card is open. File every pick before the first game tips.",
+                    icon: roundComplete ? "checkmark.seal.fill" : "basketball.fill",
+                    signalColor: roundComplete ? .green : .red
+                )
+            }.buttonStyle(.plain)
+        } else {
+            let commandColor: Color = state.playerPicksAreComplete ? .green : (state.cardIsPublished ? .red : accent)
+            Button {
+                if state.cardIsPublished { desk = .picks }
+                else if state.canBuildCard { showingCardBuilder = true }
+            } label: {
+                FieldhouseAction(
+                    kicker: state.playerPicksAreComplete
+                        ? "PLAYER COMMAND · WEEK \(state.window) · COMPLETE"
+                        : (state.cardIsPublished ? "PLAYER COMMAND · WEEK \(state.window) · PICKS OPEN" : "PLAYER COMMAND · WEEK \(state.window)"),
+                    title: state.playerPicksAreComplete
+                        ? "Week \(state.window) Picks Complete"
+                        : (state.cardIsPublished ? "Make Your 10 Picks" : (state.isCommissioner ? "Build Next Week's Card" : "Card Not Posted Yet")),
+                    detail: state.playerPicksAreComplete
+                        ? "Your ten picks are on the record. Tap to view your locked board."
+                        : (state.cardIsPublished
+                        ? "Ten shared games. One card. Locks at the first selected tip."
+                        : (state.isCommissioner ? "Pull the odds and publish the next board." : "The commissioner is building the next ten-game board.")),
+                    icon: state.playerPicksAreComplete ? "checkmark.seal.fill" : (state.cardIsPublished ? "list.bullet.clipboard.fill" : (state.isCommissioner ? "hammer.fill" : "hourglass")),
+                    signalColor: commandColor
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!state.cardIsPublished && !state.canBuildCard)
+            .opacity(!state.cardIsPublished && !state.canBuildCard ? 0.72 : 1)
         }
-        .buttonStyle(.plain)
-        .disabled(!state.cardIsPublished && !state.canBuildCard)
-        .opacity(!state.cardIsPublished && !state.canBuildCard ? 0.72 : 1)
     }
 
 }
@@ -2620,16 +2656,22 @@ private struct FieldhouseHomeMasthead: View {
                     .frame(width: 68, height: 68).background(accent, in: RoundedRectangle(cornerRadius: 17))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(state.league.displayName).font(.system(size: 28, weight: .black)).fontWidth(.condensed)
-                    Text("\(state.league.rawValue) · \(FieldhouseSeasonCalendar.windowLabel(state.window)) · \(state.phase.rawValue)")
+                    Text(state.postseasonScorecardIsActive
+                         ? "\(state.league.rawValue) · 2027 TOURNAMENT · POSTSEASON"
+                         : "\(state.league.rawValue) · \(FieldhouseSeasonCalendar.windowLabel(state.window)) · \(state.phase.rawValue)")
                         .font(.system(size: 9, weight: .black)).tracking(1.2).foregroundStyle(.white.opacity(0.55))
                 }
             }
             Divider().overlay(accent.opacity(0.45))
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 HStack {
-                    Label("SHOT CLOCK", systemImage: "timer").font(.caption2.weight(.black)).tracking(1.3)
+                    Label(state.postseasonScorecardIsActive ? "ROUND CLOCK" : "SHOT CLOCK", systemImage: "timer")
+                        .font(.caption2.weight(.black)).tracking(1.3)
                     Spacer()
-                    Text(FieldhouseSeasonCalendar.lockClock(at: context.date, window: state.window, games: state.publishedGames)).font(.caption.weight(.black))
+                    Text(state.postseasonScorecardIsActive
+                         ? state.postseasonLockLabel(at: context.date)
+                         : FieldhouseSeasonCalendar.lockClock(at: context.date, window: state.window, games: state.publishedGames))
+                        .font(.caption.weight(.black))
                 }.foregroundStyle(accent)
             }
         }
@@ -3124,6 +3166,7 @@ private struct FieldhouseStandingsPage: View {
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
+    @Binding var openActivePostseasonRound: Bool
     private var sportID: String { state.league == .ncaaw ? "ncaaw" : "ncaam" }
     @State private var showingOverall = false
     @State private var showingPostseason = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
@@ -3173,7 +3216,11 @@ private struct FieldhouseStandingsPage: View {
                             .font(.caption.weight(.black)).foregroundStyle(accent)
                             .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
                     }.buttonStyle(.plain)
-                    FieldhouseBracketsPage(state: $state, strikePresentation: $postseasonStrikePresentation)
+                    FieldhouseBracketsPage(
+                        state: $state,
+                        strikePresentation: $postseasonStrikePresentation,
+                        openActivePostseasonRound: $openActivePostseasonRound
+                    )
                 }
             } else {
                 ScrollView {
@@ -3248,6 +3295,13 @@ private struct FieldhouseStandingsPage: View {
             guard let token = auth.token else { profile = nil; return }
             profile = try? await SupabaseAPI.profile(token: token, userId: profileUserID)
         }
+        .onAppear { routePostseasonCommandIfNeeded() }
+        .onChange(of: openActivePostseasonRound) { _, _ in routePostseasonCommandIfNeeded() }
+    }
+
+    private func routePostseasonCommandIfNeeded() {
+        guard openActivePostseasonRound else { return }
+        showingPostseason = true
     }
 
     private var regionalCutSummary: some View {
@@ -3403,6 +3457,7 @@ private struct FieldhouseBracketsPage: View {
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
+    @Binding var openActivePostseasonRound: Bool
     @State private var confirmingBracketHellfire = false
     @State private var showingHistory = false
     @State private var showingBracketPicker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
@@ -3449,6 +3504,8 @@ private struct FieldhouseBracketsPage: View {
         } message: {
             Text("This cannot be undone. The machine makes all 75 decisions in the 76-team bracket, locks it permanently, and allows no edits or rerolls. At least 60% correct earns 1.5× raw bracket points. Below 60% cuts raw bracket points in half.")
         }
+        .onAppear { openRequestedRoundIfNeeded() }
+        .onChange(of: openActivePostseasonRound) { _, _ in openRequestedRoundIfNeeded() }
         .fileImporter(isPresented: $showingFieldImporter, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
             guard case .success(let urls) = result, let url = urls.first else { return }
             let accessed = url.startAccessingSecurityScopedResource()
@@ -3469,6 +3526,12 @@ private struct FieldhouseBracketsPage: View {
         } message: {
             Text("War Room validates exactly 76 teams, 75 connected games, four 19-team regions, and official tip times. Publishing opens this same field in every \(state.league.rawValue) league.")
         }
+    }
+
+    private func openRequestedRoundIfNeeded() {
+        guard openActivePostseasonRound, state.activePostseasonRound != nil else { return }
+        showingRoundPicker = true
+        openActivePostseasonRound = false
     }
 
     private var overview: some View {
