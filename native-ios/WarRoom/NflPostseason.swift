@@ -49,12 +49,32 @@ struct NflPostseasonScorecard: Decodable, Sendable {
     let divisionalPoints: Int
     let conferencePoints: Int
     let superBowlPoints: Int
+    let correctPicks: Int
+    let rawPoints: Int
+    let adjustedPoints: Int
     let totalPoints: Int
     let usedJdam: Bool
+    let jdamMultiplier: Double
     enum CodingKeys: String, CodingKey {
         case wildCardPoints = "wild_card_points"; case divisionalPoints = "divisional_points"
         case conferencePoints = "conference_points"; case superBowlPoints = "super_bowl_points"
-        case totalPoints = "total_points"; case usedJdam = "used_jdam"
+        case correctPicks = "correct_picks"; case rawPoints = "raw_points"
+        case adjustedPoints = "adjusted_points"; case totalPoints = "total_points"
+        case usedJdam = "used_jdam"; case jdamMultiplier = "jdam_multiplier"
+    }
+}
+
+enum NflJdamScoring {
+    static let decisionCount = 13
+    static let successThreshold = 8
+
+    static func multiplier(correctPicks: Int, usedJdam: Bool) -> Double {
+        guard usedJdam else { return 1.0 }
+        return correctPicks >= successThreshold ? 1.5 : 0.5
+    }
+
+    static func adjustedPoints(rawPoints: Int, correctPicks: Int, usedJdam: Bool) -> Int {
+        Int((Double(rawPoints) * multiplier(correctPicks: correctPicks, usedJdam: usedJdam)).rounded())
     }
 }
 

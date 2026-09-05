@@ -410,6 +410,19 @@ struct WarRoomTests {
         #expect(LiveScorecardOfficialState.propStatus(choice: "No", officialResult: "Yes", points: 3) == "MISS +0")
     }
 
+    @Test func nflJdamMissesTheBoundaryAtSevenOfThirteen() {
+        #expect(NflJdamScoring.decisionCount == 13)
+        #expect(NflJdamScoring.successThreshold == 8)
+        #expect(NflJdamScoring.multiplier(correctPicks: 7, usedJdam: true) == 0.5)
+        #expect(NflJdamScoring.adjustedPoints(rawPoints: 17, correctPicks: 7, usedJdam: true) == 9)
+    }
+
+    @Test func nflJdamClearsTheBoundaryAtEightOfThirteen() {
+        #expect(NflJdamScoring.multiplier(correctPicks: 8, usedJdam: true) == 1.5)
+        #expect(NflJdamScoring.adjustedPoints(rawPoints: 17, correctPicks: 8, usedJdam: true) == 26)
+        #expect(NflJdamScoring.adjustedPoints(rawPoints: 17, correctPicks: 13, usedJdam: false) == 17)
+    }
+
     private func standing(name: String, points: Int, id: Int) -> Standing {
         Standing(
             id: UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", id))!,

@@ -1646,7 +1646,7 @@ enum SupabaseAPI {
 
     static func nflPostseasonScorecard(token:String,leagueId:UUID,userId:UUID,seasonKey:Int) async throws -> NflPostseasonScorecard? {
         var components=URLComponents(url:SupabaseConfiguration.baseURL.appending(path:"rest/v1/nfl_postseason_scorecards"),resolvingAgainstBaseURL:false)!
-        components.queryItems=[URLQueryItem(name:"select",value:"wild_card_points,divisional_points,conference_points,super_bowl_points,total_points,used_jdam"),URLQueryItem(name:"league_id",value:"eq.\(leagueId.uuidString.lowercased())"),URLQueryItem(name:"user_id",value:"eq.\(userId.uuidString.lowercased())"),URLQueryItem(name:"season_key",value:"eq.\(seasonKey)"),URLQueryItem(name:"limit",value:"1")]
+        components.queryItems=[URLQueryItem(name:"select",value:"wild_card_points,divisional_points,conference_points,super_bowl_points,correct_picks,raw_points,adjusted_points,total_points,used_jdam,jdam_multiplier"),URLQueryItem(name:"league_id",value:"eq.\(leagueId.uuidString.lowercased())"),URLQueryItem(name:"user_id",value:"eq.\(userId.uuidString.lowercased())"),URLQueryItem(name:"season_key",value:"eq.\(seasonKey)"),URLQueryItem(name:"limit",value:"1")]
         return try await send(authorizedRequest(url:components.url!,token:token),as:[NflPostseasonScorecard].self).first
     }
 
