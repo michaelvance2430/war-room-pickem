@@ -53,6 +53,14 @@ alter function public.save_nfl_postseason_bracket(uuid,integer,jsonb,boolean)
   set search_path = '';
 alter function public.reset_league_season_guarded(uuid,text)
   set search_path = '';
+revoke all on function public.publish_nfl_postseason_slate(uuid,integer,jsonb)
+  from public,anon;
+grant execute on function public.publish_nfl_postseason_slate(uuid,integer,jsonb)
+  to authenticated,service_role;
+revoke all on function public.save_nfl_postseason_bracket(uuid,integer,jsonb,boolean)
+  from public,anon;
+grant execute on function public.save_nfl_postseason_bracket(uuid,integer,jsonb,boolean)
+  to authenticated,service_role;
 revoke insert,update on public.nfl_postseason_slates
   from authenticated;
 revoke insert,update on public.nfl_postseason_entries

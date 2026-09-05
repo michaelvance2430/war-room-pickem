@@ -184,14 +184,28 @@ grant execute on function public.claim_fieldhouse_tournament_odds_refresh(uuid,i
 
 create index if not exists fieldhouse_games_event_idx
   on public.fieldhouse_tournament_games (odds_event_id) where odds_event_id is not null;
+create index if not exists fieldhouse_tournaments_created_by_idx
+  on public.fieldhouse_tournaments (created_by);
 create index if not exists fieldhouse_brackets_league_idx
   on public.fieldhouse_bracket_entries (league_id, tournament_id);
+create index if not exists fieldhouse_brackets_user_idx
+  on public.fieldhouse_bracket_entries (user_id);
 create index if not exists fieldhouse_round_entries_league_idx
   on public.fieldhouse_round_entries (league_id, tournament_id, round_key);
+create index if not exists fieldhouse_round_entries_user_idx
+  on public.fieldhouse_round_entries (user_id);
 create index if not exists fieldhouse_postseason_totals_leaderboard_idx
   on public.fieldhouse_postseason_totals (tournament_id, league_id, total_points desc, user_id);
+create index if not exists fieldhouse_postseason_totals_league_idx
+  on public.fieldhouse_postseason_totals (league_id);
+create index if not exists fieldhouse_postseason_totals_user_idx
+  on public.fieldhouse_postseason_totals (user_id);
 create index if not exists fieldhouse_postseason_qualifiers_path_idx
   on public.fieldhouse_postseason_qualifiers (tournament_id, league_id, path, fieldhouse_region, regular_rank);
+create index if not exists fieldhouse_postseason_qualifiers_league_idx
+  on public.fieldhouse_postseason_qualifiers (league_id);
+create index if not exists fieldhouse_postseason_qualifiers_user_idx
+  on public.fieldhouse_postseason_qualifiers (user_id);
 -- A real tie remains a tie. The old one-winner indexes made co-champions
 -- impossible and forced the award function to choose a user UUID. Keep one
 -- receipt per winning player instead.
@@ -200,6 +214,10 @@ drop index if exists public.fieldhouse_one_regional_champion_idx;
 drop index if exists public.fieldhouse_one_toilet_champion_idx;
 create unique index if not exists fieldhouse_award_recipient_idx
   on public.fieldhouse_postseason_awards(tournament_id,league_id,award_key,user_id);
+create index if not exists fieldhouse_awards_league_idx
+  on public.fieldhouse_postseason_awards (league_id);
+create index if not exists fieldhouse_awards_user_idx
+  on public.fieldhouse_postseason_awards (user_id);
 
 alter table public.fieldhouse_tournaments enable row level security;
 alter table public.fieldhouse_tournament_teams enable row level security;
@@ -211,15 +229,18 @@ alter table public.fieldhouse_postseason_qualifiers enable row level security;
 alter table public.fieldhouse_postseason_awards enable row level security;
 
 -- Published fields are universal public game facts. Draft fields remain service-only.
+drop policy if exists "Authenticated read published Fieldhouse tournaments" on public.fieldhouse_tournaments;
 create policy "Authenticated read published Fieldhouse tournaments"
   on public.fieldhouse_tournaments for select to authenticated
   using (status <> 'draft');
+drop policy if exists "Authenticated read published Fieldhouse teams" on public.fieldhouse_tournament_teams;
 create policy "Authenticated read published Fieldhouse teams"
   on public.fieldhouse_tournament_teams for select to authenticated
   using (exists (
     select 1 from public.fieldhouse_tournaments t
     where t.id = tournament_id and t.status <> 'draft'
   ));
+drop policy if exists "Authenticated read published Fieldhouse games" on public.fieldhouse_tournament_games;
 create policy "Authenticated read published Fieldhouse games"
   on public.fieldhouse_tournament_games for select to authenticated
   using (exists (
@@ -228,12 +249,15 @@ create policy "Authenticated read published Fieldhouse games"
   ));
 
 -- Raw picks are private receipts. Opponent declassification must use a guarded RPC.
+drop policy if exists "Players read own Fieldhouse bracket" on public.fieldhouse_bracket_entries;
 create policy "Players read own Fieldhouse bracket"
   on public.fieldhouse_bracket_entries for select to authenticated
   using (user_id = (select auth.uid()));
+drop policy if exists "Players read own Fieldhouse round picks" on public.fieldhouse_round_entries;
 create policy "Players read own Fieldhouse round picks"
   on public.fieldhouse_round_entries for select to authenticated
   using (user_id = (select auth.uid()));
+drop policy if exists "League members read Fieldhouse postseason totals" on public.fieldhouse_postseason_totals;
 create policy "League members read Fieldhouse postseason totals"
   on public.fieldhouse_postseason_totals for select to authenticated
   using (exists (
@@ -241,6 +265,7 @@ create policy "League members read Fieldhouse postseason totals"
     where m.league_id = fieldhouse_postseason_totals.league_id
       and m.user_id = (select auth.uid())
   ));
+drop policy if exists "League members read Fieldhouse postseason qualifiers" on public.fieldhouse_postseason_qualifiers;
 create policy "League members read Fieldhouse postseason qualifiers"
   on public.fieldhouse_postseason_qualifiers for select to authenticated
   using (exists (
@@ -248,6 +273,7 @@ create policy "League members read Fieldhouse postseason qualifiers"
     where m.league_id = fieldhouse_postseason_qualifiers.league_id
       and m.user_id = (select auth.uid())
   ));
+drop policy if exists "League members read Fieldhouse awards" on public.fieldhouse_postseason_awards;
 create policy "League members read Fieldhouse awards"
   on public.fieldhouse_postseason_awards for select to authenticated
   using (exists (
@@ -274,7 +300,9 @@ revoke insert, update, delete on public.fieldhouse_tournaments,
   public.fieldhouse_postseason_awards from anon, authenticated;
 
 create or replace function public.fieldhouse_round_weight(p_round text)
-returns integer language sql immutable as $$
+returns integer language sql immutable
+set search_path = ''
+as $$
   select case p_round
     when 'opening' then 1 when 'r64' then 1 when 'r32' then 2
     when 's16' then 4 when 'e8' then 8 when 'ff' then 16 when 'title' then 32

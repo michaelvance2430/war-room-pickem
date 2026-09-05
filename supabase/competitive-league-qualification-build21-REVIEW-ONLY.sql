@@ -52,6 +52,13 @@ create table if not exists public.career_champion_milestones (
   unique (user_id, achievement_code)
 );
 
+create index if not exists career_championship_receipts_user_idx
+  on public.career_championship_receipts (user_id);
+create index if not exists career_champion_milestones_receipt_idx
+  on public.career_champion_milestones (triggering_receipt_key);
+create index if not exists career_champion_milestones_league_idx
+  on public.career_champion_milestones (triggering_league_id);
+
 alter table public.league_competitive_seasons enable row level security;
 alter table public.career_championship_receipts enable row level security;
 alter table public.career_champion_milestones enable row level security;

@@ -35,6 +35,12 @@ alter table public.league_season_closeouts
   drop constraint if exists league_season_closeouts_league_id_season_key_key;
 create unique index if not exists league_season_closeouts_competition_key
   on public.league_season_closeouts(league_id,season_key,competition_type);
+create index if not exists league_season_closeouts_closed_by_idx
+  on public.league_season_closeouts(closed_by);
+create index if not exists league_season_closeouts_league_champion_idx
+  on public.league_season_closeouts(league_champion_id);
+create index if not exists league_season_closeouts_toilet_champion_idx
+  on public.league_season_closeouts(toilet_bowl_champion_id);
 
 create or replace function private.validate_closeout_trophy_catalog(
   p_sport_id text,
