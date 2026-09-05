@@ -5553,6 +5553,14 @@ private struct FieldhouseProfilePage: View {
             }
             dossierButton(.standings, "Standings", "Regional race and live room order", "chart.bar.fill", accent)
             dossierButton(.locker, "Locker Room", "Open room communications", "bubble.left.and.bubble.right.fill", accent)
+            Button { activeDestination = .crystalBall } label: {
+                FieldhouseAction(
+                    kicker: "CRYSTAL BALL · SEALED",
+                    title: state.crystalBallChampion ?? "Champion not selected",
+                    detail: "Open your permanent preseason championship prediction.",
+                    icon: "sparkles"
+                )
+            }.buttonStyle(.plain)
 
             dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
             dossierButton(
@@ -5602,9 +5610,6 @@ private struct FieldhouseProfilePage: View {
 
             dossierLabel("TROPHY CASE", detail: "THE ROOM CANNOT DELETE HISTORY")
             dossierInfo("No permanent hardware yet", "The engraver checked twice", "trophy.fill", .yellow)
-            Button { activeDestination = .crystalBall } label: {
-                FieldhouseAction(kicker: "CRYSTAL BALL · SEALED", title: state.crystalBallChampion ?? "Champion not selected", detail: "The original championship prediction stays on your permanent profile.", icon: "sparkles")
-            }.buttonStyle(.plain)
 
             dossierLabel("IDENTITY CONTROL", detail: "CHANGE THE NAME. KEEP THE RECEIPTS.")
             dossierButton(.editProfile, "Edit Profile", "Name, photo, birthday, favorite team and loadout", "person.crop.rectangle.fill", .green)
