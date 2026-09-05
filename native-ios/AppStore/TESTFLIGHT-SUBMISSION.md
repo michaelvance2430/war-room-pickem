@@ -4,8 +4,8 @@
 
 - App name: War Room Pick'Em
 - Bundle ID: `com.warroompicks.WarRoom`
-- Version: `1.0`
-- Build: `1`
+- Version: `3.3`
+- Build: `21`
 - Platform: iPhone
 - Minimum iOS: 17.0
 - Category: Sports
@@ -15,7 +15,7 @@
 
 ## Beta description
 
-War Room Pick'Em is a private-league college football pick'em built around weekly cards, confidence points, best bets, standings, scorecards, postseason brackets, achievements, and league trash talk.
+War Room Pick'Em is a private-league football and college-basketball picks app built around weekly cards, confidence points, best bets, live boards, standings, scorecards, postseason brackets, achievements, and league trash talk.
 
 ## What to test
 
@@ -31,7 +31,7 @@ War Room Pick'Em is a private-league college football pick'em built around weekl
 ## Review notes
 
 - This app does not offer gambling, wagering, cash prizes, or real-money contests.
-- League results are entered by commissioners and are explainable in weekly scorecards.
+- Football results are scored from the authoritative live-score pipeline and remain explainable in player scorecards. Commissioners do not choose official winners.
 - Locker Room content is user-generated. The app filters prohibited abuse, permits reporting, permits blocking, and provides direct support contact.
 - Account deletion is available inside Profile > Privacy & Safety. Personal profile data is removed; completed league results remain anonymized so historical standings are not rewritten.
 - A populated reviewer account and league must be entered in App Store Connect immediately before submission.
@@ -67,6 +67,7 @@ Complete the App Store Connect questionnaire truthfully. User-generated Locker R
 - [ ] Reported Locker Room content reaches the moderation queue/support channel.
 - [ ] Blocked-player messages disappear and remain hidden after relaunch.
 - [ ] Privacy manifest is present at the root of the archived `.app`.
+- [ ] `scripts/verify-native-ios-release-metadata.mjs` passes for the intended version and build number.
 - [ ] Release archive passes Xcode validation.
 - [ ] Reviewer account and populated review league are active.
 - [ ] Contact name, phone, and email are entered in Beta App Review Information.
