@@ -5311,6 +5311,9 @@ private struct FieldhouseProfilePage: View {
 
             dossierLabel("IDENTITY CONTROL", detail: "CHANGE THE NAME. KEEP THE RECEIPTS.")
             dossierButton(.editProfile, "Edit Profile", "Name, photo, birthday, favorite team and loadout", "person.crop.rectangle.fill", .green)
+            if PatreonConnectionFeature.shouldShow {
+                dossierButton(.patreon, "Connect Patreon", "Verify supporter status without changing the game", "heart.circle.fill", .green)
+            }
 
             dossierLabel("ROOM ACCESS", detail: "TRANSMISSIONS & RULES OF ENGAGEMENT")
             dossierButton(.announcements, "Announcements", "Official yelling from command", "megaphone.fill", .red)
@@ -5422,7 +5425,7 @@ private struct FieldhouseProfilePage: View {
 
 private enum FieldhouseProfileDestination: String, Identifiable {
     case scorecard, rivalry, cheevoVault, crystalBall
-    case editProfile, announcements, rules, privacy, leagueCommand, signOut
+    case editProfile, patreon, announcements, rules, privacy, leagueCommand, signOut
     var id: String { rawValue }
 }
 
@@ -5442,6 +5445,8 @@ private struct FieldhouseProfileDestinationView: View {
                     CheevoVaultView(earned: demoAchievements, sportId: sportID)
                 case .editProfile:
                     NativeProfileView()
+                case .patreon:
+                    PatreonConnectionView()
                 case .announcements:
                     AnnouncementsView()
                 case .rules:
@@ -5509,6 +5514,8 @@ private struct FieldhouseProfileDestinationView: View {
             detailCard("FAVORITE TEAM", state.favoriteTeam ?? "Not selected")
             Text("Favorite team can be changed directly on the You page now.")
                 .font(.subheadline.weight(.bold)).foregroundStyle(accent)
+        case .patreon:
+            detailCard("ACCOUNT-WIDE CONNECTION", "Patreon supporter recognition follows your War Room account across every sport without changing competitive access.")
         case .announcements:
             detailCard("NO NEW TRANSMISSIONS", "Official app and league notices will remain here after the banner is dismissed")
         case .rules:
@@ -5535,6 +5542,7 @@ private struct FieldhouseProfileDestinationView: View {
         case .cheevoVault: "Cheevo Vault"
         case .crystalBall: "Crystal Ball Receipt"
         case .editProfile: "Edit Profile"
+        case .patreon: "Patreon Connection"
         case .announcements: "Announcements"
         case .rules: "Rules of Engagement"
         case .privacy: "Privacy & Safety"
@@ -5549,6 +5557,7 @@ private struct FieldhouseProfileDestinationView: View {
         case .cheevoVault: "Every earned artifact in one cabinet."
         case .crystalBall: "The championship prediction you sealed at entry."
         case .editProfile: "Identity controls shared across every league and sport."
+        case .patreon: "Verify your Patreon relationship without granting a gameplay advantage."
         case .announcements: "App-wide and league transmissions."
         case .rules: "The scoring rules without the scavenger hunt."
         case .privacy: "Safety, policy, support, and account controls."
@@ -5563,6 +5572,7 @@ private struct FieldhouseProfileDestinationView: View {
         case .cheevoVault: "shippingbox.fill"
         case .crystalBall: "sparkles"
         case .editProfile: "person.crop.rectangle.fill"
+        case .patreon: "heart.circle.fill"
         case .announcements: "megaphone.fill"
         case .rules: "book.closed.fill"
         case .privacy: "hand.raised.fill"

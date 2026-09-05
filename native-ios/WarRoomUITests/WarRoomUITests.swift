@@ -9,6 +9,18 @@ import XCTest
 
 final class WarRoomUITests: XCTestCase {
 
+    @MainActor
+    func testPatreonConnectionExplainsAccountLinkWithoutSellingGameplay() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--patreon-preview"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["PATREON CONNECTION"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Link Your Patreon Account"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "never changes picks, scoring, standings, or competitive access")).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "unlock")).firstMatch.exists)
+    }
+
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
 

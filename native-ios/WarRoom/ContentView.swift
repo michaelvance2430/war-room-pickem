@@ -6180,6 +6180,11 @@ struct YouView: View {
                         NavigationLink { NativeProfileView() } label: {
                             dossierRow("Edit Profile", "Name, photo and public identity", "person.crop.rectangle.fill", .green)
                         }.buttonStyle(.plain)
+                        if PatreonConnectionFeature.shouldShow {
+                            NavigationLink { PatreonConnectionView() } label: {
+                                dossierRow("Connect Patreon", "Verify supporter status without changing the game", "heart.circle.fill", .green)
+                            }.buttonStyle(.plain)
+                        }
 
                         dossierLabel("ROOM ACCESS", detail: "TRANSMISSIONS & RULES OF ENGAGEMENT")
                         NavigationLink { AnnouncementsView() } label: {

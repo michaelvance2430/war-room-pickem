@@ -112,6 +112,47 @@ struct Profile: Decodable, Sendable {
     }
 }
 
+struct PatreonConnectionStatus: Decodable, Sendable, Equatable {
+    let connected: Bool
+    let patreonUserId: String?
+    let displayName: String?
+    let avatarURL: String?
+    let membershipStatus: String?
+    let currentlyEntitledAmountCents: Int?
+    let connectedAt: String?
+    let verifiedAt: String?
+    let needsReauthorization: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case connected
+        case patreonUserId = "patreon_user_id"
+        case displayName = "display_name"
+        case avatarURL = "avatar_url"
+        case membershipStatus = "membership_status"
+        case currentlyEntitledAmountCents = "currently_entitled_amount_cents"
+        case connectedAt = "connected_at"
+        case verifiedAt = "verified_at"
+        case needsReauthorization = "needs_reauthorization"
+    }
+
+    var badge: String {
+        guard connected else { return "NOT CONNECTED" }
+        if needsReauthorization == true { return "RECONNECT REQUIRED" }
+        switch membershipStatus {
+        case "active_patron": return "ACTIVE SUPPORTER"
+        case "free_member": return "FREE MEMBER"
+        case "declined_patron": return "PAYMENT ISSUE"
+        case "former_patron": return "FORMER SUPPORTER"
+        default: return "ACCOUNT CONNECTED"
+        }
+    }
+}
+
+private struct PatreonConnectionStart: Decodable {
+    let authorizationURL: URL
+    enum CodingKeys: String, CodingKey { case authorizationURL = "authorization_url" }
+}
+
 struct WeaponServiceSummary: Decodable, Sendable {
     let tacticalNukes: Int
     let deadHands: Int
@@ -2338,6 +2379,32 @@ enum SupabaseAPI {
                 ?? "Account deletion is temporarily unavailable. Contact \(AppLinks.supportEmail) for help."
             throw RequestError(message: message)
         }
+    }
+
+    static func patreonConnection(token: String) async throws -> PatreonConnectionStatus {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/patreon-oauth"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "action", value: "status")]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: PatreonConnectionStatus.self)
+    }
+
+    static func startPatreonConnection(token: String) async throws -> URL {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/patreon-oauth"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "action", value: "start")]
+        var request = authorizedRequest(url: components.url!, token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data("{}".utf8)
+        return try await send(request, as: PatreonConnectionStart.self).authorizationURL
+    }
+
+    static func disconnectPatreon(token: String) async throws {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/patreon-oauth"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "action", value: "disconnect")]
+        var request = authorizedRequest(url: components.url!, token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data("{}".utf8)
+        _ = try await send(request, as: PatreonConnectionStatus.self)
     }
 
     static func reportLockerMessage(token: String, messageId: UUID, reason: String = "abuse") async throws {
