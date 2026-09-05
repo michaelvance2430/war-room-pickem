@@ -30,7 +30,10 @@ assert.match(guide, /Bots never count/);
 assert.doesNotMatch(preflight, /\b(insert|update|delete|alter|create|drop|truncate|grant|revoke)\b/i);
 assert.match(preflight, /required baseline tables exist/);
 assert.match(preflight, /legacy NFL JDAM receipts are absent/);
-assert.match(preflight, /league sport values fit Build 21/);
+assert.match(preflight, /live league sport values fit Build 21/);
+assert.match(preflight, /lower\(coalesce\(sport_id,''\)\)='cbb'/);
+assert.match(preflight, /coalesce\(mode::text,'production'\)='foundry'/);
+assert.match(preflight, /legacy cbb is permitted only in Foundry/);
 assert.match(preflight, /league trophies have supported types/);
 
 console.log("Build 21 database release order PASS — prerequisites, ordered schemas, SELECT-only preflight, and cron hold are explicit");

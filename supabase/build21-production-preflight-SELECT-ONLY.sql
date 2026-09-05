@@ -59,9 +59,21 @@ select
 from public.nfl_postseason_scorecards;
 
 select
-  'league sport values fit Build 21' as check_name,
-  count(*) filter (where lower(coalesce(sport_id,'cfb')) not in ('cfb','nfl','ncaam','ncaaw'))=0 as passed,
-  count(*) filter (where lower(coalesce(sport_id,'cfb')) not in ('cfb','nfl','ncaam','ncaaw'))::text||' incompatible league row(s)' as detail
+  'live league sport values fit Build 21' as check_name,
+  count(*) filter (where
+    lower(coalesce(sport_id,'cfb')) not in ('cfb','nfl','ncaam','ncaaw')
+    and not (
+      lower(coalesce(sport_id,''))='cbb'
+      and coalesce(mode::text,'production')='foundry'
+    )
+  )=0 as passed,
+  count(*) filter (where
+    lower(coalesce(sport_id,'cfb')) not in ('cfb','nfl','ncaam','ncaaw')
+    and not (
+      lower(coalesce(sport_id,''))='cbb'
+      and coalesce(mode::text,'production')='foundry'
+    )
+  )::text||' incompatible live league row(s); legacy cbb is permitted only in Foundry' as detail
 from public.leagues;
 
 select

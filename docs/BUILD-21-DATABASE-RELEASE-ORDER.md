@@ -22,6 +22,11 @@ Confirm production already contains the committed foundations below before apply
 
 Run `supabase/build21-production-preflight-SELECT-ONLY.sql` first. It performs no writes.
 
+The historical `cbb` sport key is allowed only on a room whose mode is
+`foundry`. It is an isolated preview compatibility row, not a live Fieldhouse
+league. Any production-mode `cbb` row still fails preflight and must be
+explicitly migrated to `ncaam` or `ncaaw` before this release can proceed.
+
 ## Build 21 schema order
 
 Apply the review package as one guarded release window in this order:
