@@ -80,6 +80,10 @@ final class WarRoomUITests: XCTestCase {
 
         let makePicks = app.buttons["fieldhouse.picks.lane.makePicks"]
         XCTAssertTrue(makePicks.waitForExistence(timeout: 3))
+        let status = app.staticTexts["fieldhouse.header.status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 2))
+        XCTAssertTrue(status.label.contains("CHAMPIONSHIP WEEK"))
+        XCTAssertFalse(status.label.contains("WINDOW 19"))
         makePicks.tap()
 
         XCTAssertTrue(app.staticTexts["FOUR TITLES.\nONE LAST MOVE."].waitForExistence(timeout: 2))

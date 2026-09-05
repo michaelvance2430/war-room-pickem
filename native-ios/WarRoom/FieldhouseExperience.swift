@@ -2721,6 +2721,9 @@ private struct FieldhouseHeader: View {
     let back: () -> Void
     private var statusLine: String {
         guard state.postseasonIsActive else {
+            if state.phase == .conferenceChampionships {
+                return "CHAMPIONSHIP WEEK · FOUR TITLES · SELECTION SUNDAY NEXT"
+            }
             return "WINDOW \(state.window) · FOUR REGIONS · ONE ROAD TO THE MIDDLE"
         }
         guard let round = state.activePostseasonRound else {
@@ -3002,6 +3005,8 @@ private struct FieldhouseHomePage: View {
                 )
             }.buttonStyle(.plain)
         } else {
+            let championship = state.cardKind == .conferenceChampionship || state.phase == .conferenceChampionships
+            let cardLabel = championship ? "CHAMPIONSHIP WEEK" : "WEEK \(state.window)"
             let commandColor: Color = state.playerPicksAreComplete ? .green : (state.cardIsPublished ? .red : accent)
             Button {
                 if state.cardIsPublished { desk = .picks }
@@ -3009,16 +3014,16 @@ private struct FieldhouseHomePage: View {
             } label: {
                 FieldhouseAction(
                     kicker: state.playerPicksAreComplete
-                        ? "PLAYER COMMAND · WEEK \(state.window) · COMPLETE"
-                        : (state.cardIsPublished ? "PLAYER COMMAND · WEEK \(state.window) · PICKS OPEN" : "PLAYER COMMAND · WEEK \(state.window)"),
+                        ? "PLAYER COMMAND · \(cardLabel) · COMPLETE"
+                        : (state.cardIsPublished ? "PLAYER COMMAND · \(cardLabel) · PICKS OPEN" : "PLAYER COMMAND · \(cardLabel)"),
                     title: state.playerPicksAreComplete
-                        ? "Week \(state.window) Picks Complete"
-                        : (state.cardIsPublished ? "Make Your 10 Picks" : (state.isCommissioner ? "Build Next Week's Card" : "Card Not Posted Yet")),
+                        ? "\(cardLabel.capitalized) Picks Complete"
+                        : (state.cardIsPublished ? (championship ? "Pick Four Conference Champions" : "Make Your 10 Picks") : (state.isCommissioner ? (championship ? "Build Championship Week" : "Build Next Week's Card") : "Card Not Posted Yet")),
                     detail: state.playerPicksAreComplete
-                        ? "Your ten picks are on the record. Tap to view your locked board."
+                        ? (championship ? "Your four title picks are on the record. Tap to view your locked board." : "Your ten picks are on the record. Tap to view your locked board.")
                         : (state.cardIsPublished
-                        ? "Ten shared games. One card. Locks at the first selected tip."
-                        : (state.isCommissioner ? "Pull the odds and publish the next board." : "The commissioner is building the next ten-game board.")),
+                        ? (championship ? "Four conference title games. Straight up. Locks at the first selected tip." : "Ten shared games. One card. Locks at the first selected tip.")
+                        : (state.isCommissioner ? "Pull the odds and publish the next board." : (championship ? "The commissioner is building the four-game championship board." : "The commissioner is building the next ten-game board."))),
                     icon: state.playerPicksAreComplete ? "checkmark.seal.fill" : (state.cardIsPublished ? "list.bullet.clipboard.fill" : (state.isCommissioner ? "hammer.fill" : "hourglass")),
                     signalColor: commandColor
                 )
@@ -3697,14 +3702,16 @@ private struct FieldhouseHomeMasthead: View {
                     Text(state.league.displayName).font(.system(size: 28, weight: .black)).fontWidth(.condensed)
                     Text(state.postseasonScorecardIsActive
                          ? "\(state.league.rawValue) · 2027 TOURNAMENT · POSTSEASON"
-                         : "\(state.league.rawValue) · \(FieldhouseSeasonCalendar.windowLabel(state.window)) · \(state.phase.rawValue)")
+                         : state.phase == .conferenceChampionships
+                            ? "\(state.league.rawValue) · CHAMPIONSHIP WEEK · REGULAR-SEASON FINALE"
+                            : "\(state.league.rawValue) · \(FieldhouseSeasonCalendar.windowLabel(state.window)) · \(state.phase.rawValue)")
                         .font(.system(size: 9, weight: .black)).tracking(1.2).foregroundStyle(.white.opacity(0.55))
                 }
             }
             Divider().overlay(accent.opacity(0.45))
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 HStack {
-                    Label(state.postseasonScorecardIsActive ? "ROUND CLOCK" : "SHOT CLOCK", systemImage: "timer")
+                    Label(state.postseasonScorecardIsActive ? "ROUND CLOCK" : (state.phase == .conferenceChampionships ? "CHAMPIONSHIP CLOCK" : "SHOT CLOCK"), systemImage: "timer")
                         .font(.caption2.weight(.black)).tracking(1.3)
                     Spacer()
                     Text(state.postseasonScorecardIsActive
@@ -3949,13 +3956,13 @@ private struct FieldhousePicksPage: View {
             }
                 if state.picksLocked {
                     VStack(spacing: 9) {
-                        Label("WINDOW \(state.window) PICKS LOCKED", systemImage: "lock.fill").font(.headline.weight(.black)).foregroundStyle(.green)
+                        Label(championship ? "CHAMPIONSHIP PICKS LOCKED" : "WEEK \(state.window) PICKS LOCKED", systemImage: "lock.fill").font(.headline.weight(.black)).foregroundStyle(.green)
                         Button("REOPEN PICKS BEFORE FIRST TIP") { _ = state.reopenPicks(at: Date()) }
                             .font(.caption.weight(.black)).foregroundStyle(accent)
                     }.frame(maxWidth: .infinity).padding(16).background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.green.opacity(0.45)))
                 } else {
                     Button { confirmingLock = true } label: {
-                        Label("LOCK WINDOW \(state.window) PICKS", systemImage: "lock.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(17)
+                        Label(championship ? "LOCK CHAMPIONSHIP PICKS" : "LOCK WEEK \(state.window) PICKS", systemImage: "lock.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(17)
                             .foregroundStyle(.black).background(state.cardIsComplete ? accent : Color.gray, in: RoundedRectangle(cornerRadius: 15))
                     }.buttonStyle(.plain).disabled(!state.cardIsComplete)
                     if !state.cardIsComplete {
@@ -4167,14 +4174,15 @@ private struct FieldhousePicksPage: View {
     }
 
     private var expiredUpcomingBoard: some View {
-        VStack(spacing: 12) {
+        let championship = state.cardKind == .conferenceChampionship || state.phase == .conferenceChampionships
+        return VStack(spacing: 12) {
             FieldhouseHero(
-                kicker: "WEEK \(state.window) · WINDOW CLOSED",
+                kicker: championship ? "CHAMPIONSHIP WEEK · PICKS CLOSED" : "WEEK \(state.window) · WINDOW CLOSED",
                 title: "CARD NOT SUBMITTED",
                 detail: "The first selected game has tipped. This card is sealed and incomplete picks cannot be changed or scored.",
                 icon: "exclamationmark.lock.fill"
             )
-            Text("The next card opens with Week \(state.window + 1).")
+            Text(championship ? "Selection Sunday begins after Championship Week is certified." : "The next card opens with Week \(state.window + 1).")
                 .font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.55))
         }
     }
@@ -5512,7 +5520,8 @@ private struct FieldhouseProfileDestinationView: View {
             detailCard("ACCOUNT CONTROLS", "Profile, support, safety, and account deletion controls live here when connected to production")
         case .leagueCommand:
             detailCard("CURRENT ROOM", "The Fieldhouse \(state.league.rawValue) · \(state.playerCount) players")
-            detailCard("NEXT TASK", state.cardIsPublished ? (state.picksLocked ? "Week \(state.window) picks complete" : "Finish Week \(state.window) picks") : "Build the Week \(state.window) card")
+            let cardLabel = state.phase == .conferenceChampionships ? "Championship Week" : "Week \(state.window)"
+            detailCard("NEXT TASK", state.cardIsPublished ? (state.picksLocked ? "\(cardLabel) picks complete" : "Finish \(cardLabel) picks") : "Build the \(cardLabel) card")
         case .signOut:
             detailCard("PREVIEW PROTECTED", "This isolated Foundry build has no live account session to sign out. Production sign-out will require confirmation.")
         }
