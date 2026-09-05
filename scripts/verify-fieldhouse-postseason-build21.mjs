@@ -222,7 +222,7 @@ assert.match(worker, /p_first_score: firstScore, p_second_score: secondScore/);
 assert.match(worker, /if \(!pollingGames\.length\) continue/);
 assert.match(worker, /tip <= now \+ 2 \* 60_000/);
 assert.match(worker, /tip >= now - 24 \* 60 \* 60_000/);
-assert.match(worker, /hasLiveWindow \? 50 : 900/);
+assert.match(worker, /hasLiveWindow \? 300 : 900/);
 assert.match(worker, /official-tip-missing/);
 assert.match(liveStandings, /create or replace function public\.get_fieldhouse_live_board/);
 assert.match(liveStandings, /not in \('cbb', 'ncaam', 'ncaaw'\)/);
