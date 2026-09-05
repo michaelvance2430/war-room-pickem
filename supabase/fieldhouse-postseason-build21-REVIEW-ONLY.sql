@@ -596,6 +596,20 @@ begin
   from jsonb_array_elements(p_field->'teams') x;
   get diagnostics v_team_count = row_count;
 
+  if exists(
+    select 1 from public.fieldhouse_tournament_teams
+    where tournament_id=v_tournament_id and (trim(team_id)='' or trim(display_name)='')
+  ) then raise exception 'Official teams require non-empty IDs and names'; end if;
+  if (
+    select count(distinct lower(regexp_replace(trim(display_name),'[^a-z0-9]+',' ','g')))
+    from public.fieldhouse_tournament_teams where tournament_id=v_tournament_id
+  )<>76 then raise exception 'Official team names must be globally unique'; end if;
+  if p_publish and exists(
+    select 1 from public.fieldhouse_tournament_teams
+    where tournament_id=v_tournament_id
+      and (team_id~*'^replace([^a-z0-9]|$)' or display_name~*'^replace([^a-z0-9]|$)')
+  ) then raise exception 'Published field cannot contain placeholder teams'; end if;
+
   select count(*) into v_bad_count from (
     select region
     from public.fieldhouse_tournament_teams where tournament_id=v_tournament_id

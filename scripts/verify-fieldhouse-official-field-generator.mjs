@@ -32,17 +32,31 @@ assert.throws(
 
 assert.throws(
   () => generateOfficialField(uneven, { publishReady: true }),
-  /missing 44 Opening\/First Round tip times/,
+  /placeholder teams/,
 );
 
 const ready = structuredClone(uneven);
 const generatedIDs = preview.games.filter((game) => game.round === "opening" || game.round === "r64").map((game) => game.id);
 for (const [index, id] of generatedIDs.entries()) ready.gameTimes[id] = new Date(Date.UTC(2027, 2, 16, 16 + index)).toISOString();
+assert.throws(() => generateOfficialField(ready, { publishReady: true }), /placeholder teams/);
+for (const [regionIndex, region] of ready.regions.entries()) {
+  for (const slot of region.slots) {
+    const teams = slot.team ? [slot.team] : slot.opening;
+    for (const [teamIndex, team] of teams.entries()) {
+      team.id = `official-${regionIndex}-${slot.seed}-${teamIndex}`;
+      team.name = `Official Team ${regionIndex}-${slot.seed}-${teamIndex}`;
+    }
+  }
+}
 assert.equal(generateOfficialField(ready, { publishReady: true }).games.filter((game) => game.startsAt).length, 44);
 
 const duplicate = structuredClone(uneven);
 duplicate.regions[0].slots[1].team.id = duplicate.regions[0].slots[0].team.id;
 assert.throws(() => generateOfficialField(duplicate), /globally unique/);
+
+const duplicateName = structuredClone(uneven);
+duplicateName.regions[0].slots[1].team.name = duplicateName.regions[0].slots[0].team.name;
+assert.throws(() => generateOfficialField(duplicateName), /team name must be globally unique/);
 
 const tooFewOpening = structuredClone(uneven);
 const replacement = tooFewOpening.regions[0].slots.find((slot) => slot.opening);

@@ -98,6 +98,8 @@ export function generateOfficialField(input, { publishReady = false } = {}) {
   if (teams.length !== 76) fail(`A 76-team field requires exactly 76 teams; found ${teams.length}.`);
   const teamIDs = teams.map((team) => team.id);
   if (new Set(teamIDs).size !== teamIDs.length) fail("Every team id must be globally unique.");
+  const normalizedTeamNames = teams.map((team) => team.name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim());
+  if (new Set(normalizedTeamNames).size !== normalizedTeamNames.length) fail("Every team name must be globally unique.");
 
   const games = [];
   const openingFeed = new Map();
@@ -153,6 +155,8 @@ export function generateOfficialField(input, { publishReady = false } = {}) {
 
   validateGeneratedField({ teams, games });
   if (publishReady) {
+    const placeholders = teams.filter((team) => /^replace\b/i.test(team.name) || /^replace\b/i.test(team.id));
+    if (placeholders.length) fail(`Publish-ready field still contains ${placeholders.length} placeholder teams.`);
     const firstWeekend = games.filter((game) => game.round === "opening" || game.round === "r64");
     const missingTimes = firstWeekend.filter((game) => !game.startsAt).map((game) => game.id);
     if (missingTimes.length) fail(`Publish-ready field is missing ${missingTimes.length} Opening/First Round tip times: ${missingTimes.join(", ")}`);

@@ -22,4 +22,4 @@ This workflow builds the platform-owned NCAAM or NCAAW tournament field. It does
 
 7. When later-round broadcast times or Odds API event IDs become official, regenerate the same file and use **Sync Times + Event IDs**. That operation cannot replace the bracket graph or any player receipt, and it refuses to move a game time after that game has started.
 
-The generator rejects duplicate teams, missing seeds, the wrong number of opening games, disconnected sources, malformed dates, and any graph that is not exactly 76 teams and 75 decisions.
+The generator rejects placeholders in a publish-ready file, duplicate team IDs or names, missing seeds, the wrong number of opening games, disconnected sources, malformed dates, and any graph that is not exactly 76 teams and 75 decisions. The database repeats the placeholder, blank-ID, and duplicate-name checks so a manually edited file cannot bypass them.

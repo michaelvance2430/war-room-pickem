@@ -36,6 +36,8 @@ assert.match(sql, /four regions with at least 16 teams each/);
 assert.match(sql, /Every Opening Round game must feed exactly one First Round slot/);
 assert.match(sql, /one First Round slot for seeds 1 through 16/);
 assert.match(sql, /Every official team must occupy exactly one bracket entry path/);
+assert.match(sql, /Official team names must be globally unique/);
+assert.match(sql, /Published field cannot contain placeholder teams/);
 assert.match(sql, /where prior\.tournament_id=g\.tournament_id and prior\.game_id=g\.first_source_game_id and prior\.round_order=g\.round_order-1/);
 assert.match(sql, /Every bracket game must feed exactly one game in the next round/);
 assert.match(sql, /Regional bracket paths cannot cross before the Final Four/);
