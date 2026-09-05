@@ -2836,6 +2836,7 @@ private struct FieldhouseEntranceView: View {
 }
 
 private struct FieldhouseHomePage: View {
+    @EnvironmentObject private var auth: AuthStore
     @Environment(\.fieldhousePersist) private var persist
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
@@ -2847,6 +2848,7 @@ private struct FieldhouseHomePage: View {
     @State private var showingCommissionerCommand = false
     @State private var showingAnnouncements = false
     @State private var showingTournamentScorecard = false
+    @State private var leagueAttention: [LeagueAttention] = []
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHomeMasthead(state: state)
@@ -2859,7 +2861,12 @@ private struct FieldhouseHomePage: View {
                     FieldhouseHomeButton(title: "SHARE · FH2026", icon: "square.and.arrow.up")
                 }
                 Button { showingLeagueSwitcher = true } label: {
-                    FieldhouseHomeButton(title: "SWITCH LEAGUE", icon: "antenna.radiowaves.left.and.right")
+                    FieldhouseHomeButton(
+                        title: "SWITCH LEAGUE",
+                        icon: "antenna.radiowaves.left.and.right",
+                        playerBadgeCount: switchAttention.playerLeagueCount,
+                        commandBadgeCount: switchAttention.commissionerLeagueCount
+                    )
                 }.buttonStyle(.plain)
             }
             if state.isCommissioner {
@@ -2937,6 +2944,33 @@ private struct FieldhouseHomePage: View {
             if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-trophies") {
                 showingCommissionerCommand = true
             }
+        }
+        .task(id: "\(state.league.rawValue)-\(state.window)-\(state.cardIsPublished)-\(state.picksLocked)") {
+            await loadLeagueAttention()
+        }
+    }
+
+    private var switchAttention: LeagueAttentionSummary {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--league-attention-preview") {
+            return LeagueAttentionSummary(playerLeagueCount: 3, commissionerLeagueCount: 1)
+        }
+        #endif
+        if auth.user != nil { return LeagueAttentionSummary(attention: leagueAttention) }
+        return LeagueAttentionSummary(
+            playerLeagueCount: state.hasOutstandingPickTask(at: Date()) ? 1 : 0,
+            commissionerLeagueCount: state.isCommissioner && state.canBuildCard ? 1 : 0
+        )
+    }
+
+    @MainActor private func loadLeagueAttention() async {
+        guard let user = auth.user else { return }
+        do {
+            let token = try await auth.validAccessToken()
+            let memberships = try await SupabaseAPI.leagueMemberships(token: token, userId: user.id)
+            leagueAttention = await LeagueAttentionService.load(memberships: memberships, token: token, user: user)
+        } catch {
+            // Preserve the last confirmed counts. A network error must never manufacture a task or clear one.
         }
     }
 
@@ -3732,11 +3766,17 @@ private struct FieldhouseHomeButton: View {
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     let title: String
     let icon: String
+    var playerBadgeCount = 0
+    var commandBadgeCount = 0
     var body: some View {
         Label(title, systemImage: icon).font(.system(size: 10, weight: .black)).tracking(0.6)
             .foregroundStyle(accent).frame(maxWidth: .infinity).padding(.vertical, 17)
             .background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 15))
             .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.34)))
+            .overlay(alignment: .topTrailing) {
+                LeagueAttentionBadges(playerCount: playerBadgeCount, commandCount: commandBadgeCount)
+                    .offset(x: 7, y: -9)
+            }
     }
 }
 
@@ -3747,6 +3787,8 @@ private struct FieldhouseLeagueSwitcher: View {
     @Binding var league: FieldhouseLeague
     let dismiss: () -> Void
     @State private var memberships: [LeagueMembership] = []
+    @State private var attention: [LeagueAttention] = []
+    @State private var expandedSports: Set<String> = []
     @State private var loading = true
     @State private var loadError: String?
 
@@ -3762,9 +3804,19 @@ private struct FieldhouseLeagueSwitcher: View {
                         ContentUnavailableView("No leagues found", systemImage: "person.3.fill", description: Text(loadError ?? "Join or create a league from The Muster."))
                     } else {
                         ForEach(sportIDs, id: \.self) { sportID in
-                            sectionLabel(sportID)
-                            ForEach(memberships.filter { $0.leagues.sportId.lowercased() == sportID }) { membership in
-                                membershipButton(membership)
+                            let sportAttention = attention.filter { $0.membership.leagues.sportId.lowercased() == sportID }
+                            Button {
+                                withAnimation(.snappy) {
+                                    if expandedSports.contains(sportID) { expandedSports.remove(sportID) }
+                                    else { expandedSports.insert(sportID) }
+                                }
+                            } label: {
+                                sectionLabel(sportID, attention: sportAttention)
+                            }.buttonStyle(.plain)
+                            if expandedSports.contains(sportID) {
+                                ForEach(memberships.filter { $0.leagues.sportId.lowercased() == sportID }) { membership in
+                                    membershipButton(membership, attention: attention.first { $0.id == membership.leagueId })
+                                }
                             }
                         }
                     }
@@ -3799,15 +3851,22 @@ private struct FieldhouseLeagueSwitcher: View {
         return preferred.filter(ids.contains) + ids.filter { !preferred.contains($0) }.sorted()
     }
 
-    private func sectionLabel(_ sportID: String) -> some View {
-        Text(sportTitle(sportID))
-            .font(.system(size: 10, weight: .black)).tracking(1.8)
-            .foregroundStyle(SportIdentity(sportID).accent)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 8)
+    private func sectionLabel(_ sportID: String, attention: [LeagueAttention]) -> some View {
+        let summary = LeagueAttentionSummary(attention: attention)
+        return HStack(spacing: 8) {
+            Text(sportTitle(sportID)).font(.system(size: 10, weight: .black)).tracking(1.8)
+            Spacer()
+            if summary.playerLeagueCount > 0 { switcherPill(summary.playerLeagueCount, "TO DO", .red) }
+            if summary.commissionerLeagueCount > 0 { switcherPill(summary.commissionerLeagueCount, "COMMAND", .cyan) }
+            Image(systemName: expandedSports.contains(sportID) ? "chevron.up" : "chevron.down")
+        }
+        .foregroundStyle(SportIdentity(sportID).accent)
+        .padding(14)
+        .background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(SportIdentity(sportID).accent.opacity(0.28)))
     }
 
-    private func membershipButton(_ membership: LeagueMembership) -> some View {
+    private func membershipButton(_ membership: LeagueMembership, attention: LeagueAttention?) -> some View {
         let selected = auth.selectedLeagueId == membership.leagueId
         let identity = SportIdentity(membership.leagues.sportId)
         return Button {
@@ -3821,8 +3880,21 @@ private struct FieldhouseLeagueSwitcher: View {
                     Text(membership.leagues.name).font(.headline.weight(.black))
                     Text("\(sportTitle(identity.sportId)) · WEEK \(membership.leagues.currentWeek)")
                         .font(.caption2.weight(.black)).foregroundStyle(.white.opacity(0.48))
+                    if let task = attention?.playerTasks.first {
+                        Text(task.uppercased()).font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.red)
+                    } else if let task = attention?.commissionerTasks.first {
+                        Text(task.uppercased()).font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.cyan)
+                    } else if attention?.dataIsCurrent == true {
+                        Text("COMPLETE").font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.green)
+                    }
                 }
                 Spacer()
+                if let attention, attention.needsCommissionerAction {
+                    switcherPill(attention.commissionerTasks.count, "COMMAND", .cyan)
+                }
+                if let attention, attention.needsPlayerAction {
+                    switcherPill(attention.playerTasks.count, "TO DO", .red)
+                }
                 Image(systemName: selected ? "checkmark.circle.fill" : "chevron.right")
                     .foregroundStyle(selected ? identity.accent : .white.opacity(0.55))
             }
@@ -3842,11 +3914,23 @@ private struct FieldhouseLeagueSwitcher: View {
         }
     }
 
+    private func switcherPill(_ count: Int, _ label: String, _ color: Color) -> some View {
+        HStack(spacing: 3) {
+            Text("\(count)").monospacedDigit()
+            Text(label)
+        }
+        .font(.system(size: 7, weight: .black)).tracking(0.4)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 7).padding(.vertical, 5)
+        .background(color, in: Capsule())
+    }
+
     @MainActor private func loadMemberships() async {
         guard let user = auth.user else { loading = false; return }
         do {
             let token = try await auth.validAccessToken()
             memberships = try await SupabaseAPI.leagueMemberships(token: token, userId: user.id)
+            attention = await LeagueAttentionService.load(memberships: memberships, token: token, user: user)
         } catch {
             loadError = error.localizedDescription
         }

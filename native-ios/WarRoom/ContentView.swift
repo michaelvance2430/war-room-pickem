@@ -2353,6 +2353,7 @@ struct HomeView: View {
     let onOpenLocker: () -> Void
     @State private var membership: LeagueMembership?
     @State private var memberships: [LeagueMembership] = []
+    @State private var leagueAttention: [LeagueAttention] = []
     @State private var card: WeekCard?
     @State private var pick: PlayerPick?
     @State private var crystalBallPick: CrystalBallPick?
@@ -2463,7 +2464,9 @@ struct HomeView: View {
                                 CompactHomeUtilityButton(
                                     title: "SWITCH LEAGUE",
                                     icon: isNFL ? "football.fill" : "antenna.radiowaves.left.and.right",
-                                    accent: isNFL ? .cyan : .green
+                                    accent: isNFL ? .cyan : .green,
+                                    playerBadgeCount: LeagueAttentionSummary(attention: leagueAttention).playerLeagueCount,
+                                    commandBadgeCount: LeagueAttentionSummary(attention: leagueAttention).commissionerLeagueCount
                                 )
                             }
                             .buttonStyle(WarRoomCardButtonStyle())
@@ -2911,6 +2914,7 @@ struct HomeView: View {
                 latestScorecard = nil
             }
             memberships = (try? await loadedMemberships) ?? [active]
+            leagueAttention = await LeagueAttentionService.load(memberships: memberships, token: token, user: user)
             if active.isCommissioner(userId: user.id) {
                 pendingJoinRequests = (try? await SupabaseAPI.privateRoomJoinRequests(token: token, leagueId: active.leagueId)) ?? []
             } else {
@@ -3065,6 +3069,8 @@ private struct CompactHomeUtilityButton: View {
     let title: String
     let icon: String
     let accent: Color
+    var playerBadgeCount = 0
+    var commandBadgeCount = 0
 
     var body: some View {
         HStack(spacing: 9) {
@@ -3081,6 +3087,43 @@ private struct CompactHomeUtilityButton: View {
         .frame(maxWidth: .infinity, minHeight: 52)
         .background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(accent.opacity(0.45)))
+        .overlay(alignment: .topTrailing) {
+            LeagueAttentionBadges(playerCount: playerBadgeCount, commandCount: commandBadgeCount)
+                .offset(x: 7, y: -9)
+        }
+    }
+}
+
+struct LeagueAttentionBadges: View {
+    let playerCount: Int
+    let commandCount: Int
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if commandCount > 0 { badge(commandCount, color: .cyan, icon: "star.fill") }
+            if playerCount > 0 { badge(playerCount, color: .red, icon: nil) }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private func badge(_ count: Int, color: Color, icon: String?) -> some View {
+        HStack(spacing: 3) {
+            if let icon { Image(systemName: icon).font(.system(size: 7, weight: .black)) }
+            Text("\(count)").font(.system(size: 10, weight: .black, design: .rounded)).monospacedDigit()
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 7).frame(minWidth: 24, minHeight: 24)
+        .background(color, in: Capsule())
+        .overlay(Capsule().stroke(.black, lineWidth: 2))
+        .shadow(color: color.opacity(0.55), radius: 5)
+    }
+
+    private var accessibilityText: String {
+        var parts: [String] = []
+        if playerCount > 0 { parts.append("\(playerCount) league\(playerCount == 1 ? "" : "s") need player action") }
+        if commandCount > 0 { parts.append("\(commandCount) league\(commandCount == 1 ? "" : "s") need commissioner action") }
+        return parts.joined(separator: ", ")
     }
 }
 

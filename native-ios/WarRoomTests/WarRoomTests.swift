@@ -24,6 +24,53 @@ struct WarRoomTests {
         #expect(unlinked.recognitionTitle == nil)
     }
 
+    @Test func leagueAttentionKeepsPlayerAndCommissionerWorkSeparate() {
+        let playerTasks = LeagueAttentionTaskClassifier.playerTasks(
+            sportID: "cfb",
+            week: 3,
+            card: .present,
+            pick: .missing,
+            crystalBall: .present,
+            favoriteTeam: .present
+        )
+        let commissionerTasks = LeagueAttentionTaskClassifier.commissionerTasks(
+            isCommissioner: true,
+            week: 3,
+            card: .present,
+            hasTrophy: false
+        )
+        #expect(playerTasks == ["Make Week 3 picks"])
+        #expect(commissionerTasks == ["Choose championship hardware"])
+    }
+
+    @Test func leagueAttentionNeverInventsTasksWhenStatusCannotLoad() {
+        let playerTasks = LeagueAttentionTaskClassifier.playerTasks(
+            sportID: "nfl",
+            week: 2,
+            card: .unavailable,
+            pick: .unavailable,
+            crystalBall: .unavailable,
+            favoriteTeam: .unavailable
+        )
+        let commissionerTasks = LeagueAttentionTaskClassifier.commissionerTasks(
+            isCommissioner: true,
+            week: 2,
+            card: .unavailable,
+            hasTrophy: true
+        )
+        #expect(playerTasks.isEmpty)
+        #expect(commissionerTasks.isEmpty)
+    }
+
+    @Test func leagueAttentionUsesSportSpecificChampionLanguage() {
+        #expect(LeagueAttentionTaskClassifier.playerTasks(
+            sportID: "nfl", week: 1, card: .missing, pick: .missing, crystalBall: .missing, favoriteTeam: .present
+        ) == ["Call the Super Bowl champion"])
+        #expect(LeagueAttentionTaskClassifier.playerTasks(
+            sportID: "ncaaw", week: 1, card: .missing, pick: .missing, crystalBall: .missing, favoriteTeam: .present
+        ) == ["Lock Crystal Ball"])
+    }
+
     @Test func leagueInviteRouterAcceptsOnlyWarRoomJoinLinks() throws {
         let token = String(repeating: "a", count: 64)
         let valid = try #require(URL(string: "https://app.war-room-picks.com/invite/\(token)"))

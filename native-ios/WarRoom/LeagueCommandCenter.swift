@@ -4,10 +4,165 @@ struct LeagueAttention: Identifiable, Sendable {
     let membership: LeagueMembership
     let unreadLocker: Int
     let unreadAnnouncements: Int
-    let tasks: [String]
+    let playerTasks: [String]
+    let commissionerTasks: [String]
+    let dataIsCurrent: Bool
     var id: UUID { membership.leagueId }
-    var priority: Int { tasks.count * 100 + unreadAnnouncements * 10 + unreadLocker }
+    var priority: Int { playerTasks.count * 1_000 + commissionerTasks.count * 100 + unreadAnnouncements * 10 + unreadLocker }
     var totalUnread: Int { unreadLocker + unreadAnnouncements }
+    var needsPlayerAction: Bool { !playerTasks.isEmpty }
+    var needsCommissionerAction: Bool { !commissionerTasks.isEmpty }
+}
+
+struct LeagueAttentionSummary: Sendable, Equatable {
+    let playerLeagueCount: Int
+    let commissionerLeagueCount: Int
+
+    init(playerLeagueCount: Int, commissionerLeagueCount: Int) {
+        self.playerLeagueCount = playerLeagueCount
+        self.commissionerLeagueCount = commissionerLeagueCount
+    }
+
+    init(attention: [LeagueAttention]) {
+        playerLeagueCount = attention.filter(\.needsPlayerAction).count
+        commissionerLeagueCount = attention.filter(\.needsCommissionerAction).count
+    }
+}
+
+nonisolated enum LeagueAttentionValueState: Sendable, Equatable {
+    case unavailable
+    case missing
+    case present
+}
+
+enum LeagueAttentionTaskClassifier {
+    nonisolated static func playerTasks(
+        sportID: String,
+        week: Int,
+        card: LeagueAttentionValueState,
+        pick: LeagueAttentionValueState,
+        crystalBall: LeagueAttentionValueState,
+        favoriteTeam: LeagueAttentionValueState
+    ) -> [String] {
+        var tasks: [String] = []
+        if card == .present, pick == .missing { tasks.append("Make Week \(week) picks") }
+        if crystalBall == .missing { tasks.append(sportID.lowercased() == "nfl" ? "Call the Super Bowl champion" : "Lock Crystal Ball") }
+        if favoriteTeam == .missing { tasks.append("Choose favorite team") }
+        return tasks
+    }
+
+    nonisolated static func commissionerTasks(isCommissioner: Bool, week: Int, card: LeagueAttentionValueState, hasTrophy: Bool) -> [String] {
+        guard isCommissioner else { return [] }
+        var tasks: [String] = []
+        if card == .missing { tasks.append("Build Week \(week) card") }
+        if !hasTrophy { tasks.append("Choose championship hardware") }
+        return tasks
+    }
+}
+
+enum LeagueAttentionService {
+    private struct Probe<Value: Sendable>: Sendable {
+        let value: Value?
+        let succeeded: Bool
+    }
+
+    nonisolated private static func probe<Value: Sendable>(_ operation: @Sendable () async throws -> Value?) async -> Probe<Value> {
+        do { return Probe(value: try await operation(), succeeded: true) }
+        catch { return Probe(value: nil, succeeded: false) }
+    }
+
+    nonisolated static func load(memberships: [LeagueMembership], token: String, user: AuthUser) async -> [LeagueAttention] {
+        let favoriteBySport = await favoriteTeamStates(memberships: memberships, token: token, userID: user.id)
+        let favoriteTaskLeagueBySport = Dictionary(uniqueKeysWithValues: Dictionary(grouping: memberships) {
+            $0.leagues.sportId.lowercased()
+        }.compactMap { sportID, sportMemberships in
+            sportMemberships.sorted { $0.leagues.name.localizedCaseInsensitiveCompare($1.leagues.name) == .orderedAscending }
+                .first.map { (sportID, $0.leagueId) }
+        })
+        return await withTaskGroup(of: LeagueAttention.self) { group in
+            for membership in memberships {
+                group.addTask {
+                    async let cardProbe = probe {
+                        try await SupabaseAPI.weekCard(token: token, leagueId: membership.leagueId, weekNumber: membership.leagues.currentWeek)
+                    }
+                    async let pickProbe = probe {
+                        try await SupabaseAPI.playerPick(token: token, leagueId: membership.leagueId, userId: user.id, weekNumber: membership.leagues.currentWeek)
+                    }
+                    async let crystalProbe = probe {
+                        try await SupabaseAPI.crystalBallPick(token: token, leagueId: membership.leagueId, userId: user.id)
+                    }
+                    async let lockerProbe = probe {
+                        try await SupabaseAPI.lockerMessages(token: token, leagueId: membership.leagueId)
+                    }
+                    async let announcementProbe = probe {
+                        try await SupabaseAPI.announcements(token: token, leagueId: membership.leagueId)
+                    }
+
+                    let card = await cardProbe
+                    let pick = await pickProbe
+                    let crystal = await crystalProbe
+                    let locker = await lockerProbe
+                    let announcements = await announcementProbe
+                    let commissioner = membership.isCommissioner(userId: user.id)
+                    let cardState = state(for: card)
+                    let sportID = membership.leagues.sportId.lowercased()
+                    let favoriteState = favoriteTaskLeagueBySport[sportID] == membership.leagueId
+                        ? (favoriteBySport[sportID] ?? .unavailable)
+                        : .present
+                    let playerTasks = LeagueAttentionTaskClassifier.playerTasks(
+                        sportID: membership.leagues.sportId,
+                        week: membership.leagues.currentWeek,
+                        card: cardState,
+                        pick: state(for: pick),
+                        crystalBall: state(for: crystal),
+                        favoriteTeam: favoriteState
+                    )
+                    let commissionerTasks = LeagueAttentionTaskClassifier.commissionerTasks(
+                        isCommissioner: commissioner,
+                        week: membership.leagues.currentWeek,
+                        card: cardState,
+                        hasTrophy: membership.leagues.championshipTrophyId != nil
+                    )
+
+                    let lockerMessages = locker.value ?? []
+                    let announcementRows = announcements.value ?? []
+                    return LeagueAttention(
+                        membership: membership,
+                        unreadLocker: LeagueAttentionStore.unreadLockerMessages(lockerMessages, leagueId: membership.leagueId, userId: user.id),
+                        unreadAnnouncements: announcementRows.filter(\.isUnread).count,
+                        playerTasks: playerTasks,
+                        commissionerTasks: commissionerTasks,
+                        dataIsCurrent: card.succeeded && pick.succeeded && crystal.succeeded && favoriteBySport[sportID] != .unavailable
+                    )
+                }
+            }
+            var rows: [LeagueAttention] = []
+            for await row in group { rows.append(row) }
+            return rows
+        }
+    }
+
+    nonisolated private static func favoriteTeamStates(memberships: [LeagueMembership], token: String, userID: UUID) async -> [String: LeagueAttentionValueState] {
+        let sportIDs = Set(memberships.map { $0.leagues.sportId.lowercased() })
+        return await withTaskGroup(of: (String, LeagueAttentionValueState).self) { group in
+            for sportID in sportIDs {
+                group.addTask {
+                    let result = await probe {
+                        try await SupabaseAPI.favoriteTeam(token: token, userId: userID, sportId: sportID)
+                    }
+                    return (sportID, state(for: result))
+                }
+            }
+            var states: [String: LeagueAttentionValueState] = [:]
+            for await (sportID, state) in group { states[sportID] = state }
+            return states
+        }
+    }
+
+    nonisolated private static func state<Value: Sendable>(for probe: Probe<Value>) -> LeagueAttentionValueState {
+        guard probe.succeeded else { return .unavailable }
+        return probe.value == nil ? .missing : .present
+    }
 }
 
 enum LeagueAttentionStore {
@@ -80,7 +235,14 @@ struct LeagueCommandCenterView: View {
                                 HStack {
                                     Text(sportLabel(sportId)).font(.caption.weight(.black)).tracking(2)
                                     Spacer()
-                                    Text("\(sportRooms.count)").font(.caption.weight(.black))
+                                    let summary = LeagueAttentionSummary(attention: sportRooms)
+                                    if summary.playerLeagueCount > 0 {
+                                        attentionPill("\(summary.playerLeagueCount)", "TO DO", "exclamationmark", .red)
+                                    }
+                                    if summary.commissionerLeagueCount > 0 {
+                                        attentionPill("\(summary.commissionerLeagueCount)", "COMMAND", "star.fill", .cyan)
+                                    }
+                                    Text("\(sportRooms.count)").font(.caption.weight(.black)).monospacedDigit()
                                     Image(systemName: expandedSports.contains(sportId) ? "chevron.up" : "chevron.down")
                                 }
                                 .foregroundStyle(fieldhouseSportIDs.contains(sportId) ? SportIdentity(sportId).accent : .yellow)
@@ -101,8 +263,8 @@ struct LeagueCommandCenterView: View {
 
     private func leagueCard(_ item: LeagueAttention) -> some View {
         let selected = auth.selectedLeagueId == item.id
-        let urgent = !item.tasks.isEmpty
-        let accent: Color = urgent ? .red : (item.totalUnread > 0 ? .orange : .green)
+        let urgent = item.needsPlayerAction
+        let accent: Color = urgent ? .red : (item.needsCommissionerAction ? .cyan : (item.totalUnread > 0 ? .orange : .green))
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -114,12 +276,17 @@ struct LeagueCommandCenterView: View {
                 else { Image(systemName: "arrow.right.circle.fill").foregroundStyle(accent) }
             }
             HStack(spacing: 8) {
-                attentionPill("\(item.tasks.count)", "TASKS", "checklist", item.tasks.isEmpty ? .green : .red)
+                attentionPill("\(item.playerTasks.count)", "TO DO", "checklist", item.playerTasks.isEmpty ? .green : .red)
+                if let userID = auth.user?.id, item.membership.isCommissioner(userId: userID) {
+                    attentionPill("\(item.commissionerTasks.count)", "COMMAND", "star.fill", item.commissionerTasks.isEmpty ? .green : .cyan)
+                }
                 attentionPill("\(item.unreadLocker)", "LOCKER", "bubble.left.and.bubble.right.fill", item.unreadLocker == 0 ? .green : .orange)
                 attentionPill("\(item.unreadAnnouncements)", "ORDERS", "megaphone.fill", item.unreadAnnouncements == 0 ? .green : .yellow)
             }
-            if let first = item.tasks.first { Label(first.uppercased(), systemImage: "exclamationmark.triangle.fill").font(.system(size: 9, weight: .black)).tracking(0.7).foregroundStyle(.red) }
+            if let first = item.playerTasks.first { Label(first.uppercased(), systemImage: "exclamationmark.triangle.fill").font(.system(size: 9, weight: .black)).tracking(0.7).foregroundStyle(.red) }
+            else if let first = item.commissionerTasks.first { Label(first.uppercased(), systemImage: "star.fill").font(.system(size: 9, weight: .black)).tracking(0.7).foregroundStyle(.cyan) }
             else if item.totalUnread > 0 { Text("NEW TRAFFIC IS WAITING").font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(.orange) }
+            else if !item.dataIsCurrent { Text("STATUS CHECK UNAVAILABLE · PULL TO RETRY").font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(.yellow) }
             else { Text("ROOM CLEAR · NO ACTION REQUIRED").font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(.green.opacity(0.8)) }
         }
         .padding(16)
@@ -157,31 +324,7 @@ struct LeagueCommandCenterView: View {
 
     private func loadAttention() async {
         guard let token = auth.token, let user = auth.user else { loading = false; return }
-        await withTaskGroup(of: LeagueAttention.self) { group in
-            for membership in memberships {
-                group.addTask {
-                    async let card = SupabaseAPI.weekCard(token: token, leagueId: membership.leagueId, weekNumber: membership.leagues.currentWeek)
-                    async let pick = SupabaseAPI.playerPick(token: token, leagueId: membership.leagueId, userId: user.id, weekNumber: membership.leagues.currentWeek)
-                    async let crystal = SupabaseAPI.crystalBallPick(token: token, leagueId: membership.leagueId, userId: user.id)
-                    async let locker = SupabaseAPI.lockerMessages(token: token, leagueId: membership.leagueId)
-                    async let announcements = SupabaseAPI.announcements(token: token, leagueId: membership.leagueId)
-                    let loadedCard = try? await card
-                    let loadedPick = try? await pick
-                    let loadedCrystal = try? await crystal
-                    let loadedLocker = (try? await locker) ?? []
-                    let loadedAnnouncements = (try? await announcements) ?? []
-                    var tasks: [String] = []
-                    if loadedCard == nil && membership.isCommissioner(userId: user.id) { tasks.append("Build Week \(membership.leagues.currentWeek) card") }
-                    if loadedCard != nil && loadedPick == nil { tasks.append("Make Week \(membership.leagues.currentWeek) picks") }
-                    if loadedCrystal == nil { tasks.append(membership.leagues.sportId.lowercased() == "nfl" ? "Call the Super Bowl champion" : "Lock Crystal Ball") }
-                    if membership.isCommissioner(userId: user.id) && membership.leagues.championshipTrophyId == nil { tasks.append("Choose championship hardware") }
-                    return LeagueAttention(membership: membership, unreadLocker: LeagueAttentionStore.unreadLockerMessages(loadedLocker, leagueId: membership.leagueId, userId: user.id), unreadAnnouncements: loadedAnnouncements.filter(\.isUnread).count, tasks: tasks)
-                }
-            }
-            var rows: [LeagueAttention] = []
-            for await row in group { rows.append(row) }
-            attention = rows
-        }
+        attention = await LeagueAttentionService.load(memberships: memberships, token: token, user: user)
         loading = false
     }
 }
