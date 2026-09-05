@@ -2416,7 +2416,6 @@ struct HomeView: View {
     @State private var leagueAttention: [LeagueAttention] = []
     @State private var card: WeekCard?
     @State private var pick: PlayerPick?
-    @State private var crystalBallPick: CrystalBallPick?
     @State private var favoriteTeamId: String?
     @State private var standings: [Standing] = []
     @State private var announcements: [Announcement] = []
@@ -2475,7 +2474,6 @@ struct HomeView: View {
                         let isCommissioner = auth.user.map { membership.isCommissioner(userId: $0.id) } ?? false
                         let isRivalryWeek = membership.leagues.sportId.lowercased() == "cfb" && membership.leagues.currentWeek == 13
                         let needsFavoriteTeam = favoriteTeamId == nil
-                        let needsCrystalBall = crystalBallPick == nil
                         let ownSubmittedUserIds: Set<UUID> = pick != nil ? Set(auth.user.map { [$0.id] } ?? []) : []
                         let visibleSubmittedUserIds = submittedUserIds.union(ownSubmittedUserIds)
                         let visibleSubmissionCount = visibleSubmittedUserIds.count
@@ -2547,7 +2545,8 @@ struct HomeView: View {
                                     kicker: "COMMISSIONER COMMAND",
                                     title: pendingJoinRequests.isEmpty ? "Manage your league" : "\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting",
                                     icon: "person.3.sequence.fill",
-                                    accent: .cyan
+                                    accent: isNFL ? .cyan : .green,
+                                    prominent: true
                                 )
                             }.buttonStyle(WarRoomCardButtonStyle())
                             if !pendingJoinRequests.isEmpty {
@@ -2609,10 +2608,6 @@ struct HomeView: View {
                             Button { openRegularScorecard(scorecard) } label: {
                                 UnreadWeekResultCard(scorecard: scorecard, sportId: membership.leagues.sportId)
                             }.buttonStyle(WarRoomCardButtonStyle())
-                        } else if isNFL && needsCrystalBall {
-                            NavigationLink { CrystalBallView(membership: membership) } label: {
-                                NflPrimaryActionCard(kicker: "SEASON-LONG CALL · REQUIRED", title: "Name Your Champion", detail: "Make the call before the evidence arrives. The receipt follows you all season.", icon: "sparkles", urgent: true)
-                            }.buttonStyle(WarRoomCardButtonStyle())
                         } else if isNFL && card == nil && isCommissioner {
                             NavigationLink { CommissionerCardBuilderView(membership: membership) } label: {
                                 NflPrimaryActionCard(kicker: "COMMISSIONER CONTROL · WEEK \(membership.leagues.currentWeek)", title: "Set the Prime-Time Slate", detail: "Choose five games from the Thursday-to-Monday board, then set the prop.", icon: "rectangle.3.group.fill", urgent: true)
@@ -2644,10 +2639,6 @@ struct HomeView: View {
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if isNFL {
                             CompactHomeRow(kicker: "CARD FILED · WEEK \(membership.leagues.currentWeek)", title: "You’re set for kickoff", icon: "checkmark.seal.fill", accent: .cyan)
-                        } else if needsCrystalBall {
-                            NavigationLink { CrystalBallView(membership: membership) } label: {
-                                StatusCard(kicker: "🚨 REQUIRED · LOOK HERE FIRST", title: "PICK CRYSTAL BALL NOW", detail: "Choose the champion before you do anything else. Revisionist history is not a feature.", icon: "exclamationmark.triangle.fill", featured: true, accent: .red, emergency: true)
-                            }.buttonStyle(WarRoomCardButtonStyle())
                         } else if card == nil && isCommissioner {
                             NavigationLink { CommissionerCardBuilderView(membership: membership) } label: {
                                 StatusCard(kicker: isRivalryWeek ? "🚨 DO THIS NEXT · RIVALRY DESK" : "🚨 DO THIS NEXT · COMMISSIONER", title: isRivalryWeek ? "Build the Rivalry Card" : "Build This Week’s Card", detail: isRivalryWeek ? "Pick five grudge games. Family, geography, trophies, and good judgment are all suspended." : "Pick five games, add one prop, then give the room something to argue about.", icon: isRivalryWeek ? "bolt.horizontal.fill" : "hammer.fill", featured: true, accent: .red, emergency: true, actionLabel: "OPEN COMMAND")
@@ -2699,11 +2690,6 @@ struct HomeView: View {
                                 )
                             }.buttonStyle(WarRoomCardButtonStyle())
                         }
-                        if let crystalBallPick {
-                            NavigationLink { CrystalBallView(membership: membership) } label: {
-                                CompactHomeRow(kicker: "CRYSTAL BALL", title: crystalBallPick.teamName, icon: "sparkles", accent: isNFL ? .cyan : .green)
-                            }.buttonStyle(WarRoomCardButtonStyle())
-                        }
                         if leagueOverride == nil {
                             let moreAccent: Color = isNFL ? .cyan : .green
                             VStack(spacing: 0) {
@@ -2748,40 +2734,6 @@ struct HomeView: View {
                             .background(.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 16))
                             .overlay(RoundedRectangle(cornerRadius: 16).stroke(moreAccent.opacity(0.42), lineWidth: 1))
                         }
-                        if isNFL {
-                            NflScoreboardStrip(
-                                players: standings.count,
-                                games: card?.cardGames.count ?? 0,
-                                cardStatus: isCommissioner ? "\(visibleSubmissionCount)/\(standings.count)" : (pick == nil ? "OPEN" : "FILED"),
-                                commissioner: isCommissioner
-                            )
-                        } else {
-                            HStack(spacing: 8) {
-                                HomeMetric(value: "\(standings.count)", label: "IN THE ROOM")
-                                HomeMetric(value: card.map { "\($0.cardGames.count)" } ?? "—", label: "GAMES")
-                                HomeMetric(value: isCommissioner ? "\(visibleSubmissionCount)/\(standings.count)" : (pick == nil ? "OPEN" : "SAVED"), label: isCommissioner ? "SUBMITTED" : "YOUR CARD")
-                            }
-                        }
-
-                        if isNFL { NflBroadcastSectionLabel(title: "GAME-DAY DESK", detail: "STANDINGS · LOCKER ROOM · OFFICIAL FEED") }
-                        else { HomeSectionLabel(title: "ROOM OPERATIONS", detail: "AUTHORIZED PERSONNEL & DEGENERATES") }
-                        HStack(spacing: 12) {
-                            Button(action: onOpenStandings) {
-                                HomeOperationTile(kicker: isNFL ? "PLAYOFF RACE" : "INTEL", title: "Standings", detail: isNFL ? "Every game matters" : "Facts, unfortunately", icon: "chart.bar.fill", accent: isNFL ? .blue : .green)
-                            }
-                            .buttonStyle(WarRoomCardButtonStyle())
-                            Button(action: onOpenLocker) {
-                                HomeOperationTile(kicker: isNFL ? "SIDELINE" : "COMMS", title: "Locker Room", detail: isNFL ? "Talk through the whistle" : "Choose violence", icon: "bubble.left.and.bubble.right.fill", accent: isNFL ? .red : .green)
-                            }
-                            .buttonStyle(WarRoomCardButtonStyle())
-                        }
-                        NavigationLink { AnnouncementsView() } label: {
-                            if isNFL {
-                                NflPrimaryActionCard(kicker: announcements.filter(\.isUnread).isEmpty ? "LEAGUE OFFICE WIRE" : "\(announcements.filter(\.isUnread).count) NEW BULLETINS", title: "Official Announcements", detail: announcements.first?.title ?? "Commissioner posts, schedule notes, and room rulings.", icon: "megaphone.fill", urgent: !announcements.filter(\.isUnread).isEmpty)
-                            } else {
-                                StatusCard(kicker: announcements.filter(\.isUnread).isEmpty ? "OFFICIAL TRANSMISSION" : "\(announcements.filter(\.isUnread).count) UNREAD · EYES UP", title: "Announcements", detail: announcements.first?.title ?? "Commish posts, room updates, and official yelling.", icon: "megaphone.fill", accent: announcements.filter(\.isUnread).isEmpty ? .green : .yellow)
-                            }
-                        }.buttonStyle(WarRoomCardButtonStyle())
                         if isNFL { NflBroadcastSectionLabel(title: "POSTGAME SHOW", detail: "FINAL THIRTEEN · DISPATCH · LAST WORD") }
                         else { HomeSectionLabel(title: "FIELD REPORTS", detail: "PROPAGANDA, RUMORS, OCCASIONAL FACTS") }
                         let postseasonIsOpen = membership.leagues.sportId.lowercased() == "nfl"
@@ -2945,7 +2897,6 @@ struct HomeView: View {
             async let loadedMemberships = leagueOverride == nil ? SupabaseAPI.leagueMemberships(token: token, userId: user.id) : [active]
             async let loadedCard = SupabaseAPI.weekCard(token: token, leagueId: active.leagueId, weekNumber: active.leagues.currentWeek)
             async let loadedPick = SupabaseAPI.playerPick(token: token, leagueId: active.leagueId, userId: user.id, weekNumber: active.leagues.currentWeek)
-            async let loadedCrystal = SupabaseAPI.crystalBallPick(token: token, leagueId: active.leagueId, userId: user.id)
             async let loadedFavorite = SupabaseAPI.favoriteTeam(token: token, userId: user.id, sportId: active.leagues.sportId)
             async let loadedStandings = SupabaseAPI.standings(token: token, leagueId: active.leagueId)
             async let loadedAnnouncements = SupabaseAPI.announcements(token: token, leagueId: active.leagueId)
@@ -2958,7 +2909,6 @@ struct HomeView: View {
             homeScores = [:]
             homeScoreStatus = nil
             pick = try await loadedPick
-            crystalBallPick = try await loadedCrystal
             favoriteTeamId = (try? await loadedFavorite)?.teamId
             standings = try await loadedStandings
             announcements = try await loadedAnnouncements
@@ -3274,6 +3224,7 @@ private struct CompactHomeRow: View {
     let icon: String
     let accent: Color
     var embedded = false
+    var prominent = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -3289,7 +3240,8 @@ private struct CompactHomeRow: View {
                     .tracking(1.15)
                     .foregroundStyle(accent)
                 Text(title)
-                    .font(.subheadline.weight(.black))
+                    .font(.system(size: prominent ? 24 : 15, weight: .black))
+                    .fontWidth(prominent ? .condensed : .standard)
                     .foregroundStyle(.white)
                     .lineLimit(2)
             }
@@ -3321,7 +3273,7 @@ private struct CompactWeekReadyCard: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("THIS WEEK").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(accent)
-                    Text("Week \(week) is ready").font(.title3.weight(.black)).fontWidth(.condensed).foregroundStyle(.white)
+                    Text("Week \(week) is ready").font(.system(size: 27, weight: .black)).fontWidth(.condensed).foregroundStyle(.white)
                 }
                 Spacer()
                 Image(systemName: commissioner ? "person.2.badge.gearshape.fill" : "checkmark.seal.fill")
@@ -5553,7 +5505,7 @@ private struct StatusCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(kicker).font(emergency ? .headline.weight(.black) : .caption2.weight(.black)).tracking(emergency ? 1.2 : 2).foregroundStyle(emergency ? .white : accent)
             HStack {
-                Text(title).font(emergency ? .system(size: 34, weight: .black) : (featured ? .system(size: 25, weight: .black) : .title3.weight(.black))).fontWidth(featured ? .condensed : .standard)
+                Text(title).font(emergency ? .system(size: 34, weight: .black) : (featured ? .system(size: 29, weight: .black) : .title3.weight(.black))).fontWidth(featured ? .condensed : .standard)
                 Spacer(minLength: 6)
                 if let icon {
                     Image(systemName: icon).font(emergency ? .system(size: 30, weight: .black) : (featured ? .title2 : .headline)).foregroundStyle(emergency ? .white : accent)
@@ -6227,6 +6179,9 @@ struct YouView: View {
     @State private var leagueStandings: [Standing] = []
     @State private var postseasonScorecards: [PostseasonScorecard] = []
     @State private var regularSeasonScorecards: [RegularSeasonScorecard] = []
+    @State private var activeWeekCard: WeekCard?
+    @State private var submittedUserIds: Set<UUID> = []
+    @State private var crystalBallPick: CrystalBallPick?
     @State private var selectedAchievement: ProfileAchievement?
     @State private var selectedTrophy: ProfileTrophy?
     @State private var earnedSwagExpanded = false
@@ -6271,6 +6226,31 @@ struct YouView: View {
                             if let user = auth.user { CampaignDogTagsView(userId: user.id) }
                             if let user = auth.user { ProfilePassportView(userId: user.id, isOwner: true) }
                         currentCampaignCard
+                        if let membership = selectedMembership {
+                            dossierLabel(
+                                identity.isNFL ? "GAME-DAY DESK" : "ROOM OPERATIONS",
+                                detail: "ROOM STATUS · STANDINGS · LOCKER ROOM"
+                            )
+                            HStack(spacing: 8) {
+                                dossierStat("\(leagueStandings.count)", "IN THE ROOM")
+                                dossierStat(activeWeekCard.map { "\($0.cardGames.count)" } ?? "—", "GAMES")
+                                dossierStat("\(submittedUserIds.count)/\(leagueStandings.count)", "SUBMITTED")
+                            }
+                            NavigationLink { StandingsView(leagueOverride: membership) } label: {
+                                dossierRow("Standings", identity.isNFL ? "Playoff race and live room order" : "Live room order", "chart.bar.fill", operationalAccent)
+                            }.buttonStyle(.plain)
+                            NavigationLink { LockerRoomView(leagueOverride: membership) } label: {
+                                dossierRow("Locker Room", "Open room communications", "bubble.left.and.bubble.right.fill", identity.isNFL ? .red : operationalAccent)
+                            }.buttonStyle(.plain)
+                            NavigationLink { CrystalBallView(membership: membership) } label: {
+                                dossierRow(
+                                    crystalBallPick == nil ? "Pick Your Crystal Ball" : "Crystal Ball · \(crystalBallPick?.teamName ?? "Sealed")",
+                                    crystalBallPick == nil ? "Required season-long champion call" : "Open the permanent preseason receipt",
+                                    crystalBallPick == nil ? "exclamationmark.triangle.fill" : "sparkles",
+                                    crystalBallPick == nil ? .red : operationalAccent
+                                )
+                            }.buttonStyle(.plain)
+                        }
                         if !regularSeasonScorecards.isEmpty {
                             dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
                             ForEach(regularSeasonScorecards) { scorecard in
@@ -6423,9 +6403,21 @@ struct YouView: View {
                 if auth.selectedLeagueId == nil, let first = leagues.first { auth.selectLeague(first.leagueId) }
                 favoriteTeam = try? await SupabaseAPI.favoriteTeam(token: token, userId: user.id, sportId: identity.sportId)
                 if let leagueId = (leagues.first { $0.leagueId == auth.selectedLeagueId } ?? leagues.first)?.leagueId {
-                    leagueStandings = (try? await SupabaseAPI.standings(token: token, leagueId: leagueId)) ?? []
-                    regularSeasonScorecards = (try? await SupabaseAPI.regularSeasonScorecards(token: token, leagueId: leagueId, userId: user.id)) ?? []
-                    postseasonScorecards = (try? await SupabaseAPI.postseasonScorecards(token: token, leagueId: leagueId, seasonKey: Calendar.current.component(.year, from: Date()), userId: user.id)) ?? []
+                    let activeMembership = leagues.first { $0.leagueId == leagueId }
+                    async let loadedStandings = SupabaseAPI.standings(token: token, leagueId: leagueId)
+                    async let loadedRegularScorecards = SupabaseAPI.regularSeasonScorecards(token: token, leagueId: leagueId, userId: user.id)
+                    async let loadedPostseasonScorecards = SupabaseAPI.postseasonScorecards(token: token, leagueId: leagueId, seasonKey: Calendar.current.component(.year, from: Date()), userId: user.id)
+                    leagueStandings = (try? await loadedStandings) ?? []
+                    regularSeasonScorecards = (try? await loadedRegularScorecards) ?? []
+                    postseasonScorecards = (try? await loadedPostseasonScorecards) ?? []
+                    if let activeMembership {
+                        async let loadedCard = SupabaseAPI.weekCard(token: token, leagueId: leagueId, weekNumber: activeMembership.leagues.currentWeek)
+                        async let loadedSubmissions = SupabaseAPI.weekSubmittedUserIds(token: token, leagueId: leagueId, weekNumber: activeMembership.leagues.currentWeek)
+                        async let loadedCrystalBall = SupabaseAPI.crystalBallPick(token: token, leagueId: leagueId, userId: user.id)
+                        activeWeekCard = try? await loadedCard
+                        submittedUserIds = (try? await loadedSubmissions) ?? []
+                        crystalBallPick = try? await loadedCrystalBall
+                    }
                 }
             }
         }

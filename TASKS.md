@@ -8,6 +8,9 @@
 
 ## Done
 
+- [x] ~~Make the simplified Home-to-You hierarchy universal~~ (2026-09-05)
+  - Removed Crystal Ball, room/player/game/submission metrics, Standings, Locker Room, and Announcements from the shared CFB/NFL Home above the Field Reports boundary and relocated them into the real shared You hierarchy. Applied the same rule to NCAAM and NCAAW, while preserving last scorecards, More from War Room, postseason/Dispatch, latest Locker report, and Help Shape the War Room on Home. Enlarged only the actionable command-box titles. The native build and full unit/UI test suite pass; no upload or production change was made.
+
 - [x] ~~Replace the Build 21 football personnel board with a game-first scoreboard~~ (2026-09-05)
   - Removed the league-wide player dossiers and per-team player-name columns from the shared CFB/NFL Board. Every matchup now remains visible and is grouped Final, Live Now, or Waiting to Play with its kickoff and locked spread. A completed game illuminates the actual ATS winner—not merely the straight-up winner—with a green outline and glow. The native simulator build and full WarRoomTests suite pass; no upload or production change was made.
 

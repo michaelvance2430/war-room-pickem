@@ -2846,7 +2846,6 @@ private struct FieldhouseHomePage: View {
     @State private var showingLeagueSwitcher = false
     @State private var showingCardBuilder = false
     @State private var showingCommissionerCommand = false
-    @State private var showingAnnouncements = false
     @State private var showingTournamentScorecard = false
     @State private var leagueAttention: [LeagueAttention] = []
     @State private var competitiveStatus: CompetitiveLeagueStatus?
@@ -2881,7 +2880,7 @@ private struct FieldhouseHomePage: View {
             }
             if state.isCommissioner {
                 Button { showingCommissionerCommand = true } label: {
-                    FieldhouseAction(kicker: "COMMISSIONER COMMAND", title: "Manage your league", detail: "Cards, players, regions, and season controls.", icon: "person.3.fill")
+                    FieldhouseAction(kicker: "COMMISSIONER COMMAND", title: "Manage your league", detail: "Cards, players, regions, and season controls.", icon: "person.3.fill", prominent: true)
                 }.buttonStyle(.plain)
             }
             playerCommand
@@ -2907,15 +2906,6 @@ private struct FieldhouseHomePage: View {
             if let certifiedWindow = state.lastCertifiedWindow, let certifiedPoints = state.lastCertifiedPoints {
                 FieldhouseAction(kicker: "LAST CERTIFIED SCORECARD", title: "Week \(certifiedWindow) · \(certifiedPoints) points", detail: "Permanent weekly receipt.", icon: "clipboard.fill")
             }
-            Button { showingAnnouncements = true } label: {
-                FieldhouseAction(
-                    kicker: "OFFICIAL TRANSMISSION",
-                    title: "Announcements",
-                    detail: "Commissioner posts, room updates, and official yelling.",
-                    icon: "megaphone.fill"
-                )
-            }
-            .buttonStyle(.plain)
         }
         .sheet(isPresented: $showingLeagueSwitcher) {
             FieldhouseLeagueSwitcher(league: Binding(get: { state.league }, set: { state.selectLeague($0) }), dismiss: { showingLeagueSwitcher = false })
@@ -2942,10 +2932,6 @@ private struct FieldhouseHomePage: View {
         }
         .sheet(isPresented: $showingCommissionerCommand) {
             FieldhouseCommissionerCommand(state: $state)
-        }
-        .sheet(isPresented: $showingAnnouncements) {
-            NavigationStack { AnnouncementsView() }
-                .preferredColorScheme(.dark)
         }
         .fullScreenCover(isPresented: $showingTournamentScorecard) {
             FieldhouseTournamentScorecardView(state: state)
@@ -3063,7 +3049,8 @@ private struct FieldhouseHomePage: View {
                                         ? "Your current-round picks are on the record. Open Picks for the bracket and live board."
                                         : "The tournament command center is ready.",
                     icon: taskCount > 0 ? "basketball.fill" : bracketMissed || roundMissed ? "lock.fill" : scheduleReady ? "checkmark.seal.fill" : "clock.fill",
-                    signalColor: taskCount > 0 || bracketMissed || roundMissed ? .red : scheduleReady ? .green : accent
+                    signalColor: taskCount > 0 || bracketMissed || roundMissed ? .red : scheduleReady ? .green : accent,
+                    prominent: true
                 )
             }.buttonStyle(.plain)
         } else {
@@ -3087,7 +3074,8 @@ private struct FieldhouseHomePage: View {
                         ? (championship ? "Four conference title games. Straight up. Locks at the first selected tip." : "Ten shared games. One card. Locks at the first selected tip.")
                         : (state.isCommissioner ? "Pull the odds and publish the next board." : (championship ? "The commissioner is building the four-game championship board." : "The commissioner is building the next ten-game board."))),
                     icon: state.playerPicksAreComplete ? "checkmark.seal.fill" : (state.cardIsPublished ? "list.bullet.clipboard.fill" : (state.isCommissioner ? "hammer.fill" : "hourglass")),
-                    signalColor: commandColor
+                    signalColor: commandColor,
+                    prominent: true
                 )
             }
             .buttonStyle(.plain)
@@ -5388,6 +5376,15 @@ private struct FieldhouseProfilePage: View {
             ProfilePassportView(userId: profileUserID, isOwner: true)
             currentCampaign
 
+            dossierLabel("ROOM OPERATIONS", detail: "ROOM STATUS · STANDINGS · LOCKER ROOM")
+            HStack(spacing: 8) {
+                FieldhouseMetric(value: "\(state.playerCount)", label: "IN THE ROOM")
+                FieldhouseMetric(value: state.cardIsPublished ? "\(state.publishedGames.count)" : "—", label: "GAMES")
+                FieldhouseMetric(value: state.playerPicksAreComplete ? "SAVED" : "OPEN", label: "YOUR CARD")
+            }
+            dossierButton(.standings, "Standings", "Regional race and live room order", "chart.bar.fill", accent)
+            dossierButton(.locker, "Locker Room", "Open room communications", "bubble.left.and.bubble.right.fill", accent)
+
             dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
             dossierButton(
                 .scorecard,
@@ -5555,7 +5552,7 @@ private struct FieldhouseProfilePage: View {
 }
 
 private enum FieldhouseProfileDestination: String, Identifiable {
-    case scorecard, rivalry, cheevoVault, crystalBall
+    case scorecard, rivalry, cheevoVault, crystalBall, standings, locker
     case editProfile, patreon, announcements, rules, privacy, leagueCommand, signOut
     var id: String { rawValue }
 }
@@ -5586,6 +5583,16 @@ private struct FieldhouseProfileDestinationView: View {
                     SafetyAndSupportView()
                 case .leagueCommand:
                     LeagueCommandCenterView(memberships: [])
+                case .standings:
+                    FieldhouseStandingsPage(
+                        state: $state,
+                        openActivePostseasonRound: .constant(false),
+                        liveProjectionByUser: [:],
+                        liveProjectionActive: false,
+                        liveProjectionStale: false
+                    )
+                case .locker:
+                    FieldhouseLockerPage()
                 default:
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
@@ -5640,6 +5647,8 @@ private struct FieldhouseProfileDestinationView: View {
         case .crystalBall:
             detailCard("SEALED PREDICTION", state.crystalBallChampion ?? "No champion selected")
             detailCard("PERMANENT RECEIPT", "The selection cannot be changed after confirmation and remains on your profile")
+        case .standings, .locker:
+            EmptyView()
         case .editProfile:
             detailCard("PROFILE PHOTO", "Photo controls connect when Fieldhouse is wired to the live profile service")
             detailCard("FAVORITE TEAM", state.favoriteTeam ?? "Not selected")
@@ -5672,6 +5681,8 @@ private struct FieldhouseProfileDestinationView: View {
         case .rivalry: "Rivalry Report"
         case .cheevoVault: "Cheevo Vault"
         case .crystalBall: "Crystal Ball Receipt"
+        case .standings: "Standings"
+        case .locker: "Locker Room"
         case .editProfile: "Edit Profile"
         case .patreon: "Patreon Connection"
         case .announcements: "Announcements"
@@ -5687,6 +5698,8 @@ private struct FieldhouseProfileDestinationView: View {
         case .rivalry: "Your position against the people trying to catch you."
         case .cheevoVault: "Every earned artifact in one cabinet."
         case .crystalBall: "The championship prediction you sealed at entry."
+        case .standings: "Your region and the live room order."
+        case .locker: "Room communications."
         case .editProfile: "Identity controls shared across every league and sport."
         case .patreon: "Verify your Patreon relationship without granting a gameplay advantage."
         case .announcements: "App-wide and league transmissions."
@@ -5702,6 +5715,8 @@ private struct FieldhouseProfileDestinationView: View {
         case .rivalry: "person.2.fill"
         case .cheevoVault: "shippingbox.fill"
         case .crystalBall: "sparkles"
+        case .standings: "chart.bar.fill"
+        case .locker: "bubble.left.and.bubble.right.fill"
         case .editProfile: "person.crop.rectangle.fill"
         case .patreon: "heart.circle.fill"
         case .announcements: "megaphone.fill"
@@ -5743,6 +5758,7 @@ private struct FieldhouseAction: View {
     @Environment(\.fieldhouseLeague) private var league
     let kicker: String; let title: String; let detail: String; let icon: String
     var signalColor: Color? = nil
+    var prominent = false
     private var accent: Color { FieldhouseTheme.accent(for: league) }
     private var actionColor: Color { signalColor ?? accent }
     var body: some View {
@@ -5750,7 +5766,7 @@ private struct FieldhouseAction: View {
             Image(systemName: icon).font(.title2.weight(.black)).foregroundStyle(actionColor).frame(width: 45, height: 45).background(actionColor.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 4) {
                 Text(kicker).font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(actionColor)
-                Text(title).font(.headline.weight(.black)).foregroundStyle(signalColor == nil ? .white : actionColor)
+                Text(title).font(.system(size: prominent ? 25 : 17, weight: .black)).fontWidth(prominent ? .condensed : .standard).foregroundStyle(signalColor == nil ? .white : actionColor)
                 Text(detail).font(.caption).foregroundStyle(.white.opacity(0.55))
             }
             Spacer(); Image(systemName: "chevron.right").foregroundStyle(actionColor)
