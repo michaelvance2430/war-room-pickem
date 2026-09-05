@@ -189,6 +189,29 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(FieldhouseBracketEngine.liveRoundKey(field: field, now: ISO8601DateFormatter().date(from: "2027-03-19T00:00:00Z")!), "r32")
     }
 
+    func testFreshRoundCannotAdvanceUntilEveryPriorRoundWinnerIsOfficial() {
+        let teams = [
+            FieldhouseOfficialTeam(teamID: "a", displayName: "Alpha", region: "East", seed: 1),
+            FieldhouseOfficialTeam(teamID: "b", displayName: "Bravo", region: "East", seed: 16),
+            FieldhouseOfficialTeam(teamID: "c", displayName: "Charlie", region: "East", seed: 8),
+            FieldhouseOfficialTeam(teamID: "d", displayName: "Delta", region: "East", seed: 9)
+        ]
+        let games = [
+            FieldhouseOfficialGame(gameID: "r64-1", roundKey: "r64", roundOrder: 1, ordinal: 0, region: "East", firstTeamID: "a", secondTeamID: "b", firstSourceGameID: nil, secondSourceGameID: nil, startsAt: "2027-03-18T16:00:00Z", winnerTeamID: "a"),
+            FieldhouseOfficialGame(gameID: "r64-2", roundKey: "r64", roundOrder: 1, ordinal: 1, region: "East", firstTeamID: "c", secondTeamID: "d", firstSourceGameID: nil, secondSourceGameID: nil, startsAt: "2027-03-18T18:00:00Z", winnerTeamID: nil),
+            FieldhouseOfficialGame(gameID: "r32-1", roundKey: "r32", roundOrder: 2, ordinal: 0, region: "East", firstTeamID: nil, secondTeamID: nil, firstSourceGameID: "r64-1", secondSourceGameID: "r64-2", startsAt: "2027-03-20T16:00:00Z", winnerTeamID: nil)
+        ]
+        let field = FieldhouseOfficialField(
+            tournamentID: UUID(), sportID: "ncaam", seasonKey: 2027,
+            status: "in_progress", firstTipAt: "2027-03-18T16:00:00Z",
+            teams: teams, games: games
+        )
+
+        let afterFirstRoundTips = ISO8601DateFormatter().date(from: "2027-03-19T00:00:00Z")!
+        XCTAssertEqual(FieldhouseBracketEngine.liveRoundKey(field: field, now: afterFirstRoundTips), "r64")
+        XCTAssertTrue(FieldhouseBracketEngine.roundMatchups(key: "r32", field: field).first?.teams.map(\.id) == ["a"])
+    }
+
     func testTournamentScorecardActivatesOnlyAfterAPlayerFilesPostseasonPicks() {
         var state = FieldhouseSeasonState()
         state.officialPostseasonField = .previewRound(for: .ncaam)
