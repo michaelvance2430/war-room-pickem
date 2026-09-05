@@ -1758,8 +1758,12 @@ enum FieldhouseStateHydrator {
             state.postseasonBracketCorrectPicks = 0
             state.postseasonBracketRawPoints = 0
             state.postseasonBracketAdjustedPoints = 0
-            state.postseasonFreshRoundPoints = snapshot.roundEntries.reduce(0) { $0 + $1.points }
-            state.postseasonTotalPoints = state.postseasonFreshRoundPoints
+            // The generated postseason total is the only score authority used
+            // by Home, scorecard, standings, regional races, and awards. Round
+            // entry points may be written just before that total is refreshed;
+            // adding them here would temporarily create a second scoreboard.
+            state.postseasonFreshRoundPoints = 0
+            state.postseasonTotalPoints = 0
             state.postseasonScoreUpdatedAt = nil
         }
 

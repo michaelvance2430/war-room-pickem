@@ -125,7 +125,7 @@ final class FieldhouseExperienceTests: XCTestCase {
             CardGame(id: firstGameID, sortOrder: 0, awayTeam: "UConn Huskies", homeTeam: "South Carolina Gamecocks", spread: -4.5, favorite: "home", startTime: "2026-11-05T00:30:00Z", awayRank: 2, homeRank: 1, isRivalry: false),
             CardGame(id: secondGameID, sortOrder: 1, awayTeam: "Iowa Hawkeyes", homeTeam: "UCLA Bruins", spread: -2.5, favorite: "home", startTime: "2026-11-06T01:00:00Z", awayRank: 8, homeRank: 4, isRivalry: false)
         ]
-        let snapshot = FieldhouseAuthenticatedSnapshot(
+        var snapshot = FieldhouseAuthenticatedSnapshot(
             membership: membership,
             card: WeekCard(id: UUID(), weekNumber: 1, lockTime: "2026-11-05T00:30:00Z", propQuestion: FieldhousePropKind.teamScores90.question, propOptionA: "YES", propOptionB: "NO", propPoints: 3, cardGames: games),
             pick: PlayerPick(id: UUID(), propChoice: "YES", lockedAt: "2026-11-04T20:00:00Z", totalPoints: nil, isChaos: true, pickGames: [
@@ -197,6 +197,26 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.postseasonFreshRoundPoints, 8)
         XCTAssertEqual(state.postseasonTotalPoints, 47)
         XCTAssertEqual(state.postseasonPoints(for: userID), 47)
+
+        snapshot.postseasonTotals = []
+        snapshot.roundEntries = [
+            FieldhouseRoundEntryRecord(
+                roundKey: "r64",
+                picks: ["r64-1": "uconn"],
+                submittedAt: "2027-03-18T15:00:00Z",
+                lockedAt: "2027-03-18T16:00:00Z",
+                points: 8
+            )
+        ]
+        let awaitingAuthority = FieldhouseStateHydrator.hydrate(
+            snapshot: snapshot,
+            userID: userID,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        XCTAssertEqual(awaitingAuthority.postseasonFreshRoundPoints, 0)
+        XCTAssertEqual(awaitingAuthority.postseasonTotalPoints, 0)
+        XCTAssertEqual(awaitingAuthority.postseasonPoints(for: userID), 0)
+        XCTAssertEqual(awaitingAuthority.postseasonScoreFreshnessLabel, "WAITING FOR FIRST OFFICIAL RESULT")
     }
 
     func testFreshRoundUsesOfficialWinnersToOpenNextRound() {
