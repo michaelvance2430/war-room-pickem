@@ -105,6 +105,7 @@ assert.match(api, /static func fieldhouseLiveBoard/);
 assert.match(api, /static func fieldhousePostseasonQualifier/);
 assert.match(client, /FieldhouseLiveStandingsEngine\.projectedTotals/);
 assert.match(client, /FieldhouseRoomPickEngine\.counts\(board: board, games: state\.scoringGames\)/);
+assert.match(client, /private func persist\(_ event: FieldhousePersistenceEvent\)[\s\S]*let token = try await auth\.validAccessToken\(\)/);
 assert.match(client, /ROOM PICK COUNTS REFRESHING/);
 assert.doesNotMatch(client, /14 \+ index|11 \+ index/);
 assert.match(client, /Never allow Foundry preview scores or picks to leak/);

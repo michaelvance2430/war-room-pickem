@@ -2285,38 +2285,39 @@ struct FieldhouseNativePreviewView: View {
         let pendingState = state
         Task { @MainActor in
             do {
+                let token = try await auth.validAccessToken()
                 switch event {
                 case .setup:
                     guard let favorite = pendingState.favoriteTeam, let champion = pendingState.crystalBallChampion else {
                         throw FieldhouseRepositoryError(message: "Favorite team and Crystal Ball champion are both required.")
                     }
-                    try await FieldhouseAuthenticatedRepository.saveSetup(token: liveContext.token, userID: liveContext.userID, membership: liveContext.membership, favoriteTeam: favorite, crystalBallChampion: champion)
+                    try await FieldhouseAuthenticatedRepository.saveSetup(token: token, userID: liveContext.userID, membership: liveContext.membership, favoriteTeam: favorite, crystalBallChampion: champion)
                 case .publishCard:
-                    try await FieldhouseAuthenticatedRepository.publishCard(token: liveContext.token, membership: liveContext.membership, state: pendingState)
+                    try await FieldhouseAuthenticatedRepository.publishCard(token: token, membership: liveContext.membership, state: pendingState)
                 case .picks:
-                    _ = try await FieldhouseAuthenticatedRepository.savePicks(token: liveContext.token, membership: liveContext.membership, state: pendingState)
+                    _ = try await FieldhouseAuthenticatedRepository.savePicks(token: token, membership: liveContext.membership, state: pendingState)
                 case .trophy:
                     let trophyID = pendingState.championshipTrophyID
                     guard !trophyID.isEmpty else { throw FieldhouseRepositoryError(message: "Choose a trophy before saving.") }
-                    try await FieldhouseAuthenticatedRepository.selectTrophy(token: liveContext.token, membership: liveContext.membership, trophyID: trophyID)
+                    try await FieldhouseAuthenticatedRepository.selectTrophy(token: token, membership: liveContext.membership, trophyID: trophyID)
                 case .favoriteTeam:
                     guard let favorite = pendingState.favoriteTeam else { throw FieldhouseRepositoryError(message: "Choose a favorite team before saving.") }
-                    try await FieldhouseAuthenticatedRepository.saveFavoriteTeam(token: liveContext.token, userID: liveContext.userID, membership: liveContext.membership, favoriteTeam: favorite)
+                    try await FieldhouseAuthenticatedRepository.saveFavoriteTeam(token: token, userID: liveContext.userID, membership: liveContext.membership, favoriteTeam: favorite)
                 case .bracket:
                     try await FieldhouseAuthenticatedRepository.saveBracket(
-                        token: liveContext.token,
+                        token: token,
                         membership: liveContext.membership,
                         state: pendingState
                     )
                 case .postseasonRound:
                     try await FieldhouseAuthenticatedRepository.saveRoundPicks(
-                        token: liveContext.token,
+                        token: token,
                         membership: liveContext.membership,
                         state: pendingState
                     )
                 case .importOfficialField(let data, let publish):
                     try await FieldhouseAuthenticatedRepository.importOfficialField(
-                        token: liveContext.token,
+                        token: token,
                         userID: liveContext.userID,
                         membership: liveContext.membership,
                         data: data,
@@ -2324,14 +2325,14 @@ struct FieldhouseNativePreviewView: View {
                     )
                 case .syncOfficialSchedule(let data):
                     try await FieldhouseAuthenticatedRepository.syncOfficialSchedule(
-                        token: liveContext.token,
+                        token: token,
                         userID: liveContext.userID,
                         membership: liveContext.membership,
                         data: data
                     )
                 }
 
-                let verified = try await FieldhouseAuthenticatedRepository.load(token: liveContext.token, userID: liveContext.userID, preferredLeagueID: liveContext.membership.leagueId)
+                let verified = try await FieldhouseAuthenticatedRepository.load(token: token, userID: liveContext.userID, preferredLeagueID: liveContext.membership.leagueId)
                 let hydrated = FieldhouseStateHydrator.hydrate(snapshot: verified, userID: liveContext.userID, cached: pendingState)
                 state = hydrated
                 standings = verified.standings
