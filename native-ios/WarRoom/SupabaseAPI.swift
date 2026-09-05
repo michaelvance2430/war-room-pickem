@@ -1048,6 +1048,31 @@ struct ProfileAchievement: Decodable, Identifiable, Sendable {
     }
 }
 
+private struct CareerChampionMilestone: Decodable, Sendable {
+    let triggeringLeagueId: UUID
+    let achievementCode: String
+    let title: String
+    let flavor: String
+    let achievedAt: String
+
+    var achievement: ProfileAchievement {
+        ProfileAchievement(
+            leagueId: triggeringLeagueId,
+            code: achievementCode,
+            title: title,
+            flavor: flavor,
+            earnedAt: achievedAt
+        )
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case title, flavor
+        case triggeringLeagueId = "triggering_league_id"
+        case achievementCode = "achievement_code"
+        case achievedAt = "achieved_at"
+    }
+}
+
 struct ProfileTrophy: Decodable, Identifiable, Sendable {
     let id: UUID
     let leagueId: UUID
@@ -2181,9 +2206,21 @@ enum SupabaseAPI {
         let achievementsURL = components.url!
         async let liveRequest = send(authorizedRequest(url: achievementsURL, token: token), as: [ProfileAchievement].self)
         async let eggRequest = easterEggFinds(token: token, userId: userId)
+        async let milestoneRequest = careerChampionMilestones(token: token, userId: userId)
         let live = try await liveRequest
         let eggs = (try? await eggRequest)?.compactMap(EasterEggEngine.achievement(for:)) ?? []
-        return LegacyCareerRecords.achievements(for: userId, merging: live + eggs)
+        let milestones = (try? await milestoneRequest)?.map(\.achievement) ?? []
+        return LegacyCareerRecords.achievements(for: userId, merging: live + eggs + milestones)
+    }
+
+    private static func careerChampionMilestones(token: String, userId: UUID) async throws -> [CareerChampionMilestone] {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/career_champion_milestones"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "triggering_league_id,achievement_code,title,flavor,achieved_at"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())"),
+            URLQueryItem(name: "order", value: "threshold.asc"),
+        ]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [CareerChampionMilestone].self)
     }
 
     static func easterEggProfile(token: String, userId: UUID) async throws -> EasterEggProfile {

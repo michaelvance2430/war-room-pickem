@@ -23,7 +23,25 @@ create table if not exists public.league_competitive_seasons (
   unique (league_id, season_key, sport_id)
 );
 
+-- Repeat titles are separate permanent receipts. A player may own ten real
+-- league trophies while the ordinary Championship Ring Cheevo remains a
+-- single career unlock. These rows recognize the harder 3 / 5 / 10 thresholds
+-- without duplicating the base ring or its promotion points.
+create table if not exists public.career_champion_milestones (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  threshold integer not null check (threshold in (3,5,10)),
+  achievement_code text not null,
+  title text not null,
+  flavor text not null,
+  triggering_trophy_id uuid not null references public.league_trophies(id),
+  triggering_league_id uuid not null references public.leagues(id),
+  achieved_at timestamptz not null default now(),
+  primary key (user_id, threshold),
+  unique (user_id, achievement_code)
+);
+
 alter table public.league_competitive_seasons enable row level security;
+alter table public.career_champion_milestones enable row level security;
 
 drop policy if exists "Members read competitive season status" on public.league_competitive_seasons;
 create policy "Members read competitive season status"
@@ -38,6 +56,25 @@ create policy "Members read competitive season status"
 -- explicit grant is intentional; RLS still limits rows to room members.
 grant select on public.league_competitive_seasons to authenticated;
 revoke all on public.league_competitive_seasons from anon;
+
+drop policy if exists "Shared rooms read champion milestones" on public.career_champion_milestones;
+create policy "Shared rooms read champion milestones"
+  on public.career_champion_milestones for select to authenticated
+  using (
+    user_id = (select auth.uid())
+    or exists (
+      select 1
+      from public.memberships viewer
+      join public.memberships subject on subject.league_id = viewer.league_id
+      join public.leagues league on league.id = viewer.league_id
+      where viewer.user_id = (select auth.uid())
+        and subject.user_id = career_champion_milestones.user_id
+        and coalesce(league.mode::text,'production') = 'production'
+    )
+  );
+
+grant select on public.career_champion_milestones to authenticated;
+revoke all on public.career_champion_milestones from anon;
 
 create or replace function private.compute_league_competitive_status(p_league_id uuid)
 returns jsonb
@@ -147,6 +184,9 @@ declare
 begin
   v_status := private.compute_league_competitive_status(p_league_id);
   if v_status->>'sportId' is null then raise exception 'League not found'; end if;
+  if lower(p_sport_id) <> lower(v_status->>'sportId') then
+    raise exception 'Competitive-season sport does not match the league';
+  end if;
 
   insert into public.league_competitive_seasons(
     league_id,season_key,sport_id,status,active_human_count,total_human_count,qualification,certified_at
@@ -184,6 +224,14 @@ begin
   if not coalesce((v_status->>'official')::boolean,false) then
     raise exception 'Demo league: eight active players at 75 percent participation are required for permanent hardware';
   end if;
+  -- Every accepted hardware write leaves the durable qualification receipt
+  -- needed by downstream career milestones and later audits. This keeps older
+  -- CFB/NFL trophy paths from silently skipping certification.
+  perform private.certify_league_competitive_season(
+    new.league_id,
+    new.season_year,
+    v_status->>'sportId'
+  );
   return new;
 end;
 $$;
@@ -194,6 +242,77 @@ before insert or update of winner_user_id on public.league_trophies
 for each row execute function private.guard_demo_league_hardware();
 
 revoke all on function private.guard_demo_league_hardware() from public,anon,authenticated;
+
+create or replace function private.award_repeat_champion_milestones()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_championships integer;
+  v_threshold integer;
+  v_code text;
+  v_title text;
+  v_flavor text;
+begin
+  if new.winner_user_id is null or new.trophy_type <> 'championship' then return new; end if;
+
+  -- The hardware guard runs first. Repeat recognition additionally requires
+  -- the durable Official-season receipt and a real production room.
+  if not exists (
+    select 1
+    from public.league_competitive_seasons competitive
+    join public.leagues league on league.id = competitive.league_id
+    where competitive.league_id = new.league_id
+      and competitive.season_key = new.season_year
+      and competitive.status = 'official'
+      and coalesce(league.mode::text,'production') = 'production'
+  ) then return new; end if;
+
+  select count(distinct trophy.id)::integer into v_championships
+  from public.league_trophies trophy
+  join public.league_competitive_seasons competitive
+    on competitive.league_id = trophy.league_id
+   and competitive.season_key = trophy.season_year
+   and competitive.status = 'official'
+  join public.leagues league
+    on league.id = trophy.league_id
+   and coalesce(league.mode::text,'production') = 'production'
+  where trophy.winner_user_id = new.winner_user_id
+    and trophy.trophy_type = 'championship';
+
+  foreach v_threshold in array array[3,5,10] loop
+    if v_championships >= v_threshold then
+      select
+        case v_threshold when 3 then 'three_ring_circus' when 5 then 'five_star_dynasty' else 'ten_room_terror' end,
+        case v_threshold when 3 then 'Three-Ring Circus' when 5 then 'Five-Star Dynasty' else 'Ten-Room Terror' end,
+        case v_threshold
+          when 3 then 'Three legitimate rooms. Three engraved titles. The lucky-season defense has been dismissed for lack of evidence.'
+          when 5 then 'Five official championships across real rooms. At this point the trophy case is no longer furniture. It is infrastructure.'
+          else 'Ten official league championships. Ten separate groups had every opportunity to stop this and collectively failed.'
+        end
+      into v_code,v_title,v_flavor;
+
+      insert into public.career_champion_milestones(
+        user_id,threshold,achievement_code,title,flavor,
+        triggering_trophy_id,triggering_league_id
+      ) values (
+        new.winner_user_id,v_threshold,v_code,v_title,v_flavor,
+        new.id,new.league_id
+      ) on conflict (user_id,threshold) do nothing;
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+
+drop trigger if exists league_trophies_award_repeat_champion_milestones on public.league_trophies;
+create trigger league_trophies_award_repeat_champion_milestones
+after insert or update of winner_user_id,trophy_type,season_year on public.league_trophies
+for each row execute function private.award_repeat_champion_milestones();
+
+revoke all on function private.award_repeat_champion_milestones() from public,anon,authenticated;
 
 notify pgrst, 'reload schema';
 commit;

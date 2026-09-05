@@ -16,6 +16,8 @@ enum ProfileCosmetics {
         "built_different_olympian": "Olympian", "the_816_archivist": "BBQ Sauce",
         "sad_little_brains": "Sad Little Brain", "neighborhood_creeper": "Neighborhood Creeper",
         "championship_ring": "Ring Bearer", "season_sovereign": "Season Sovereign",
+        "three_ring_circus": "Three-Time Champion", "five_star_dynasty": "Five-Star Dynasty",
+        "ten_room_terror": "Ten-Room Terror",
         "national_nightmare": "The Oracle", "elite_commish": "Iron Gavel",
         "immortal_streak": "Immortal", "unbreakable": "Unbreakable", "the_closer": "The Closer",
         "sniper": "The Sniper", "ten_streak_terror": "Streak Terror", "war_room_general": "War Room General",
@@ -85,6 +87,8 @@ enum ProfileCosmetics {
         .init(id: "prop", name: "Prop Overlord", badge: "prop_overlord", colors: (.pink, .purple)),
         .init(id: "toilet", name: "Porcelain Throne", badge: "toilet_crown", colors: (.purple, .pink)),
         .init(id: "ring", name: "Championship Gold", badge: "championship_ring", colors: (.yellow, .white)),
+        .init(id: "dynasty", name: "Dynasty Fire", badge: "five_star_dynasty", colors: (.orange, .yellow)),
+        .init(id: "ten_room", name: "Ten-Room Inferno", badge: "ten_room_terror", colors: (.red, .yellow)),
         .init(id: "legend", name: "War Room Legend", badge: "war_room_legend", colors: (.orange, .yellow)),
         .init(id: "immortal", name: "Immortal Flame", badge: "immortal_streak", colors: (.orange, .red))
     ]

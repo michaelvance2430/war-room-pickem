@@ -373,6 +373,21 @@ struct WarRoomTests {
         #expect(merged.first?.leagueId == secondLeague)
     }
 
+    @Test func repeatChampionMilestonesStackWithoutDuplicatingTheBaseRing() {
+        let league = UUID()
+        let rows = [
+            ProfileAchievement(leagueId: league, code: "championship_ring", title: "Championship Ring", flavor: "Base ring", earnedAt: "2027-01-01T00:00:00Z"),
+            ProfileAchievement(leagueId: league, code: "three_ring_circus", title: "Three-Ring Circus", flavor: "Three titles", earnedAt: "2028-01-01T00:00:00Z"),
+            ProfileAchievement(leagueId: league, code: "five_star_dynasty", title: "Five-Star Dynasty", flavor: "Five titles", earnedAt: "2029-01-01T00:00:00Z"),
+            ProfileAchievement(leagueId: league, code: "ten_room_terror", title: "Ten-Room Terror", flavor: "Ten titles", earnedAt: "2030-01-01T00:00:00Z"),
+        ]
+
+        #expect(PromotionPoints.total(for: rows) == 550)
+        #expect(ProfileCosmetics.titleName(for: "three_ring_circus") == "Three-Time Champion")
+        #expect(ProfileCosmetics.titleName(for: "five_star_dynasty") == "Five-Star Dynasty")
+        #expect(ProfileCosmetics.titleName(for: "ten_room_terror") == "Ten-Room Terror")
+    }
+
     @Test func favoriteTeamIdsResolveForBoardLoyalty() {
         #expect(FootballTeamCatalog.team(forTeamId: "ohio-state", sportId: "cfb")?.name == "Ohio State")
         #expect(FootballTeamCatalog.team(forTeamId: "cfb-notre-dame", sportId: "cfb")?.name == "Notre Dame")

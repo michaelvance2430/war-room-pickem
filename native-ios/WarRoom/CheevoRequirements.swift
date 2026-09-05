@@ -83,6 +83,9 @@ face_of_the_franchise|Upload a profile photo.
 gameday_ready|Play 3 weeks.
 national_nightmare|Correctly pick the national champion on Crystal Ball (commish crowns the champ).
 championship_ring|Win the league Championship (Trophy Room).
+three_ring_circus|Win three Official league championships. Demo rooms and inactive leagues do not count.
+five_star_dynasty|Win five Official league championships. Demo rooms and inactive leagues do not count.
+ten_room_terror|Win ten Official league championships. Demo rooms and inactive leagues do not count.
 toilet_crown|Win the Toilet Bowl (Trophy Room).
 season_sovereign|Finish #1 overall with at least 10 weeks played (checked on profile/standings load).
 unbreakable|Get 20 correct ATS picks in a row (hot week streak).

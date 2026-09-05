@@ -8,6 +8,9 @@
 
 ## Done
 
+- [x] ~~Protect career championships from demo-room farming~~ (2026-09-05)
+  - Every permanent hardware write now creates a durable Official-season qualification receipt first. Only championship trophies from production rooms with that receipt count toward the new three-, five-, and ten-title career milestones. The native profile merges those milestone awards without duplicating the base championship achievement. Focused native tests and the Build 21 authority verifier pass; the SQL remains review-only and has not been executed against production.
+
 - [x] ~~Make eight active players the official-league threshold~~ (2026-09-05)
   - Build 21 defines an active human as a non-bot player who locked at least 75% of completed eligible regular-season cards, rounded up, with a four-card minimum. Eight qualifying humans make a season official; smaller rooms remain fully playable demos but cannot create permanent hardware. Career promotion points and the visible Cheevo cabinet now count each achievement code once even when historical league-scoped rows contain duplicates. Fieldhouse final awards are filtered through the server-owned qualification receipt. Native tests and the Build 21 authority verifier pass; the database migration remains review-only and production is untouched.
 

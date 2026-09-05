@@ -6689,6 +6689,9 @@ face_of_the_franchise|Face of the Franchise
 gameday_ready|Gameday Ready
 national_nightmare|National Nightmare
 championship_ring|Championship Ring
+three_ring_circus|Three-Ring Circus
+five_star_dynasty|Five-Star Dynasty
+ten_room_terror|Ten-Room Terror
 toilet_crown|Toilet Crown
 season_sovereign|Season Sovereign
 unbreakable|Unbreakable
@@ -7338,6 +7341,9 @@ func achievementVisual(for code: String) -> AchievementVisual {
     case "grudge_veteran": return AchievementVisual(icon: "doc.text.fill", glyph: "🧾", color: .purple)
     case "dynasty_of_spite": return AchievementVisual(icon: "crown.fill", glyph: "🧬", color: .yellow)
     case "war_room_legend": return AchievementVisual(icon: "trophy.fill", glyph: "🏆", color: .yellow)
+    case "three_ring_circus": return AchievementVisual(icon: "3.circle.fill", glyph: "💍", color: .yellow)
+    case "five_star_dynasty": return AchievementVisual(icon: "star.circle.fill", glyph: "⭐⭐⭐⭐⭐", color: .orange)
+    case "ten_room_terror": return AchievementVisual(icon: "flame.circle.fill", glyph: "🔥", color: .red)
     case "elite_commish": return AchievementVisual(icon: "scalemass.fill", glyph: "⚖️", color: .yellow)
     case "war_room_recruit": return AchievementVisual(icon: "helmet.fill", glyph: "🪖", color: .green)
     case "creator_checked_in": return AchievementVisual(icon: "gift.fill", glyph: "🎁", color: .red)
