@@ -231,7 +231,7 @@ begin
       end,
       'regular_season','regular-weapon-'||p_league_id||'-'||v_uid||'-'||p_week_number,v_game_count,
       jsonb_build_object(
-        'bonusPercent', case when lower(v_league.sport_id) in ('cbb','ncaam','ncaaw') then 100 else 50 end,
+        'bonusPercent',100,
         'selectionMode','posted_favorites','penaltyPoints',0
       )
     ) on conflict(source_event_id) do nothing;

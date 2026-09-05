@@ -1207,14 +1207,14 @@ enum FieldhouseScoreEngine {
                     ? result.straightUpWinner(in: game)
                     : result.coverWinner(in: game),
                   selections[index] == winner, let confidence = confidences[index] else { continue }
-            total += confidence * (bestBetGame == index ? 2 : 1) * effectiveGameMultiplier
+            total += confidence * (bestBetGame == index ? 2 : 1)
         }
         if cardKind.requiresProp, let prop, let propAnswer,
            let correctAnswer = FieldhousePropEvaluator.answer(for: prop, games: games, results: results),
            propAnswer == (correctAnswer ? "YES" : "NO") {
             total += 3
         }
-        return total
+        return total * effectiveGameMultiplier
     }
 }
 
@@ -1248,14 +1248,13 @@ enum FieldhouseLiveStandingsEngine {
                 guard selectedTeam == leader else { continue }
                 liveWeek += pick.confidence * (pick.isBestBet ? 2 : 1)
             }
-            if cardKind.allowsHellfire && slip.isHellfire { liveWeek *= 2 }
-
             if cardKind.requiresProp, let prop,
                let choice = slip.propChoice,
                let answer = FieldhousePropEvaluator.answer(for: prop, games: games, results: results),
                choice.uppercased() == (answer ? "YES" : "NO") {
                 liveWeek += 3
             }
+            if cardKind.allowsHellfire && slip.isHellfire { liveWeek *= 2 }
             return (standing.userId, standing.totalPoints + liveWeek)
         })
     }
@@ -4133,7 +4132,7 @@ private struct FieldhousePicksPage: View {
             Button("CANCEL", role: .cancel) {}
             Button("DEPLOY HELLFIRE", role: .destructive) { deployHellfire() }
         } message: {
-            Text("This cannot be undone. Hellfire fills and permanently locks all ten favorites, confidence points, Best Bet, and the prop. Every correct game pick scores double. Wrong picks lose nothing. This card cannot be edited or reopened.")
+            Text("This cannot be undone. Hellfire fills and permanently locks all ten favorites, confidence points, Best Bet, and the prop. Every point the card earns—including the prop—scores double. Misses lose nothing. This card cannot be edited or reopened.")
         }
         .onReceive(Timer.publish(every: 15, on: .main, in: .common).autoconnect()) { date in
             now = date
@@ -4155,7 +4154,7 @@ private struct FieldhousePicksPage: View {
             )
             if state.cardKind.allowsHellfire {
                 Button { confirmingHellfire = true } label: {
-                    FieldhouseAction(kicker: "HELLFIRE · \(state.regularHellfiresRemaining)/2 AVAILABLE", title: state.regularHellfiresRemaining == 0 ? "Hellfires Expended" : "Deploy Hellfire", detail: "One-way door: fills and locks the card. Correct game picks score double; misses cost nothing.", icon: "scope")
+                    FieldhouseAction(kicker: "HELLFIRE · \(state.regularHellfiresRemaining)/2 AVAILABLE", title: state.regularHellfiresRemaining == 0 ? "Hellfires Expended" : "Deploy Hellfire", detail: "One-way door: fills and locks the card. Every earned point—including the prop—scores double; misses cost nothing.", icon: "scope")
                 }.buttonStyle(.plain).disabled(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now)).opacity(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now) ? 0.45 : 1)
             }
                 ForEach(Array(state.publishedGames.enumerated()), id: \.element.id) { index, game in
@@ -5839,7 +5838,7 @@ private struct FieldhouseProfileDestinationView: View {
         case .rules:
             detailCard("WEEKLY CARD", "Pick 10 games against the spread. Use each confidence value from 1 through 10 once.")
             detailCard("BEST BET", "Doubles the confidence points on one game. Incorrect picks score zero; football push language is never used.")
-            detailCard("HELLFIRE", "Regular season: 2× correct game points and permanent picks. Postseason: 1.5× with the 60% threshold.")
+            detailCard("HELLFIRE", "Regular season: 2× every earned point and permanent picks. Postseason: 1.5× with the 60% threshold.")
         case .privacy:
             detailCard("ENTERTAINMENT ONLY", "No real-money wagering, prizes, or payouts")
             detailCard("ACCOUNT CONTROLS", "Profile, support, safety, and account deletion controls live here when connected to production")

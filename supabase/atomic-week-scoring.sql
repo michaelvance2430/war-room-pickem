@@ -201,10 +201,8 @@ begin
   ), totals as (
     select id,
       case
-        when is_chaos and v_sport_id in ('cbb', 'ncaam', 'ncaaw')
-          then (game_points * 2 + prop_points)::integer
         when is_chaos
-          then (game_points + prop_points + (game_points + prop_points + 1) / 2)::integer
+          then ((game_points + prop_points) * 2)::integer
         else (game_points + prop_points)::integer
       end total
     from base_scores

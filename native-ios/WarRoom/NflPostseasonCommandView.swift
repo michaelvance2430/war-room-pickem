@@ -8,6 +8,8 @@ struct NflPostseasonCloudView: View {
     @State private var results: [String:String] = [:]
     @State private var scorecard: NflPostseasonScorecard?
     @State private var fieldStatus: NflPostseasonFieldStatus?
+    @State private var hardwareAward: ProfileTrophy?
+    @State private var presentedHardware: ProfileTrophy?
     @State private var picks: [String:String] = [:]
     @State private var loading = true
     @State private var saving = false
@@ -34,6 +36,7 @@ struct NflPostseasonCloudView: View {
                     if loading { ProgressView("Opening postseason command…").tint(.cyan).frame(maxWidth:.infinity).padding(30) }
                     else if let slate {
                         if let scorecard { scorecardPanel(scorecard) }
+                        if let hardwareAward { hardwarePanel(hardwareAward) }
                         if let foundryBotsSeeded {
                             Label("\(foundryBotsSeeded) SIMULATION BRACKETS SEALED · 13 DECISIONS EACH", systemImage: "checkmark.shield.fill")
                                 .font(.caption.weight(.black)).foregroundStyle(.cyan)
@@ -82,6 +85,9 @@ struct NflPostseasonCloudView: View {
         .alert("AUTHORIZE JDAM?",isPresented:$confirmingJdam){Button("KEEP CONTROL",role:.cancel){};Button("AUTHORIZE",role:.destructive){Task{await deployJdam()}}}message:{Text("This cannot be undone. JDAM replaces all 13 decisions and permanently seals the bracket. Get 8 or more correct and weighted playoff points earn 1.5×. Get 7 or fewer correct and weighted points are cut to 0.5×. No edits or rerolls.")}
         .fullScreenCover(item: $strikePresentation) { strike in
             WeaponStrikeVideoView(presentation: strike) { strikePresentation = nil }
+        }
+        .fullScreenCover(item: $presentedHardware) { award in
+            TrophyEvidenceView(trophy: award, title: NflPostseasonHardwareSelector.title(for: award))
         }
     }
 
@@ -190,13 +196,75 @@ struct NflPostseasonCloudView: View {
     private var jdamPanel: some View { VStack(alignment:.leading,spacing:10){HStack{VStack(alignment:.leading){Text("POSTSEASON WEAPON · M.A.P.’S").font(.system(size:8,weight:.black)).tracking(1.3).foregroundStyle(.red);Text("JDAM OVERRIDE").font(.title3.weight(.black))};Spacer();Image(systemName:"scope").font(.title.weight(.black)).foregroundStyle(.red)};Text("One permanent computer bracket. 8–13 correct earns 1.5× weighted points. 0–7 correct cuts weighted points to 0.5×.").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.64));Button("AUTHORIZE JDAM"){confirmingJdam=true}.font(.headline.weight(.black)).frame(maxWidth:.infinity).buttonStyle(.borderedProminent).tint(.red)}.padding(16).background(.red.opacity(0.08),in:RoundedRectangle(cornerRadius:7)).overlay(RoundedRectangle(cornerRadius:7).stroke(.red.opacity(0.58))) }
     private var sealedPanel: some View { VStack(spacing:8){Label(entry?.usedJdam == true ? "JDAM BRACKET SEALED":"BRACKET SEALED",systemImage:"checkmark.seal.fill").font(.headline.weight(.black)).foregroundStyle(.cyan);Text(entry?.usedJdam == true ? "Permanent receipt secured. Final scoring uses the 8-of-13 JDAM threshold." : "Cloud receipt secured. This bracket follows you across every device.").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.6))}.frame(maxWidth:.infinity).padding(18).background(.blue.opacity(0.12),in:RoundedRectangle(cornerRadius:7)).overlay(RoundedRectangle(cornerRadius:7).stroke(.cyan.opacity(0.48))) }
     private func scorecardPanel(_ row:NflPostseasonScorecard)->some View { VStack(alignment:.leading,spacing:10){Label("CERTIFIED PLAYOFF RECEIPT",systemImage:"list.clipboard.fill").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.cyan);Text("\(row.totalPoints) POINTS").font(.system(size:30,weight:.black)).fontWidth(.condensed);HStack{metric("WC",row.wildCardPoints);metric("DIV",row.divisionalPoints);metric("CONF",row.conferencePoints);metric("SB",row.superBowlPoints)};if row.usedJdam{Divider().overlay(.white.opacity(0.18));HStack{metric("CORRECT","\(row.correctPicks)/13");metric("RAW",row.rawPoints);metric("JDAM",String(format:"%.1f×",row.jdamMultiplier));metric("FINAL",row.adjustedPoints)};Text(row.correctPicks >= NflJdamScoring.successThreshold ? "JDAM THRESHOLD CLEARED · 1.5× APPLIED" : "JDAM THRESHOLD MISSED · 0.5× APPLIED").font(.system(size:8,weight:.black)).tracking(1).foregroundStyle(row.correctPicks >= NflJdamScoring.successThreshold ? .green:.red)}}.padding(17).background(.black.opacity(0.88),in:RoundedRectangle(cornerRadius:7)).overlay(RoundedRectangle(cornerRadius:7).stroke(.blue.opacity(0.58))) }
+    private func hardwarePanel(_ award: ProfileTrophy) -> some View {
+        Button { presentedHardware = award } label: {
+            HStack(spacing: 14) {
+                Image(systemName: award.trophyType.lowercased() == "toilet_bowl" ? "toilet.fill" : "trophy.fill")
+                    .font(.title.weight(.black))
+                    .foregroundStyle(award.trophyType.lowercased() == "toilet_bowl" ? .brown : .yellow)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("PERMANENT HARDWARE SECURED").font(.system(size: 8, weight: .black)).tracking(1.4).foregroundStyle(.yellow)
+                    Text(NflPostseasonHardwareSelector.title(for: award)).font(.headline.weight(.black)).foregroundStyle(.white)
+                    Text("Open the official engraving and Final Thirteen receipt.").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(.yellow)
+            }
+            .padding(16)
+            .background(.yellow.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(.yellow.opacity(0.58), lineWidth: 2))
+        }
+        .buttonStyle(.plain)
+    }
     private func metric(_ label:String,_ value:Int)->some View { VStack{Text("\(value)").font(.headline.weight(.black));Text(label).font(.system(size:7,weight:.black)).foregroundStyle(.secondary)}.frame(maxWidth:.infinity) }
     private func metric(_ label:String,_ value:String)->some View { VStack{Text(value).font(.headline.weight(.black));Text(label).font(.system(size:7,weight:.black)).foregroundStyle(.secondary)}.frame(maxWidth:.infinity) }
     private func commandLink(_ title:String,_ detail:String,_ icon:String,_ color:Color)->some View { HStack(spacing:12){Image(systemName:icon).font(.title2.weight(.black)).foregroundStyle(color);VStack(alignment:.leading){Text(title).font(.headline.weight(.black)).foregroundStyle(.white);Text(detail).font(.caption).foregroundStyle(.white.opacity(0.55))};Spacer();Image(systemName:"chevron.right").foregroundStyle(color)}.padding(15).background(.black.opacity(0.82),in:RoundedRectangle(cornerRadius:17)).overlay(RoundedRectangle(cornerRadius:17).stroke(color.opacity(0.45))) }
 
     private func resultMark(_ game:NflBracketGame,team:NflPostseasonTeam)->String { guard let result=results[game.id] else{return "ADVANCE"};return result==team.id ? "✓ CORRECT":"PICK" }
     private func select(_ team:NflPostseasonTeam,in game:NflBracketGame){picks[game.id]=team.id;NflBracketEngine.clearedDownstream(after:game.id,picks:&picks)}
-    @MainActor private func load() async { defer{loading=false};guard let token=auth.token,let user=auth.user else{return};do{var loaded=try await SupabaseAPI.nflPostseasonSlate(token:token,leagueId:membership.leagueId,seasonKey:seasonKey);if loaded==nil && membership.leagues.mode=="foundry" && isCommissioner{loaded=try await SupabaseAPI.publishNflPostseasonSlate(token:token,leagueId:membership.leagueId,seasonKey:seasonKey,teams:Self.foundryField)};slate=loaded;if loaded != nil && membership.leagues.mode=="foundry" && isCommissioner{foundryBotsSeeded=try await SupabaseAPI.seedFoundryNflPostseason(token:token,leagueId:membership.leagueId,seasonKey:seasonKey).botsSeeded};async let loadedEntry=SupabaseAPI.nflPostseasonEntry(token:token,leagueId:membership.leagueId,userId:user.id,seasonKey:seasonKey);async let loadedResults=SupabaseAPI.nflPostseasonResults(token:token,leagueId:membership.leagueId,seasonKey:seasonKey);async let loadedScore=SupabaseAPI.nflPostseasonScorecard(token:token,leagueId:membership.leagueId,userId:user.id,seasonKey:seasonKey);entry=try await loadedEntry;picks=entry?.picks ?? [:];results=(try await loadedResults)?.winners ?? [:];scorecard=try await loadedScore;fieldStatus=try? await SupabaseAPI.nflPostseasonFieldStatus(token:token,leagueId:membership.leagueId,userId:user.id,seasonKey:seasonKey)}catch{errorMessage=error.localizedDescription} }
+    @MainActor private func load() async {
+        defer { loading = false }
+        guard let token = auth.token, let user = auth.user else { return }
+        do {
+            var loaded = try await SupabaseAPI.nflPostseasonSlate(token: token, leagueId: membership.leagueId, seasonKey: seasonKey)
+            if loaded == nil && membership.leagues.mode == "foundry" && isCommissioner {
+                loaded = try await SupabaseAPI.publishNflPostseasonSlate(token: token, leagueId: membership.leagueId, seasonKey: seasonKey, teams: Self.foundryField)
+            }
+            slate = loaded
+            if loaded != nil && membership.leagues.mode == "foundry" && isCommissioner {
+                foundryBotsSeeded = try await SupabaseAPI.seedFoundryNflPostseason(token: token, leagueId: membership.leagueId, seasonKey: seasonKey).botsSeeded
+            }
+
+            async let loadedEntry = SupabaseAPI.nflPostseasonEntry(token: token, leagueId: membership.leagueId, userId: user.id, seasonKey: seasonKey)
+            async let loadedResults = SupabaseAPI.nflPostseasonResults(token: token, leagueId: membership.leagueId, seasonKey: seasonKey)
+            async let loadedScore = SupabaseAPI.nflPostseasonScorecard(token: token, leagueId: membership.leagueId, userId: user.id, seasonKey: seasonKey)
+            async let loadedFieldStatus = SupabaseAPI.nflPostseasonFieldStatus(token: token, leagueId: membership.leagueId, userId: user.id, seasonKey: seasonKey)
+            async let loadedTrophies = SupabaseAPI.profileTrophies(token: token, userId: user.id)
+
+            entry = try await loadedEntry
+            picks = entry?.picks ?? [:]
+            results = (try await loadedResults)?.winners ?? [:]
+            scorecard = try await loadedScore
+            fieldStatus = try? await loadedFieldStatus
+            let trophies = (try? await loadedTrophies) ?? []
+            hardwareAward = NflPostseasonHardwareSelector.award(
+                from: trophies,
+                leagueID: membership.leagueId,
+                seasonKey: seasonKey,
+                userID: user.id
+            )
+            presentHardwareOnceIfNeeded()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+    @MainActor private func presentHardwareOnceIfNeeded() {
+        guard let hardwareAward else { return }
+        let key = NflPostseasonHardwareSelector.presentationKey(for: hardwareAward)
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        presentedHardware = hardwareAward
+    }
     @MainActor private func lockBracket(usedJdam:Bool) async -> Bool {guard let token=auth.token else{return false};saving=true;errorMessage=nil;do{entry=try await SupabaseAPI.lockNflPostseasonBracket(token:token,leagueId:membership.leagueId,seasonKey:seasonKey,picks:picks,usedJdam:usedJdam);saving=false;return true}catch{errorMessage=error.localizedDescription;saving=false;return false}}
     @MainActor private func deployJdam() async {guard let teams=slate?.teams else{return};picks=NflBracketEngine.jdamPicks(teams:teams);guard complete else{errorMessage="JDAM could not resolve the bracket. Reopen postseason command and try again.";return};if await lockBracket(usedJdam:true){strikePresentation=WeaponStrikeCatalog.presentation(for:"nfl")}}
     static var foundryField:[NflPostseasonTeam]{["AFC","NFC"].flatMap{conference in FootballTeamCatalog.nfl.filter{$0.conference.hasPrefix(conference)}.prefix(7).enumerated().map{index,team in .init(id:FootballTeamCatalog.normalizedTeamId(team.name),name:team.name,conference:conference,seed:index+1)}}}

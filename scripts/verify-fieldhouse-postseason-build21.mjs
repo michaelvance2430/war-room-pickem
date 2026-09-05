@@ -243,7 +243,11 @@ assert.match(client, /Never allow Foundry preview scores or picks to leak/);
 assert.doesNotMatch(client, /postseasonFreshRoundPoints = snapshot\.roundEntries\.reduce/);
 assert.match(client, /The generated postseason total is the only score authority used/);
 assert.match(client, /else if let scoringCard = snapshot\.scoringCard/);
-assert.match(client, /if auth\.user != nil && auth\.token != nil \{\s*YouView\(onBack:/);
+assert.match(
+  client,
+  /if auth\.user != nil && auth\.token != nil && !ProcessInfo\.processInfo\.arguments\.contains\("--fieldhouse-preview"\) \{\s*YouView\(onBack:/,
+);
+assert.match(client, /else \{\s*NavigationStack \{\s*ScrollView \{\s*FieldhouseProfilePage\(state: \$state\)/);
 assert.match(client, /if state\.officialPostseasonField != nil \{\s*clearLiveProjection\(\)\s*refreshLifecycle\(at: Date\(\)\)\s*return\s*\}/);
 assert.match(client, /LIVE PROJECTION/);
 assert.match(client, /liveProjectionWeek != state\.scoringWindow/);
@@ -311,7 +315,10 @@ assert.match(client, /if let liveContext \{\s*LockerRoomView\(leagueOverride: li
 assert.match(client, /authenticatedStandings\.isEmpty && state\.isAuthenticatedSession/);
 assert.match(client, /state\.isAuthenticatedSession && liveRegionalStandings\.isEmpty/);
 assert.match(client, /Highest cumulative postseason score through the title game earns this trophy/);
-assert.match(client, /if auth\.user != nil && auth\.token != nil \{\s*YouView\(onBack:/);
+assert.match(
+  client,
+  /if auth\.user != nil && auth\.token != nil && !ProcessInfo\.processInfo\.arguments\.contains\("--fieldhouse-preview"\) \{\s*YouView\(onBack:/,
+);
 assert.match(content, /else if identity\.isFieldhouse \{ FieldhouseBackdrop\(leagueOverride:/);
 assert.match(content, /NCAAW FIELDHOUSE LIVE WIRE/);
 assert.match(content, /case "m-iron-rim": return "FieldhouseMTheIronRim"/);

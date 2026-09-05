@@ -120,6 +120,40 @@ enum NflPostseasonFieldPolicy {
     }
 }
 
+enum NflPostseasonHardwareSelector {
+    static func award(
+        from trophies: [ProfileTrophy],
+        leagueID: UUID,
+        seasonKey: Int,
+        userID: UUID
+    ) -> ProfileTrophy? {
+        trophies
+            .filter {
+                $0.leagueId == leagueID
+                    && $0.seasonYear == seasonKey
+                    && $0.winnerUserId == userID
+                    && ["championship", "toilet_bowl"].contains($0.trophyType.lowercased())
+            }
+            .sorted { left, right in
+                let leftPriority = left.trophyType.lowercased() == "championship" ? 0 : 1
+                let rightPriority = right.trophyType.lowercased() == "championship" ? 0 : 1
+                if leftPriority != rightPriority { return leftPriority < rightPriority }
+                return left.awardedAt > right.awardedAt
+            }
+            .first
+    }
+
+    static func presentationKey(for award: ProfileTrophy) -> String {
+        "warroom.nfl-postseason-hardware-presented.\(award.id.uuidString.lowercased())"
+    }
+
+    static func title(for award: ProfileTrophy) -> String {
+        award.trophyType.lowercased() == "toilet_bowl"
+            ? "NFL TOILET BOWL CHAMPION"
+            : "NFL FINAL THIRTEEN CHAMPION"
+    }
+}
+
 enum NflJdamScoring {
     static let decisionCount = 13
     static let successThreshold = 8

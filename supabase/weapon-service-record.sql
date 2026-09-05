@@ -9,7 +9,7 @@ create table if not exists public.weapon_service_events (
   user_id uuid not null references public.profiles (id) on delete cascade,
   league_id uuid not null,
   league_name text not null check (char_length(btrim(league_name)) between 1 and 120),
-  sport_id text not null check (sport_id in ('cfb', 'nfl', 'cbb')),
+  sport_id text not null check (sport_id in ('cfb', 'nfl', 'cbb', 'ncaam', 'ncaaw')),
   season_year integer not null check (season_year between 2000 and 2100),
   week_number integer null check (week_number between 0 and 30),
   weapon_type text not null check (weapon_type in ('tactical_nuke', 'dead_hand', 'jdam', 'hellfire')),
@@ -31,9 +31,27 @@ create table if not exists public.weapon_service_events (
     (weapon_type = 'tactical_nuke' and phase = 'regular_season')
     or (weapon_type = 'dead_hand' and sport_id = 'cfb' and phase = 'postseason')
     or (weapon_type = 'jdam' and sport_id = 'nfl' and phase in ('regular_season','postseason'))
-    or (weapon_type = 'hellfire' and sport_id = 'cbb' and phase in ('regular_season','postseason'))
+    or (weapon_type = 'hellfire' and sport_id in ('cbb','ncaam','ncaaw') and phase in ('regular_season','postseason'))
   )
 );
+
+-- Upgrade an existing pre-Fieldhouse ledger as well as a clean install. These
+-- constraints must accept the canonical men's and women's basketball sport IDs
+-- before atomic-pick-save can record a Hellfire authorization.
+alter table public.weapon_service_events
+  drop constraint if exists weapon_service_events_sport_id_check;
+alter table public.weapon_service_events
+  drop constraint if exists weapon_service_events_weapon_sport_check;
+alter table public.weapon_service_events
+  add constraint weapon_service_events_sport_id_check
+  check (sport_id in ('cfb', 'nfl', 'cbb', 'ncaam', 'ncaaw'));
+alter table public.weapon_service_events
+  add constraint weapon_service_events_weapon_sport_check check (
+    (weapon_type = 'tactical_nuke' and phase = 'regular_season')
+    or (weapon_type = 'dead_hand' and sport_id = 'cfb' and phase = 'postseason')
+    or (weapon_type = 'jdam' and sport_id = 'nfl' and phase in ('regular_season','postseason'))
+    or (weapon_type = 'hellfire' and sport_id in ('cbb','ncaam','ncaaw') and phase in ('regular_season','postseason'))
+  );
 
 comment on table public.weapon_service_events is
   'Permanent account-wide weapon authorization ledger. Append-only in normal operation; admin voids are new events/status, not client edits.';

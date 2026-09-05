@@ -540,6 +540,25 @@ struct WarRoomTests {
         #expect(NflJdamScoring.adjustedPoints(rawPoints: 17, correctPicks: 13, usedJdam: false) == 17)
     }
 
+    @Test func nflPostseasonHardwarePresentationUsesOnlyTheAuthoritativeCurrentReceipt() throws {
+        let league = UUID()
+        let user = UUID()
+        let expected = ProfileTrophy(id: UUID(), leagueId: league, seasonYear: 2026, trophyType: "championship", winnerName: "Riley V", winnerUserId: user, subtitle: nil, notes: nil, awardedAt: "2027-02-15T04:00:00Z", trophyDesignId: "nfl_gridiron_crown")
+        let wrongLeague = ProfileTrophy(id: UUID(), leagueId: UUID(), seasonYear: 2026, trophyType: "championship", winnerName: "Riley V", winnerUserId: user, subtitle: nil, notes: nil, awardedAt: "2027-02-15T04:00:00Z", trophyDesignId: "nfl_gridiron_crown")
+        let wrongSeason = ProfileTrophy(id: UUID(), leagueId: league, seasonYear: 2025, trophyType: "toilet_bowl", winnerName: "Riley V", winnerUserId: user, subtitle: nil, notes: nil, awardedAt: "2026-02-15T04:00:00Z", trophyDesignId: "toilet_bowl")
+
+        let selected = try #require(NflPostseasonHardwareSelector.award(
+            from: [wrongLeague, wrongSeason, expected],
+            leagueID: league,
+            seasonKey: 2026,
+            userID: user
+        ))
+
+        #expect(selected.id == expected.id)
+        #expect(NflPostseasonHardwareSelector.title(for: selected) == "NFL FINAL THIRTEEN CHAMPION")
+        #expect(NflPostseasonHardwareSelector.presentationKey(for: selected).contains(selected.id.uuidString.lowercased()))
+    }
+
     private func standing(name: String, points: Int, id: Int) -> Standing {
         Standing(
             id: UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", id))!,

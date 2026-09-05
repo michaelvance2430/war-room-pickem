@@ -18,6 +18,8 @@ assert.doesNotMatch(sql, /grant insert[^;]*authenticated/i);
 assert.doesNotMatch(sql, /create policy[\s\S]*for insert[\s\S]*authenticated/i);
 assert.match(sql, /weapon_service_events_source_event_id_key unique/);
 assert.match(sql, /weapon_service_events_weapon_sport_check/);
+assert.match(sql, /sport_id in \('cfb', 'nfl', 'cbb', 'ncaam', 'ncaaw'\)/);
+assert.match(sql, /weapon_type = 'hellfire' and sport_id in \('cbb','ncaam','ncaaw'\)/);
 assert.match(client, /loadWeaponServiceRecord/);
 assert.match(client, /loadWeaponServiceCounts/);
 assert.match(profile, /loadWeaponServiceSummary/);

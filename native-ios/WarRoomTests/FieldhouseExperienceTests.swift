@@ -1075,7 +1075,7 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(points, 32)
     }
 
-    func testRegularSeasonHellfireDoublesCorrectGamePointsWithoutPenalizingMisses() {
+    func testRegularSeasonHellfireDoublesEveryEarnedPointWithoutPenalizingMisses() {
         let games = Array(FieldhouseGameCatalog.windowOne.prefix(2))
         let results = [
             games[0].id: FieldhouseGameResult(gameID: games[0].id, awayScore: 78, homeScore: 76, phase: .final),
@@ -1087,11 +1087,11 @@ final class FieldhouseExperienceTests: XCTestCase {
             selections: [0: games[0].away, 1: games[1].away],
             confidences: [0: 10, 1: 9],
             bestBetGame: 0,
-            prop: nil,
-            propAnswer: nil,
+            prop: .combinedScore150,
+            propAnswer: "YES",
             gameMultiplier: 2
         )
-        XCTAssertEqual(points, 40)
+        XCTAssertEqual(points, 46)
     }
 
     func testLiveStandingsProjectionUsesRevealedPicksAndFieldhouseHellfireWithoutChangingCertifiedTotal() {

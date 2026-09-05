@@ -41,6 +41,10 @@ assert.match(model, /postseasonLeaders[\s\S]*regularSeasonPoints/);
 assert.match(view, /CHAMPIONSHIP FIELD/);
 assert.match(view, /TOILET BOWL FIELD/);
 assert.match(view, /Final Thirteen points decide the trophy/);
+assert.match(view, /NflPostseasonHardwareSelector\.award/);
+assert.match(view, /presentHardwareOnceIfNeeded/);
+assert.match(view, /PERMANENT HARDWARE SECURED/);
+assert.match(model, /warroom\.nfl-postseason-hardware-presented/);
 assert.match(api, /rest\/v1\/nfl_postseason_field_status/);
 assert.match(api, /resource: "nfl_profile_trophies"/);
 

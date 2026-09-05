@@ -887,7 +887,7 @@ private struct PicksView: View {
 
     private var regularSeasonWeaponConfirmationMessage: String {
         let weapon = isNFL ? "JDAM" : (isFieldhouse ? "Hellfire" : "The targeting computer")
-        return "\(weapon) replaces this week’s reopened card using the posted favorites and a legal confidence ladder. It adds a 50% bonus to points earned, never subtracts points, and immediately spends one of two season uses. This cannot be undone. No edits. No rerolls."
+        return "\(weapon) replaces this week’s reopened card using the posted favorites and a legal confidence ladder. Every point the card earns—including its prop—scores double. Misses lose nothing, and one of two season uses is spent immediately. This cannot be undone. No edits. No rerolls."
     }
 
     private func authorizeRegularSeasonWeapon(card: WeekCard) async {
@@ -912,10 +912,10 @@ private struct PicksView: View {
             hydrateDraft(from: pick)
             tacticalNukesUsed = min(2, tacticalNukesUsed + 1)
             saveNotice = isNFL
-                ? "JDAM card sealed. Earned points receive 50% support."
+                ? "JDAM card sealed. Every earned point scores double."
                 : (isFieldhouse
-                    ? "Hellfire card sealed. Earned points receive 50% support."
-                    : "Nuclear card sealed. Earned points receive 50% support.")
+                    ? "Hellfire card sealed. Every earned point scores double."
+                    : "Nuclear card sealed. Every earned point scores double.")
             editingSubmittedCard = false
             strikePresentation = WeaponStrikeCatalog.presentation(for: league.leagues.sportId)
         } catch { saveErrorMessage = error.localizedDescription }
@@ -1326,7 +1326,7 @@ private struct RegularSeasonWeaponPanel: View {
                 Text("\(remaining)/2").font(.title3.weight(.black)).monospacedDigit().foregroundStyle(armed ? .green : accent)
             }
             if armed {
-                Label("AI CARD SEALED · EARNED POINTS +50%", systemImage: "checkmark.seal.fill")
+                Label("AI CARD SEALED · EARNED POINTS 2×", systemImage: "checkmark.seal.fill")
                     .font(.caption.weight(.black)).foregroundStyle(.green)
             } else {
                 Button(action: authorize) {
@@ -1334,7 +1334,7 @@ private struct RegularSeasonWeaponPanel: View {
                         .font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 7)
                 }.buttonStyle(.borderedProminent).tint(accent).disabled(remaining == 0)
             }
-            Text("The computer takes the posted favorites. Correct picks keep their normal points and add a 50% catch-up bonus. Misses never cost points.")
+            Text("The computer takes the posted favorites. Every point the card earns—including the prop—scores double. Misses never cost points.")
                 .font(.system(size: 9, weight: .bold)).foregroundStyle(.white.opacity(0.56)).multilineTextAlignment(.center)
         }
         .padding(16)
@@ -1390,7 +1390,7 @@ private struct LockedPickSummaryView: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(isNFL ? "JDAM SUPPORT LOCKED" : "NUCLEAR CARD LOCKED")
                                     .font(.caption.weight(.black)).tracking(1)
-                                Text("POSTED FAVORITES · EARNED POINTS +50% · SEALED")
+                                Text("POSTED FAVORITES · EARNED POINTS 2× · SEALED")
                                     .font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.52))
                             }
                             Spacer()
@@ -7874,7 +7874,7 @@ struct AchievementEvidenceView: View {
     }
 }
 
-private struct TrophyEvidenceView: View {
+struct TrophyEvidenceView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: AuthStore
     let trophy: ProfileTrophy
@@ -8671,7 +8671,7 @@ struct HowToPlayView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("NFL CAMPAIGN · WEEK 1 THROUGH SUPER BOWL", systemImage: "football.fill")
                             .font(.caption.weight(.black)).tracking(1).foregroundStyle(.cyan)
-                        Text("No preseason. Pick five games each week through Week 18, call the Super Bowl champion in the Crystal Ball, then build all 13 playoff decisions. Two regular-season JDAM support calls can add a 50% catch-up bonus; the postseason JDAM remains the unpredictable full-bracket override.")
+                        Text("No preseason. Pick five games each week through Week 18, call the Super Bowl champion in the Crystal Ball, then build all 13 playoff decisions. Two regular-season JDAM calls can double every point earned on the sealed card; the postseason JDAM remains the unpredictable full-bracket override.")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.72))
                     }
                     .padding(16).background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
