@@ -88,6 +88,13 @@ final class WarRoomUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["BEST BET"].exists)
         XCTAssertFalse(app.staticTexts["PROP"].exists)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "HELLFIRE")).firstMatch.exists)
+
+        let bestBet = app.buttons["fieldhouse.best-bet.0"]
+        for _ in 0..<5 where !bestBet.isHittable { app.swipeUp() }
+        XCTAssertTrue(bestBet.isHittable, "Best Bet must be a prominent full-width action below confidence points.")
+        XCTAssertTrue(bestBet.label.contains("MARK AS BEST BET"))
+        bestBet.tap()
+        XCTAssertTrue(bestBet.label.contains("BEST BET ARMED"))
     }
 
     @MainActor

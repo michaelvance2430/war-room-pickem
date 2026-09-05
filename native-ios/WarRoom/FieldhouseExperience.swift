@@ -4181,16 +4181,11 @@ private struct FieldhousePicksPage: View {
 
     private func gameCard(index: Int, game matchup: FieldhouseGame) -> some View {
         let selected = state.sideSelections[index]
+        let isBestBet = state.bestBetGame == index
         return VStack(alignment: .leading, spacing: 11) {
             HStack {
                 Text(matchup.championshipConference.map { "\($0.displayName) CHAMPIONSHIP · \(matchup.displayTip(in: state.window))" } ?? "COURT \(index + 1) · FIRST TIP \(matchup.displayTip(in: state.window))").font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(accent)
                 Spacer()
-                Button {
-                    state.bestBetGame = state.bestBetGame == index ? nil : index
-                } label: {
-                    Label("BEST BET", systemImage: state.bestBetGame == index ? "star.fill" : "star")
-                        .font(.system(size: 8, weight: .black)).foregroundStyle(state.bestBetGame == index ? .yellow : .white.opacity(0.52))
-                }.buttonStyle(.plain).disabled(state.picksLocked || !state.canEditPicks(at: now))
             }
             HStack(spacing: 8) {
                 sideButton(matchup.away, game: index, selected: selected)
@@ -4213,6 +4208,23 @@ private struct FieldhousePicksPage: View {
                     }.buttonStyle(.plain).disabled(!available || state.picksLocked || !state.canEditPicks(at: now))
                 }
             }
+            Button {
+                state.bestBetGame = isBestBet ? nil : index
+            } label: {
+                Label(
+                    isBestBet ? "BEST BET ARMED · ×2" : "MARK AS BEST BET · ×2",
+                    systemImage: isBestBet ? "star.fill" : "star"
+                )
+                .font(.caption.weight(.black))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .foregroundStyle(isBestBet ? .black : .white)
+                .background(isBestBet ? Color.green : Color.red, in: RoundedRectangle(cornerRadius: 11))
+            }
+            .buttonStyle(.plain)
+            .disabled(state.picksLocked || !state.canEditPicks(at: now))
+            .opacity(state.picksLocked || !state.canEditPicks(at: now) ? 0.45 : 1)
+            .accessibilityIdentifier("fieldhouse.best-bet.\(index)")
         }.padding(14).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(selected == nil ? .white.opacity(0.12) : accent.opacity(0.42)))
     }
 
