@@ -462,9 +462,11 @@ begin
   select
     'fieldhouse-round-open:' || p_tournament_id || ':' || p_round_key || ':' || l.id,
     l.id,
-    'card_built',
-    upper(v_round_title) || ' PICKS ARE LIVE',
-    l.name || ': make every ' || v_round_title || ' pick before the first game tips.',
+    case when p_round_key='opening' then 'fieldhouse_selection_sunday' else 'fieldhouse_round_open' end,
+    case when p_round_key='opening' then 'SELECTION SUNDAY IS LIVE' else upper(v_round_title) || ' PICKS ARE LIVE' end,
+    case when p_round_key='opening'
+      then l.name || ': fill your 76-team bracket and make all 12 Opening Round picks before the first game tips.'
+      else l.name || ': make every ' || v_round_title || ' pick before the first game tips.' end,
     'picks',
     null,
     clock_timestamp()
@@ -481,9 +483,11 @@ begin
     select
       'fieldhouse-round-lock-1h:' || p_tournament_id || ':' || p_round_key || ':' || l.id,
       l.id,
-      'card_lock_1h',
+      case when p_round_key='opening' then 'fieldhouse_selection_sunday_lock_1h' else 'fieldhouse_round_lock_1h' end,
       'FINAL WARNING · 1 HOUR',
-      l.name || ': ' || v_round_title || ' picks lock at first tip. Finish and confirm the round.',
+      case when p_round_key='opening'
+        then l.name || ': your 76-team bracket and Opening Round picks lock at first tip. Finish and confirm both.'
+        else l.name || ': ' || v_round_title || ' picks lock at first tip. Finish and confirm the round.' end,
       'picks',
       null,
       v_first_tip - interval '1 hour'

@@ -2126,7 +2126,7 @@ struct FieldhouseNativePreviewView: View {
         notificationDestination = nil
         switch route.destination {
         case "picks":
-            if state.activePostseasonRound != nil {
+            if state.activePostseasonRound != nil && !route.routesToFieldhousePostseasonOverview {
                 openActivePostseasonRound = true
             }
             desk = .picks
@@ -4262,7 +4262,7 @@ private struct FieldhouseBracketsPage: View {
             Text("TWO PATHS · ONE POSTSEASON SCORE").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(accent)
             HStack(spacing: 9) {
                 postseasonPath(icon: "rectangle.split.3x3.fill", title: "MY BRACKET", detail: "Predict all 75 games once. Locks before the Buy-In.")
-                postseasonPath(icon: "basketball.fill", title: "ROUND PICKS", detail: "A fresh spread card opens and scores every round.")
+                postseasonPath(icon: "basketball.fill", title: "ROUND PICKS", detail: "A fresh winner card opens and scores every round.")
             }
             Text("Both paths earn trophy points. Cheevos remain career rewards and never alter the regional race.")
                 .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))

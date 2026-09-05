@@ -6,21 +6,28 @@ struct WarRoomNotificationRoute: Codable, Equatable, Sendable {
     let destination: String
     let leagueId: UUID?
     let week: Int?
+    let kind: String?
 
-    init(destination: String, leagueId: UUID? = nil, week: Int? = nil) {
+    init(destination: String, leagueId: UUID? = nil, week: Int? = nil, kind: String? = nil) {
         self.destination = destination
         self.leagueId = leagueId
         self.week = week
+        self.kind = kind
     }
 
     init?(userInfo: [AnyHashable: Any]) {
         guard let destination = userInfo["destination"] as? String else { return nil }
         self.destination = destination
         self.leagueId = (userInfo["league_id"] as? String).flatMap(UUID.init(uuidString:))
+        self.kind = userInfo["kind"] as? String
         if let week = userInfo["week"] as? Int { self.week = week }
         else if let week = userInfo["week"] as? NSNumber { self.week = week.intValue }
         else if let week = userInfo["week"] as? String { self.week = Int(week) }
         else { self.week = nil }
+    }
+
+    var routesToFieldhousePostseasonOverview: Bool {
+        kind == "fieldhouse_selection_sunday" || kind == "fieldhouse_selection_sunday_lock_1h"
     }
 }
 

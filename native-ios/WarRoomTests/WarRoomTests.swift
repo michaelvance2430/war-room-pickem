@@ -43,6 +43,24 @@ struct WarRoomTests {
         #expect(try JSONDecoder().decode(WarRoomNotificationRoute.self, from: JSONEncoder().encode(route)) == route)
     }
 
+    @Test func selectionSundayNotificationKeepsBothPostseasonTasksVisible() throws {
+        let leagueId = UUID(uuidString: "76730ee3-d440-4a91-9616-a768ffc03189")!
+        let selectionSunday = try #require(WarRoomNotificationRoute(userInfo: [
+            "destination": "picks",
+            "league_id": leagueId.uuidString.lowercased(),
+            "kind": "fieldhouse_selection_sunday",
+        ]))
+        let laterRound = try #require(WarRoomNotificationRoute(userInfo: [
+            "destination": "picks",
+            "league_id": leagueId.uuidString.lowercased(),
+            "kind": "fieldhouse_round_open",
+        ]))
+
+        #expect(selectionSunday.routesToFieldhousePostseasonOverview)
+        #expect(!laterRound.routesToFieldhousePostseasonOverview)
+        #expect(try JSONDecoder().decode(WarRoomNotificationRoute.self, from: JSONEncoder().encode(selectionSunday)) == selectionSunday)
+    }
+
     @Test func dispatchAlwaysExposesExactlyFourOrderedPages() {
         #expect(DispatchPageCatalog.names == ["FRONT", "SPORTS", "RIVALRIES", "BACK"])
     }
