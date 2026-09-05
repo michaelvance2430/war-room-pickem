@@ -130,7 +130,9 @@ Deno.serve(async (request: Request) => {
       if (!pollingGames.length) continue;
 
       const hasLiveWindow = pollingGames.some((game) => Date.parse(game.starts_at || "") >= now - 5 * 60 * 60_000);
-      const minimumRefreshSeconds = hasLiveWindow ? 50 : 900;
+      // NCAAM and NCAAW each share one provider cache. The minute cron can
+      // inspect local state freely; live provider data is capped at 3 minutes.
+      const minimumRefreshSeconds = hasLiveWindow ? 180 : 900;
       const { data: cached } = await db.from("live_football_score_cache").select("events").eq("sport", tournament.sport_id).maybeSingle();
       let events = Array.isArray(cached?.events) ? cached.events : [];
       const { data: claimed } = await db.rpc("claim_live_football_score_refresh", { p_sport: tournament.sport_id, p_min_age_seconds: minimumRefreshSeconds });

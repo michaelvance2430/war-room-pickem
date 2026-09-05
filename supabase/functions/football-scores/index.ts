@@ -31,7 +31,9 @@ const mergeWeeklyEvents = (cached: any[], fresh: CachedScoreEvent[]) => {
 const scoreRefreshPlan = (starts: number[], now = Date.now()) => {
   if (!starts.length) return null;
   const liveWindow = starts.some((start) => now >= start - 5 * 60_000 && now <= start + 6 * 60 * 60_000);
-  if (liveWindow) return { minAgeSeconds: 50, daysFrom: 1 };
+  // Clients may ask for the shared board every 15 seconds, but only the first
+  // request after this three-minute provider gate spends Odds API credits.
+  if (liveWindow) return { minAgeSeconds: 180, daysFrom: 1 };
   const last = Math.max(...starts);
   if (now <= last + 6 * 60 * 60_000) return null;
   if (now <= last + 3 * 86_400_000) return { minAgeSeconds: 15 * 60, daysFrom: 3 };
