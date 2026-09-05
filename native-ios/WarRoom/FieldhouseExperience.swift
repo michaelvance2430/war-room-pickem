@@ -181,6 +181,28 @@ enum WarRoomPostseasonRule {
     }
 }
 
+struct FieldhouseCompetitionRank: Equatable {
+    let place: Int
+    let tied: Bool
+
+    var rowLabel: String { tied ? "T\(place)" : "\(place)" }
+    var headlineLabel: String { tied ? "T-\(place)" : "#\(place)" }
+}
+
+enum FieldhousePostseasonRanking {
+    static func rank(
+        for userID: UUID,
+        among participantIDs: [UUID],
+        totals: [UUID: Int]
+    ) -> FieldhouseCompetitionRank? {
+        guard participantIDs.contains(userID) else { return nil }
+        let score = totals[userID] ?? 0
+        let higher = participantIDs.filter { (totals[$0] ?? 0) > score }.count
+        let tied = participantIDs.filter { (totals[$0] ?? 0) == score }.count > 1
+        return FieldhouseCompetitionRank(place: higher + 1, tied: tied)
+    }
+}
+
 enum FieldhouseSeasonPhase: String, Codable {
     case preseason = "PRESEASON"
     case regularSeason = "REGULAR SEASON"
@@ -3942,7 +3964,11 @@ private struct FieldhouseStandingsPage: View {
                     }
                 } else {
                     ForEach(Array(visibleStandings.enumerated()), id: \.element.id) { index, standing in
-                        authenticatedStandingRow(rank: index + 1, standing: standing)
+                        authenticatedStandingRow(
+                            rankLabel: displayedRankLabel(for: standing, fallbackIndex: index),
+                            highlighted: index < 4,
+                            standing: standing
+                        )
                         cutLines(after: index)
                     }
                 }
@@ -3997,7 +4023,7 @@ private struct FieldhouseStandingsPage: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("#\(currentRegionalRank)").font(.title2.weight(.black)).foregroundStyle(accent)
+                    Text(currentRegionalRankLabel).font(.title2.weight(.black)).foregroundStyle(accent)
                     if liveProjectionActive {
                         Text(liveProjectionStale ? "LIVE · LAST UPDATE" : "LIVE PROJECTION")
                             .font(.system(size: 7, weight: .black)).tracking(0.8)
@@ -4082,12 +4108,14 @@ private struct FieldhouseStandingsPage: View {
         }
     }
 
-    private func authenticatedStandingRow(rank: Int, standing: Standing) -> some View {
+    private func authenticatedStandingRow(rankLabel: String, highlighted: Bool, standing: Standing) -> some View {
         let profile = standing.profiles
         let earnedTitle = ProfileCosmetics.titleName(for: profile?.equippedTitleId)
         let displayName = earnedTitle.map { "\(SportIdentity(sportID).cheevoTitle(code: profile?.equippedTitleId ?? "", fallback: $0)) \(standing.name)" } ?? standing.name
         return HStack(spacing: 12) {
-            Text("\(rank)").font(.title3.weight(.black)).foregroundStyle(rank <= 4 ? .yellow : .white.opacity(0.58)).frame(width: 30)
+            Text(rankLabel).font(.title3.weight(.black))
+                .foregroundStyle(highlighted ? .yellow : .white.opacity(0.58))
+                .frame(width: 34)
             ProfileAvatar(urlString: profile?.avatarURL, name: standing.name, size: 42, borderId: profile?.equippedBorderId, accent: accent)
             VStack(alignment: .leading, spacing: 3) {
                 Text(displayName).font(.headline.weight(.black))
@@ -4112,10 +4140,29 @@ private struct FieldhouseStandingsPage: View {
         HStack { Rectangle().fill(color).frame(height: 1); Text(title).font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(color); Rectangle().fill(color).frame(height: 1) }
     }
 
-    private var currentRegionalRank: Int {
+    private func displayedRankLabel(for standing: Standing, fallbackIndex: Int) -> String {
+        guard usesPostseasonScores else { return "\(fallbackIndex + 1)" }
+        return FieldhousePostseasonRanking.rank(
+            for: standing.userId,
+            among: visibleStandings.map(\.userId),
+            totals: state.postseasonLeaderboardTotals
+        )?.rowLabel ?? "\(fallbackIndex + 1)"
+    }
+
+    private var currentRegionalRankLabel: String {
         guard let userID = auth.user?.id,
-              let index = visibleStandings.firstIndex(where: { $0.userId == userID }) else { return state.rank }
-        return index + 1
+              let standing = visibleStandings.first(where: { $0.userId == userID }) else {
+            return "#\(state.rank)"
+        }
+        guard usesPostseasonScores else {
+            let index = visibleStandings.firstIndex(where: { $0.userId == userID }) ?? max(0, state.rank - 1)
+            return "#\(index + 1)"
+        }
+        return FieldhousePostseasonRanking.rank(
+            for: standing.userId,
+            among: visibleStandings.map(\.userId),
+            totals: state.postseasonLeaderboardTotals
+        )?.headlineLabel ?? "#\(state.rank)"
     }
 }
 
@@ -4429,11 +4476,16 @@ private struct FieldhouseRegionalRacePreview: View {
                 ForEach(Array(liveRegionalStandings.prefix(4).enumerated()), id: \.element.id) { index, standing in
                     let score = state.postseasonPoints(for: standing.userId)
                     let leader = liveRegionalStandings.first.map { state.postseasonPoints(for: $0.userId) } ?? score
-                    raceRow(index: index, name: standing.name, score: score, pointsBack: max(0, leader - score))
+                    let rank = FieldhousePostseasonRanking.rank(
+                        for: standing.userId,
+                        among: liveRegionalStandings.map(\.userId),
+                        totals: state.postseasonLeaderboardTotals
+                    )
+                    raceRow(rankLabel: rank?.rowLabel ?? "\(index + 1)", name: standing.name, score: score, pointsBack: max(0, leader - score))
                 }
             } else {
                 ForEach(Array(previewScores.enumerated()), id: \.offset) { index, entry in
-                    raceRow(index: index, name: entry.0, score: entry.1, pointsBack: entry.2)
+                    raceRow(rankLabel: "\(index + 1)", name: entry.0, score: entry.1, pointsBack: entry.2)
                 }
             }
 
@@ -4452,9 +4504,9 @@ private struct FieldhouseRegionalRacePreview: View {
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.42)))
     }
 
-    private func raceRow(index: Int, name: String, score: Int, pointsBack: Int) -> some View {
+    private func raceRow(rankLabel: String, name: String, score: Int, pointsBack: Int) -> some View {
                 HStack(spacing: 10) {
-                    Text("\(index + 1)").font(.headline.weight(.black)).foregroundStyle(index == 0 ? .yellow : .white.opacity(0.55)).frame(width: 22)
+                    Text(rankLabel).font(.headline.weight(.black)).foregroundStyle(pointsBack == 0 ? .yellow : .white.opacity(0.55)).frame(width: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(name.uppercased()).font(.caption.weight(.black))
                         Text(pointsBack == 0 ? "POSTSEASON LEADER" : "\(pointsBack) BACK · PICKS CONTINUE")

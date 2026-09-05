@@ -2,6 +2,32 @@ import XCTest
 @testable import WarRoom
 
 final class FieldhouseExperienceTests: XCTestCase {
+    func testPostseasonStandingsUseHonestCompetitionRanksForTiedTotals() {
+        let leaderA = UUID()
+        let leaderB = UUID()
+        let third = UUID()
+        let fourth = UUID()
+        let participants = [leaderA, leaderB, third, fourth]
+        let totals = [leaderA: 42, leaderB: 42, third: 37, fourth: 30]
+
+        XCTAssertEqual(
+            FieldhousePostseasonRanking.rank(for: leaderA, among: participants, totals: totals),
+            FieldhouseCompetitionRank(place: 1, tied: true)
+        )
+        XCTAssertEqual(
+            FieldhousePostseasonRanking.rank(for: leaderB, among: participants, totals: totals)?.headlineLabel,
+            "T-1"
+        )
+        XCTAssertEqual(
+            FieldhousePostseasonRanking.rank(for: third, among: participants, totals: totals),
+            FieldhouseCompetitionRank(place: 3, tied: false)
+        )
+        XCTAssertEqual(
+            FieldhousePostseasonRanking.rank(for: fourth, among: participants, totals: totals)?.rowLabel,
+            "4"
+        )
+    }
+
     func testTournamentMoneylinesDecodeWithoutChangingStraightUpResultAuthority() throws {
         let payload = """
         {
