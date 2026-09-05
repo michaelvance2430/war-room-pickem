@@ -1668,6 +1668,27 @@ struct FieldhouseSeasonState: Codable, Equatable {
     }
 }
 
+enum FieldhouseStateReconciler {
+    static func bracketDraftIsDirty(
+        current: FieldhouseSeasonState,
+        verified: FieldhouseSeasonState
+    ) -> Bool {
+        current.postseasonBracketPicks != verified.postseasonBracketPicks
+            || current.bracketSubmitted != verified.bracketSubmitted
+            || current.bracketLocked != verified.bracketLocked
+            || current.bracketHellfireUsed != verified.bracketHellfireUsed
+    }
+
+    static func roundDraftIsDirty(
+        current: FieldhouseSeasonState,
+        verified: FieldhouseSeasonState
+    ) -> Bool {
+        current.postseasonRoundPicks != verified.postseasonRoundPicks
+            || current.postseasonRoundSubmitted != verified.postseasonRoundSubmitted
+            || current.postseasonRoundLocked != verified.postseasonRoundLocked
+    }
+}
+
 enum FieldhouseStateHydrator {
     static func hydrate(
         snapshot: FieldhouseAuthenticatedSnapshot,
@@ -2153,6 +2174,14 @@ struct FieldhouseNativePreviewView: View {
                 preferredLeagueID: liveContext.membership.leagueId
             )
             let hydrated = FieldhouseStateHydrator.hydrate(snapshot: verified, userID: liveContext.userID, cached: state)
+            let localBracketDraftIsDirty = FieldhouseStateReconciler.bracketDraftIsDirty(
+                current: state,
+                verified: lastVerifiedState
+            )
+            let localRoundDraftIsDirty = FieldhouseStateReconciler.roundDraftIsDirty(
+                current: state,
+                verified: lastVerifiedState
+            )
             let priorScoringWindow = state.scoringWindow
             let priorScoringResults = state.scoringResults
             state.scoringWindow = hydrated.scoringWindow
@@ -2171,13 +2200,17 @@ struct FieldhouseNativePreviewView: View {
             state.lastCertifiedWindow = hydrated.lastCertifiedWindow
             state.lastCertifiedPoints = hydrated.lastCertifiedPoints
             state.officialPostseasonField = hydrated.officialPostseasonField
-            state.postseasonBracketPicks = hydrated.postseasonBracketPicks
-            state.bracketSubmitted = hydrated.bracketSubmitted
-            state.bracketLocked = hydrated.bracketLocked
-            state.bracketHellfireUsed = hydrated.bracketHellfireUsed
-            state.postseasonRoundPicks = hydrated.postseasonRoundPicks
-            state.postseasonRoundSubmitted = hydrated.postseasonRoundSubmitted
-            state.postseasonRoundLocked = hydrated.postseasonRoundLocked
+            if !localBracketDraftIsDirty {
+                state.postseasonBracketPicks = hydrated.postseasonBracketPicks
+                state.bracketSubmitted = hydrated.bracketSubmitted
+                state.bracketLocked = hydrated.bracketLocked
+                state.bracketHellfireUsed = hydrated.bracketHellfireUsed
+            }
+            if !localRoundDraftIsDirty {
+                state.postseasonRoundPicks = hydrated.postseasonRoundPicks
+                state.postseasonRoundSubmitted = hydrated.postseasonRoundSubmitted
+                state.postseasonRoundLocked = hydrated.postseasonRoundLocked
+            }
             state.postseasonBracketCorrectPicks = hydrated.postseasonBracketCorrectPicks
             state.postseasonBracketRawPoints = hydrated.postseasonBracketRawPoints
             state.postseasonBracketAdjustedPoints = hydrated.postseasonBracketAdjustedPoints
@@ -2188,6 +2221,10 @@ struct FieldhouseNativePreviewView: View {
             state.postseasonEligibilityPath = hydrated.postseasonEligibilityPath
             state.postseasonEligibilityRank = hydrated.postseasonEligibilityRank
             standings = verified.standings
+            // This is the newest server-confirmed rollback point. Unsaved local
+            // bracket and round edits remain in `state`, while failed writes
+            // return to this refreshed authority instead of an old launch copy.
+            lastVerifiedState = hydrated
 
             // Tournament results and totals are already settled by the
             // autonomous server worker. Read that permanent authority first

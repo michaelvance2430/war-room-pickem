@@ -190,6 +190,30 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertFalse(state.hasOutstandingPickTask(at: beforeTip))
     }
 
+    func testPostseasonRefreshRecognizesUnsavedBracketEdits() {
+        var verified = FieldhouseSeasonState()
+        verified.postseasonBracketPicks = ["r64-east-1": "duke"]
+        verified.bracketSubmitted = true
+
+        var current = verified
+        XCTAssertFalse(FieldhouseStateReconciler.bracketDraftIsDirty(current: current, verified: verified))
+
+        current.postseasonBracketPicks["r64-east-1"] = "vermont"
+        XCTAssertTrue(FieldhouseStateReconciler.bracketDraftIsDirty(current: current, verified: verified))
+    }
+
+    func testPostseasonRefreshRecognizesUnsavedRoundEdits() {
+        var verified = FieldhouseSeasonState()
+        verified.postseasonRoundPicks = ["r64": ["r64-east-1": "duke"]]
+        verified.postseasonRoundSubmitted = ["r64"]
+
+        var current = verified
+        XCTAssertFalse(FieldhouseStateReconciler.roundDraftIsDirty(current: current, verified: verified))
+
+        current.postseasonRoundPicks["r64"]?["r64-east-1"] = "vermont"
+        XCTAssertTrue(FieldhouseStateReconciler.roundDraftIsDirty(current: current, verified: verified))
+    }
+
     func testPostseasonTasksAndBracketLockCloseExactlyAtFirstTip() {
         var state = FieldhouseSeasonState()
         state.officialPostseasonField = .previewRound(for: .ncaam)
