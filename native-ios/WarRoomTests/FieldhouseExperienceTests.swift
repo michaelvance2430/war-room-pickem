@@ -1,6 +1,7 @@
 import XCTest
 @testable import WarRoom
 
+@MainActor
 final class FieldhouseExperienceTests: XCTestCase {
     func testPostseasonStandingsUseHonestCompetitionRanksForTiedTotals() {
         let leaderA = UUID()
@@ -770,7 +771,7 @@ final class FieldhouseExperienceTests: XCTestCase {
     }
 
     func testNCAAMAndNCAAWShareRulesButKeepSeparateIdentity() {
-        var men = FieldhouseSeasonState()
+        let men = FieldhouseSeasonState()
         var women = FieldhouseSeasonState()
         women.selectLeague(.ncaaw)
 
