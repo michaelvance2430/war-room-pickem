@@ -69,7 +69,7 @@ Deno.serve(async (req: Request) => {
     method: "POST",
     headers: serviceHeaders,
     body: JSON.stringify({
-      league_id: leagueId, user_id: user.id, sport, action: "odds_pull",
+      league_id: leagueId, user_id: user.id, sport, action: "pull_odds",
       endpoint: `/odds/${sportKey}`, provider_remaining: remaining, provider_used: used,
       provider_last_cost: last, estimated_credit_cost: last ?? 1, success: provider.ok,
       http_status: provider.status, error_code: provider.ok ? null : `Odds provider ${provider.status}`,

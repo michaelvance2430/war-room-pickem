@@ -134,6 +134,8 @@ for (const phrase of [
 ]) assert.match(weeklyWorker, new RegExp(phrase));
 assert.match(fieldhouseOdds, /isHalfPointSpread/);
 assert.match(fieldhouseOdds, /do not invent a hook or silently alter the market/);
+assert.match(fieldhouseOdds, /action: "pull_odds"/);
+assert.doesNotMatch(fieldhouseOdds, /action: "odds_pull"/);
 assert.match(client, /FieldhouseSpreadRule\.isHalfPoint/);
 assert.match(client, /"bookmaker": game\.bookmaker \?\? "Fieldhouse"/);
 assert.match(weeklyWorker, /away_score:game\.awayScore,home_score:game\.homeScore/);
