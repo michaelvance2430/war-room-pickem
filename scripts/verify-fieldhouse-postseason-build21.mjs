@@ -175,6 +175,7 @@ assert.ok(content.includes(`return "FIELDHOUSE · \\(identity.isNCAAW ? "NCAAW" 
 assert.match(client, /guard !state\.isAuthenticatedSession else \{ return \}/);
 assert.match(content, /FieldhouseAuthenticatedContainer\(notificationDestination: \$fieldhouseNotificationDestination\)/);
 assert.match(content, /fieldhouseNotificationDestination = route/);
+assert.match(content, /handleNotificationDestination\(_ route: WarRoomNotificationRoute\)[\s\S]*try\? await auth\.validAccessToken\(\)/);
 assert.doesNotMatch(sql, /grant (insert|update|delete).*authenticated/i);
 assert.doesNotMatch(sql, /drop table|truncate/i);
 

@@ -365,8 +365,8 @@ struct ContentView: View {
         showOpening = false
         if let leagueId = route.leagueId {
             auth.selectLeague(leagueId)
-            if let token = auth.token,
-               let user = auth.user,
+            if let user = auth.user,
+               let token = try? await auth.validAccessToken(),
                let membership = try? await SupabaseAPI.activeLeague(
                 token: token,
                 userId: user.id,
@@ -389,8 +389,8 @@ struct ContentView: View {
         } else if route.destination == "results" {
             guard let leagueId = route.leagueId,
                   let week = route.week,
-                  let token = auth.token,
                   let user = auth.user,
+                  let token = try? await auth.validAccessToken(),
                   let membership = try? await SupabaseAPI.activeLeague(
                     token: token,
                     userId: user.id,
