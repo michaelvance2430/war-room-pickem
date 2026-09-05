@@ -606,6 +606,7 @@ struct CardGame: Decodable, Identifiable, Sendable {
     let spread: Double
     let favorite: String
     let startTime: String?
+    var bookmaker: String? = nil
     let awayRank: Int?
     let homeRank: Int?
     let isRivalry: Bool
@@ -617,6 +618,7 @@ struct CardGame: Decodable, Identifiable, Sendable {
         case homeTeam = "home_team"
         case spread, favorite
         case startTime = "start_time"
+        case bookmaker
         case awayRank = "away_rank"
         case homeRank = "home_rank"
         case isRivalry = "is_rivalry"

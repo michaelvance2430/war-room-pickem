@@ -499,7 +499,7 @@ struct FieldhouseCardWritePlan {
                 "spread": spread,
                 "favorite": favoriteSide,
                 "start_time": formatter.string(from: game.tipDate(in: state.window)),
-                "bookmaker": "Fieldhouse",
+                "bookmaker": game.bookmaker ?? "Fieldhouse",
                 "away_rank": NSNull(),
                 "home_rank": NSNull(),
                 "is_rivalry": false
@@ -854,8 +854,9 @@ struct FieldhouseGame: Identifiable, Equatable, Codable {
     let dayOffset: Int
     let tipHour: Int
     let tipMinute: Int
+    let bookmaker: String?
 
-    init(id: String, away: String, home: String, spread: String, tip: String, dayOffset: Int = 3, tipHour: Int = 19, tipMinute: Int = 0) {
+    init(id: String, away: String, home: String, spread: String, tip: String, dayOffset: Int = 3, tipHour: Int = 19, tipMinute: Int = 0, bookmaker: String? = nil) {
         self.id = id
         self.away = away
         self.home = home
@@ -864,6 +865,7 @@ struct FieldhouseGame: Identifiable, Equatable, Codable {
         self.dayOffset = dayOffset
         self.tipHour = tipHour
         self.tipMinute = tipMinute
+        self.bookmaker = bookmaker
     }
 
     func tipDate(in window: Int) -> Date {
@@ -935,7 +937,8 @@ extension FieldhouseGame {
             tip: formatter.string(from: tipDate).uppercased(),
             dayOffset: dayOffset,
             tipHour: calendar.component(.hour, from: tipDate),
-            tipMinute: calendar.component(.minute, from: tipDate)
+            tipMinute: calendar.component(.minute, from: tipDate),
+            bookmaker: oddsGame.bookmaker
         )
     }
 
@@ -977,7 +980,8 @@ extension FieldhouseGame {
             tip: tip,
             dayOffset: dayOffset,
             tipHour: hour,
-            tipMinute: minute
+            tipMinute: minute,
+            bookmaker: cardGame.bookmaker
         )
     }
 }
@@ -1123,6 +1127,28 @@ enum FieldhouseLiveStandingsEngine {
             }
             return (standing.userId, standing.totalPoints + liveWeek)
         })
+    }
+}
+
+struct FieldhouseRoomPickCount: Equatable {
+    var away = 0
+    var home = 0
+}
+
+enum FieldhouseRoomPickEngine {
+    static func counts(board: [FieldhouseLiveBoardPick], games: [FieldhouseGame]) -> [String: FieldhouseRoomPickCount] {
+        let gameByID = Dictionary(uniqueKeysWithValues: games.compactMap { game in
+            UUID(uuidString: game.id).map { ($0, game.id) }
+        })
+        var counts = Dictionary(uniqueKeysWithValues: games.map { ($0.id, FieldhouseRoomPickCount()) })
+        for slip in board {
+            for pick in slip.pickGames {
+                guard let gameID = gameByID[pick.cardGameId] else { continue }
+                if pick.side.lowercased() == "away" { counts[gameID]?.away += 1 }
+                if pick.side.lowercased() == "home" { counts[gameID]?.home += 1 }
+            }
+        }
+        return counts
     }
 }
 
@@ -1844,6 +1870,7 @@ struct FieldhouseNativePreviewView: View {
     @State private var liveProjectionWeek: Int?
     @State private var liveProjectionActive = false
     @State private var liveProjectionStale = false
+    @State private var liveRoomPickCounts: [String: FieldhouseRoomPickCount]?
     @Binding private var notificationDestination: WarRoomNotificationRoute?
     @Environment(\.scenePhase) private var scenePhase
     private let stateStore = FieldhouseStateStore()
@@ -1879,7 +1906,7 @@ struct FieldhouseNativePreviewView: View {
         _lastVerifiedState = State(initialValue: displayState)
         _standings = State(initialValue: [])
         _notificationDestination = .constant(nil)
-        _desk = State(initialValue: (reviewBracket || reviewRound) ? .standings : (reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home))))
+        _desk = State(initialValue: (reviewBracket || reviewRound) ? .picks : (reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home))))
         _strikePresentation = State(initialValue: reviewHellfire ? StrikePresentation(resourceName: initialLeague == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1") : nil)
         _showingEntrance = State(initialValue: !reviewMode)
     }
@@ -1961,7 +1988,12 @@ struct FieldhouseNativePreviewView: View {
                             overviewHorizontalPadding: 14
                         )
                     } else {
-                        FieldhousePicksPage(state: $state, strikePresentation: $strikePresentation)
+                        FieldhousePicksPage(
+                            state: $state,
+                            strikePresentation: $strikePresentation,
+                            roomPickCounts: liveRoomPickCounts,
+                            roomPickCountsAreStale: liveProjectionStale
+                        )
                     }
                 } else if desk == .profile {
                     if auth.user != nil && auth.token != nil {
@@ -2186,6 +2218,7 @@ struct FieldhouseNativePreviewView: View {
                     results: state.scoringResults,
                     prop: state.scoringProp
                 )
+                liveRoomPickCounts = FieldhouseRoomPickEngine.counts(board: board, games: state.scoringGames)
                 liveProjectionWeek = projectionWeek
                 liveProjectionActive = !board.isEmpty
                     && !state.scoringResults.isEmpty
@@ -2215,6 +2248,7 @@ struct FieldhouseNativePreviewView: View {
         liveProjectionWeek = nil
         liveProjectionActive = false
         liveProjectionStale = false
+        liveRoomPickCounts = nil
     }
 
     private func normalizedFieldhouseTeam(_ value: String) -> String {
@@ -3085,7 +3119,8 @@ private struct FieldhouseCardBuilder: View {
                                         Image(systemName: selected ? "checkmark.circle.fill" : "circle").font(.title3).foregroundStyle(selected ? accent : .white.opacity(0.38))
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text("\(game.away) at \(game.home)").font(.subheadline.weight(.black)).multilineTextAlignment(.leading)
-                                            Text("\(game.spread) · \(game.displayTip(in: window))").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.48))
+                                            Text([game.spread, game.bookmaker, game.displayTip(in: window)].compactMap { $0 }.joined(separator: " · "))
+                                                .font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.48))
                                         }
                                         Spacer()
                                     }
@@ -3355,6 +3390,8 @@ private struct FieldhousePicksPage: View {
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
+    let roomPickCounts: [String: FieldhouseRoomPickCount]?
+    let roomPickCountsAreStale: Bool
     @State private var confirmingLock = false
     @State private var confirmingHellfire = false
     @State private var lane: FieldhousePicksLane = .liveBoard
@@ -3529,8 +3566,13 @@ private struct FieldhousePicksPage: View {
                                 .font(.system(size: 8, weight: .black)).foregroundStyle(gamePoints > 0 ? .green : .red)
                         }
                         if state.roomPicksAreVisible(for: game.id) {
-                            Text("ROOM PICKS · \(14 + index) \(game.away.uppercased()) · \(11 + index) \(game.home.uppercased())")
-                                .font(.system(size: 7, weight: .black)).foregroundStyle(.cyan)
+                            if let tally = roomPickCounts?[game.id] {
+                                Text("ROOM PICKS · \(tally.away) \(game.away.uppercased()) · \(tally.home) \(game.home.uppercased())\(roomPickCountsAreStale ? " · REFRESH DELAYED" : "")")
+                                    .font(.system(size: 7, weight: .black)).foregroundStyle(roomPickCountsAreStale ? .orange : .cyan)
+                            } else {
+                                Text(state.isAuthenticatedSession ? "ROOM PICK COUNTS REFRESHING" : "ROOM PICK COUNTS REQUIRE A LIVE LEAGUE")
+                                    .font(.system(size: 7, weight: .black)).foregroundStyle(.white.opacity(0.38))
+                            }
                         } else {
                             Text("ROOM PICKS SEALED UNTIL \(game.displayTip(in: state.scoringWindow))")
                                 .font(.system(size: 7, weight: .black)).foregroundStyle(.white.opacity(0.38))

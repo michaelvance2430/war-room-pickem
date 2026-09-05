@@ -257,7 +257,13 @@ final class FieldhouseExperienceTests: XCTestCase {
     func testCardWritePlanTranslatesTeamFavoriteToSharedHomeAwayContract() throws {
         var state = FieldhouseSeasonState()
         state.isCommissioner = true
-        let games = Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize))
+        var games = Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize))
+        let first = games[0]
+        games[0] = FieldhouseGame(
+            id: first.id, away: first.away, home: first.home, spread: first.spread,
+            tip: first.tip, dayOffset: first.dayOffset, tipHour: first.tipHour,
+            tipMinute: first.tipMinute, bookmaker: "DraftKings"
+        )
         XCTAssertTrue(state.publishCard(games: games, prop: .teamScores90))
 
         let plan = try FieldhouseCardWritePlan(state: state)
@@ -271,7 +277,32 @@ final class FieldhouseExperienceTests: XCTestCase {
             XCTAssertEqual(payload["home_team"] as? String, game.home)
             XCTAssertEqual(payload["favorite"] as? String, game.favoriteTeam == game.away ? "away" : "home")
             XCTAssertNotNil(payload["start_time"] as? String)
+            XCTAssertEqual(payload["bookmaker"] as? String, index == 0 ? "DraftKings" : "Fieldhouse")
         }
+    }
+
+    func testPublishedFieldhouseCardRetainsBookmakerProvenance() throws {
+        let gameID = UUID()
+        let payload = """
+        {
+          "id": "\(gameID.uuidString)",
+          "sort_order": 0,
+          "away_team": "UConn Huskies",
+          "home_team": "Duke Blue Devils",
+          "spread": -3.5,
+          "favorite": "home",
+          "start_time": "2026-11-05T00:30:00Z",
+          "bookmaker": "DraftKings",
+          "away_rank": 2,
+          "home_rank": 1,
+          "is_rivalry": false
+        }
+        """
+
+        let decoded = try JSONDecoder().decode(CardGame.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(decoded.bookmaker, "DraftKings")
+        XCTAssertEqual(FieldhouseGame(cardGame: decoded, window: 1).bookmaker, "DraftKings")
     }
 
     func testAuthenticatedSnapshotWithoutACardClearsOnlyLeagueCardState() {
@@ -846,6 +877,30 @@ final class FieldhouseExperienceTests: XCTestCase {
             standings: [standing], board: [certifiedSlip], games: [game], results: [game.id: liveResult], prop: nil
         )
         XCTAssertEqual(certified[userID], 40)
+    }
+
+    func testLiveRoomPickCountsComeOnlyFromDeclassifiedServerPicks() {
+        let firstGameID = UUID()
+        let secondGameID = UUID()
+        let games = [
+            FieldhouseGame(id: firstGameID.uuidString.lowercased(), away: "Alpha", home: "Bravo", spread: "Bravo -3.5", tip: "MON · 7:00 PM"),
+            FieldhouseGame(id: secondGameID.uuidString.lowercased(), away: "Charlie", home: "Delta", spread: "Charlie -1.5", tip: "TUE · 8:00 PM")
+        ]
+        let board = [
+            FieldhouseLiveBoardPick(
+                id: UUID(), userId: UUID(), totalPoints: nil, propChoice: nil, isHellfire: false,
+                pickGames: [PickedGame(cardGameId: firstGameID, side: "away", confidence: 1, isBestBet: false)]
+            ),
+            FieldhouseLiveBoardPick(
+                id: UUID(), userId: UUID(), totalPoints: nil, propChoice: nil, isHellfire: false,
+                pickGames: [PickedGame(cardGameId: firstGameID, side: "home", confidence: 2, isBestBet: false)]
+            )
+        ]
+
+        let counts = FieldhouseRoomPickEngine.counts(board: board, games: games)
+
+        XCTAssertEqual(counts[games[0].id], FieldhouseRoomPickCount(away: 1, home: 1))
+        XCTAssertEqual(counts[games[1].id], FieldhouseRoomPickCount())
     }
 
     func testPostseasonHellfireUsesSixtyPercentRiskRewardRule() {

@@ -104,6 +104,9 @@ assert.match(liveStandings, /grant execute on function public\.get_fieldhouse_li
 assert.match(api, /static func fieldhouseLiveBoard/);
 assert.match(api, /static func fieldhousePostseasonQualifier/);
 assert.match(client, /FieldhouseLiveStandingsEngine\.projectedTotals/);
+assert.match(client, /FieldhouseRoomPickEngine\.counts\(board: board, games: state\.scoringGames\)/);
+assert.match(client, /ROOM PICK COUNTS REFRESHING/);
+assert.doesNotMatch(client, /14 \+ index|11 \+ index/);
 assert.match(client, /if state\.officialPostseasonField != nil \{\s*clearLiveProjection\(\)\s*refreshLifecycle\(at: Date\(\)\)\s*return\s*\}/);
 assert.match(client, /LIVE PROJECTION/);
 assert.match(client, /liveProjectionWeek != state\.scoringWindow/);
@@ -123,6 +126,7 @@ for (const phrase of [
 assert.match(fieldhouseOdds, /isHalfPointSpread/);
 assert.match(fieldhouseOdds, /do not invent a hook or silently alter the market/);
 assert.match(client, /FieldhouseSpreadRule\.isHalfPoint/);
+assert.match(client, /"bookmaker": game\.bookmaker \?\? "Fieldhouse"/);
 assert.match(weeklyWorker, /away_score:game\.awayScore,home_score:game\.homeScore/);
 assert.match(atomicScoring, /add column if not exists away_score integer/);
 assert.match(atomicScoring, /x\.away_score,\s*x\.home_score,\s*case when x\.away_score is not null then 'odds_api'/);
@@ -139,6 +143,7 @@ assert.match(client, /func postseasonBracketIsLocked\(at now: Date = Date\(\)\)/
 assert.match(client, /func outstandingPickTaskCount\(at date: Date\) -> Int/);
 assert.match(client, /outstandingPickTaskCount: state\.outstandingPickTaskCount\(at: context\.date\)/);
 assert.match(client, /if state\.postseasonIsActive \{\s*FieldhouseBracketsPage\(/);
+assert.match(client, /\(reviewBracket \|\| reviewRound\) \? \.picks/);
 assert.match(client, /case "picks":[\s\S]*desk = \.picks/);
 assert.match(client, /locked: state\.postseasonRoundIsLocked\(round\)/);
 assert.match(client, /locked: state\.postseasonBracketIsLocked\(\)/);
