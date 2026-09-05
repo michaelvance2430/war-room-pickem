@@ -452,6 +452,14 @@ struct WarRoomTests {
         #expect(boardGameIsDeclassified(startTime: sevenThirty, at: fourPM, weekScored: true))
     }
 
+    @Test func liveBoardRefreshNeverReplacesVisibleCards() {
+        #expect(boardRefreshPresentation(lockedCardCount: 12, loading: true, errorMessage: nil) == .content)
+        #expect(boardRefreshPresentation(lockedCardCount: 12, loading: false, errorMessage: "Score feed delayed") == .content)
+        #expect(boardRefreshPresentation(lockedCardCount: 0, loading: true, errorMessage: nil) == .initialLoading)
+        #expect(boardRefreshPresentation(lockedCardCount: 0, loading: false, errorMessage: "Board unavailable") == .blockingError)
+        #expect(boardRefreshPresentation(lockedCardCount: 0, loading: false, errorMessage: nil) == .empty)
+    }
+
     @Test func postgresKickoffTimestampDrivesLockedHomeState() {
         let value = "2026-08-16 16:43:41.278784+00"
         #expect(footballKickoffDate(value) != nil)

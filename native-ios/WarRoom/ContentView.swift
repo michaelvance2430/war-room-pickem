@@ -923,6 +923,22 @@ private struct PicksView: View {
     }
 }
 
+enum BoardRefreshPresentation: Equatable {
+    case initialLoading
+    case blockingError
+    case empty
+    case content
+}
+
+func boardRefreshPresentation(lockedCardCount: Int, loading: Bool, errorMessage: String?) -> BoardRefreshPresentation {
+    // Once cards are on screen, a live refresh must never replace the board.
+    // Collapsing the ScrollView content destroys the reader's scroll position.
+    if lockedCardCount > 0 { return .content }
+    if loading { return .initialLoading }
+    if errorMessage != nil { return .blockingError }
+    return .empty
+}
+
 struct WeekBoardView: View {
     let card: WeekCard
     let picks: [BoardPick]
@@ -941,6 +957,9 @@ struct WeekBoardView: View {
     }
     private var nextKickoff: Date? {
         card.cardGames.compactMap { footballKickoffDate($0.startTime) }.filter { $0 > clock }.min()
+    }
+    private var refreshPresentation: BoardRefreshPresentation {
+        boardRefreshPresentation(lockedCardCount: picks.count, loading: loading, errorMessage: errorMessage)
     }
 
     var body: some View {
@@ -961,18 +980,27 @@ struct WeekBoardView: View {
                     .background(.black.opacity(0.72), in: UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 24, bottomTrailingRadius: 4, topTrailingRadius: 24))
                     .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 24, bottomTrailingRadius: 4, topTrailingRadius: 24).stroke(identity.secondaryAccent.opacity(0.75), lineWidth: 1.5))
 
-                    if loading {
+                    if refreshPresentation == .initialLoading {
                         HStack { Spacer(); ProgressView("Decrypting the cards…").tint(identity.isNFL ? .cyan : .green); Spacer() }.padding(.vertical, 50)
-                    } else if let errorMessage {
+                    } else if refreshPresentation == .blockingError, let errorMessage {
                         VStack(spacing: 12) {
                             Text("BOARD TEMPORARILY JAMMED").font(.headline.weight(.black)).foregroundStyle(identity.isNFL ? .red : .orange)
                             Text(errorMessage).font(.footnote).foregroundStyle(.white.opacity(0.65)).multilineTextAlignment(.center)
                             Button("TRY THE RADIO AGAIN", action: retry).buttonStyle(.borderedProminent).tint(identity.isNFL ? .blue : .green)
                         }.frame(maxWidth: .infinity).padding(24).background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 18))
-                    } else if picks.isEmpty {
+                    } else if refreshPresentation == .empty {
                         Text("NO LOCKED CARDS RECOVERED. EVERYONE HAS SOME EXPLAINING TO DO.")
                             .font(.headline.weight(.black)).foregroundStyle(identity.isNFL ? .red : .orange).padding(24)
                     } else {
+                        if loading {
+                            Label("REFRESHING SCORES · BOARD POSITION HELD", systemImage: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 9, weight: .black)).tracking(1.1)
+                                .foregroundStyle(identity.isNFL ? .cyan : .green)
+                        } else if errorMessage != nil {
+                            Label("LIVE REFRESH DELAYED · LAST BOARD HELD", systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 9, weight: .black)).tracking(1.1)
+                                .foregroundStyle(.orange)
+                        }
                         HStack {
                             BoardMetric(value: "\(picks.count)", label: "CARDS EXPOSED", color: identity.isNFL ? .cyan : .green)
                             BoardMetric(value: "\(visibleGames.count)/\(card.cardGames.count)", label: "DECLASSIFIED", color: identity.isNFL ? .red : .orange)
