@@ -118,7 +118,7 @@ alter table public.platform_odds_api_usage
   drop constraint if exists platform_odds_api_usage_action_check;
 alter table public.platform_odds_api_usage
   add constraint platform_odds_api_usage_action_check
-  check (action in ('pull_odds','score_sync','tournament_score_sync'));
+  check (action in ('pull_odds','score_sync','tournament_score_sync','tournament_odds_sync'));
 
 create or replace function public.claim_live_football_score_refresh(
   p_sport text,

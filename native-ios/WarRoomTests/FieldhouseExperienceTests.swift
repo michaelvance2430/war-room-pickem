@@ -2,6 +2,35 @@ import XCTest
 @testable import WarRoom
 
 final class FieldhouseExperienceTests: XCTestCase {
+    func testTournamentMoneylinesDecodeWithoutChangingStraightUpResultAuthority() throws {
+        let payload = """
+        {
+          "game_id":"east-r64-1",
+          "round_key":"r64",
+          "round_order":1,
+          "ordinal":0,
+          "region":"East",
+          "first_team_id":"duke",
+          "second_team_id":"vermont",
+          "first_source_game_id":null,
+          "second_source_game_id":null,
+          "starts_at":"2027-03-18T16:00:00Z",
+          "winner_team_id":null,
+          "first_score":null,
+          "second_score":null,
+          "first_moneyline":-650,
+          "second_moneyline":475,
+          "odds_bookmaker":"DraftKings",
+          "odds_updated_at":"2027-03-18T04:00:00Z"
+        }
+        """
+        let game = try JSONDecoder().decode(FieldhouseTournamentGameRecord.self, from: Data(payload.utf8))
+        XCTAssertEqual(game.firstMoneyline, -650)
+        XCTAssertEqual(game.secondMoneyline, 475)
+        XCTAssertEqual(game.oddsBookmaker, "DraftKings")
+        XCTAssertNil(game.winnerTeamId)
+    }
+
     func testSelectionSundayEligibilityLabelsKeepHardwarePathsExplicit() {
         var state = FieldhouseSeasonState()
         XCTAssertEqual(state.postseasonEligibilityLabel, "SELECTION SUNDAY PENDING")

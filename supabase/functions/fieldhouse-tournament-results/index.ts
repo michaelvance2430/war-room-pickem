@@ -39,6 +39,83 @@ Deno.serve(async (request: Request) => {
         const secondID = game.second_team_id || (game.second_source_game_id ? games.get(game.second_source_game_id)?.winner_team_id : null);
         return Boolean(firstID && secondID);
       });
+      const teams = new Map(tournament.fieldhouse_tournament_teams.map((team) => [team.team_id, team]));
+      const preTipOddsGames = readyPending.filter((game) => {
+        const tip = Date.parse(game.starts_at || "");
+        return Number.isFinite(tip) && tip > now && tip <= now + 8 * 24 * 60 * 60_000;
+      });
+      if (preTipOddsGames.length) {
+        const { data: claimedOdds, error: oddsClaimError } = await db.rpc("claim_fieldhouse_tournament_odds_refresh", {
+          p_tournament_id: tournament.id,
+          p_min_age_seconds: 43_200,
+        });
+        if (oddsClaimError) {
+          waiting.push(`${tournament.id}:odds-claim:${oddsClaimError.message}`);
+        } else if (claimedOdds) {
+          const oddsURL = new URL(`https://api.the-odds-api.com/v4/sports/${sportKey(tournament.sport_id)}/odds`);
+          oddsURL.searchParams.set("apiKey", required("ODDS_API_KEY"));
+          oddsURL.searchParams.set("regions", "us");
+          oddsURL.searchParams.set("markets", "h2h");
+          oddsURL.searchParams.set("oddsFormat", "american");
+          oddsURL.searchParams.set("dateFormat", "iso");
+          const oddsProvider = await fetch(oddsURL);
+          const remaining = numericHeader(oddsProvider.headers.get("x-requests-remaining"));
+          const used = numericHeader(oddsProvider.headers.get("x-requests-used"));
+          const last = numericHeader(oddsProvider.headers.get("x-requests-last"));
+          await db.from("platform_odds_api_usage").insert({
+            sport: tournament.sport_id,
+            action: "tournament_odds_sync",
+            endpoint: "/odds/fieldhouse-tournament",
+            provider_remaining: remaining,
+            provider_used: used,
+            provider_last_cost: last,
+            estimated_credit_cost: last ?? 1,
+            success: oddsProvider.ok,
+            http_status: oddsProvider.status,
+            dry_run: false,
+          });
+          if (oddsProvider.ok) {
+            const oddsEvents = await oddsProvider.json();
+            for (const game of preTipOddsGames) {
+              const firstID = game.first_team_id || (game.first_source_game_id ? games.get(game.first_source_game_id)?.winner_team_id : null);
+              const secondID = game.second_team_id || (game.second_source_game_id ? games.get(game.second_source_game_id)?.winner_team_id : null);
+              if (!firstID || !secondID) continue;
+              const first = teams.get(firstID), second = teams.get(secondID);
+              if (!first || !second) continue;
+              const event = (Array.isArray(oddsEvents) ? oddsEvents : []).find((row: any) => {
+                if (game.odds_event_id && String(row.id) === game.odds_event_id) return true;
+                const pair = new Set([norm(String(row.home_team || "")), norm(String(row.away_team || ""))]);
+                return pair.has(norm(first.display_name)) && pair.has(norm(second.display_name));
+              });
+              const bookmaker = event?.bookmakers?.find((book: any) => {
+                const market = book.markets?.find((item: any) => item.key === "h2h");
+                const names = new Set((market?.outcomes || []).map((outcome: any) => norm(String(outcome.name || ""))));
+                return names.has(norm(first.display_name)) && names.has(norm(second.display_name));
+              });
+              const market = bookmaker?.markets?.find((item: any) => item.key === "h2h");
+              const firstPrice = Number(market?.outcomes?.find((outcome: any) => norm(String(outcome.name || "")) === norm(first.display_name))?.price);
+              const secondPrice = Number(market?.outcomes?.find((outcome: any) => norm(String(outcome.name || "")) === norm(second.display_name))?.price);
+              if (!event || !bookmaker || !Number.isFinite(firstPrice) || !Number.isFinite(secondPrice)) continue;
+              const { error: oddsUpdateError } = await db.from("fieldhouse_tournament_games").update({
+                odds_event_id: String(event.id),
+                first_moneyline: Math.round(firstPrice),
+                second_moneyline: Math.round(secondPrice),
+                odds_bookmaker: String(bookmaker.title || bookmaker.key || "Sportsbook"),
+                odds_updated_at: new Date().toISOString(),
+              }).eq("tournament_id", tournament.id).eq("game_id", game.game_id).is("winner_team_id", null).gt("starts_at", new Date().toISOString());
+              if (oddsUpdateError) waiting.push(`${tournament.id}:${game.game_id}:odds:${oddsUpdateError.message}`);
+            }
+            await db.from("fieldhouse_tournaments").update({ odds_fetched_at: new Date().toISOString() }).eq("id", tournament.id);
+          } else {
+            // A provider outage retries after fifteen minutes without allowing
+            // the cron cadence to hammer a paid endpoint every minute.
+            await db.from("fieldhouse_tournaments").update({
+              odds_refresh_claimed_at: new Date(now - (43_200 - 900) * 1_000).toISOString(),
+            }).eq("id", tournament.id);
+            waiting.push(`${tournament.id}:odds-provider-${oddsProvider.status}`);
+          }
+        }
+      }
       const missingSchedule = readyPending.filter((game) => !game.starts_at);
       if (missingSchedule.length) waiting.push(...missingSchedule.map((game) => `${tournament.id}:${game.game_id}:official-tip-missing`));
       const pollingGames = readyPending.filter((game) => {
@@ -71,8 +148,6 @@ Deno.serve(async (request: Request) => {
         events = await provider.json();
         await db.from("live_football_score_cache").update({ events, fetched_at: new Date().toISOString(), provider_remaining: remaining, provider_used: used, provider_last_cost: last, last_http_status: provider.status, last_error: null }).eq("sport", tournament.sport_id);
       }
-      const teams = new Map(tournament.fieldhouse_tournament_teams.map((team) => [team.team_id, team]));
-
       for (const game of pollingGames) {
         const firstID = game.first_team_id || (game.first_source_game_id ? games.get(game.first_source_game_id)?.winner_team_id : null);
         const secondID = game.second_team_id || (game.second_source_game_id ? games.get(game.second_source_game_id)?.winner_team_id : null);

@@ -28,6 +28,10 @@ struct FieldhouseOfficialGame: Identifiable, Hashable, Codable {
     let winnerTeamID: String?
     let firstScore: Int?
     let secondScore: Int?
+    let firstMoneyline: Int?
+    let secondMoneyline: Int?
+    let oddsBookmaker: String?
+    let oddsUpdatedAt: String?
     var id: String { gameID }
 
     init(
@@ -43,7 +47,11 @@ struct FieldhouseOfficialGame: Identifiable, Hashable, Codable {
         startsAt: String?,
         winnerTeamID: String?,
         firstScore: Int? = nil,
-        secondScore: Int? = nil
+        secondScore: Int? = nil,
+        firstMoneyline: Int? = nil,
+        secondMoneyline: Int? = nil,
+        oddsBookmaker: String? = nil,
+        oddsUpdatedAt: String? = nil
     ) {
         self.gameID = gameID
         self.roundKey = roundKey
@@ -58,6 +66,10 @@ struct FieldhouseOfficialGame: Identifiable, Hashable, Codable {
         self.winnerTeamID = winnerTeamID
         self.firstScore = firstScore
         self.secondScore = secondScore
+        self.firstMoneyline = firstMoneyline
+        self.secondMoneyline = secondMoneyline
+        self.oddsBookmaker = oddsBookmaker
+        self.oddsUpdatedAt = oddsUpdatedAt
     }
 }
 
@@ -91,7 +103,11 @@ extension FieldhouseOfficialField {
                 gameID: "preview-east-r64-\(index)", roundKey: "r64", roundOrder: 1, ordinal: index,
                 region: "East", firstTeamID: "preview-\(seeds.0)", secondTeamID: "preview-\(seeds.1)",
                 firstSourceGameID: nil, secondSourceGameID: nil,
-                startsAt: "2027-03-18T16:00:00Z", winnerTeamID: nil
+                startsAt: "2027-03-18T16:00:00Z", winnerTeamID: nil,
+                firstMoneyline: index.isMultiple(of: 2) ? -220 : 145,
+                secondMoneyline: index.isMultiple(of: 2) ? 180 : -170,
+                oddsBookmaker: "DraftKings",
+                oddsUpdatedAt: "2027-03-18T04:00:00Z"
             )
         }
         return .init(tournamentID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000076")!, sportID: league.favoriteSportID, seasonKey: 2027, status: "published", firstTipAt: "2027-03-18T16:00:00Z", teams: teams, games: games)
@@ -663,7 +679,7 @@ struct FieldhouseRoundPickerView: View {
                     Text(locked
                          ? "Picks are sealed. Official scores and winners update on this board as games become final."
                          : scheduleReady
-                            ? "Pick every straight-up winner for this round. These picks are separate from your Selection Sunday bracket and score one point each."
+                            ? "Pick every straight-up winner for this round. Moneylines are information only; each correct pick scores one point."
                             : "Matchups are set, but picks stay closed until every official tip time is on file.")
                         .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.65))
                     ForEach(games) { game in
@@ -678,6 +694,11 @@ struct FieldhouseRoundPickerView: View {
                                         Text("#\(team.seed)").font(.caption.weight(.black)).foregroundStyle(accent)
                                         Text(team.name).font(.subheadline.weight(.black)).foregroundStyle(teamColor(team, game: game))
                                         Spacer()
+                                        if let moneyline = moneyline(team, game: game), officialGame(game)?.winnerTeamID == nil {
+                                            Text("ML \(moneyline)")
+                                                .font(.caption.weight(.black)).monospacedDigit()
+                                                .foregroundStyle(.white.opacity(0.62))
+                                        }
                                         if let score = score(team, game: game) {
                                             Text("\(score)").font(.headline.weight(.black)).monospacedDigit().foregroundStyle(teamColor(team, game: game))
                                         }
@@ -685,6 +706,12 @@ struct FieldhouseRoundPickerView: View {
                                             .foregroundStyle(statusColor(team, game: game))
                                     }.padding(12).background(picks[game.id] == team.id ? accent.opacity(0.14) : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 11))
                                 }.buttonStyle(.plain).disabled(locked || !scheduleReady)
+                            }
+                            if let bookmaker = officialGame(game)?.oddsBookmaker,
+                               officialGame(game)?.winnerTeamID == nil {
+                                Text("\(bookmaker.uppercased()) · ODDS FOR CONTEXT · PICKS SCORE STRAIGHT-UP")
+                                    .font(.system(size: 8, weight: .black)).tracking(0.7)
+                                    .foregroundStyle(.white.opacity(0.40))
                             }
                         }.padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
                             .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.30)))
@@ -716,6 +743,13 @@ struct FieldhouseRoundPickerView: View {
         if game.first?.id == team.id { return official.firstScore }
         if game.second?.id == team.id { return official.secondScore }
         return nil
+    }
+
+    private func moneyline(_ team: FieldhouseBracketTeam, game: FieldhouseBracketMatchup) -> String? {
+        guard let official = officialGame(game) else { return nil }
+        let value = game.first?.id == team.id ? official.firstMoneyline : official.secondMoneyline
+        guard let value else { return nil }
+        return value > 0 ? "+\(value)" : "\(value)"
     }
 
     private func teamColor(_ team: FieldhouseBracketTeam, game: FieldhouseBracketMatchup) -> Color {

@@ -14,6 +14,8 @@ create table if not exists public.fieldhouse_tournaments (
   first_tip_at timestamptz,
   published_at timestamptz,
   finalized_at timestamptz,
+  odds_refresh_claimed_at timestamptz,
+  odds_fetched_at timestamptz,
   created_by uuid not null references auth.users(id) on delete restrict,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -41,6 +43,10 @@ create table if not exists public.fieldhouse_tournament_games (
   first_source_game_id text,
   second_source_game_id text,
   odds_event_id text,
+  first_moneyline integer,
+  second_moneyline integer,
+  odds_bookmaker text,
+  odds_updated_at timestamptz,
   starts_at timestamptz,
   winner_team_id text,
   first_score integer,
@@ -56,6 +62,15 @@ create table if not exists public.fieldhouse_tournament_games (
   check (first_score is null or first_score >= 0),
   check (second_score is null or second_score >= 0)
 );
+
+alter table public.fieldhouse_tournaments
+  add column if not exists odds_refresh_claimed_at timestamptz,
+  add column if not exists odds_fetched_at timestamptz;
+alter table public.fieldhouse_tournament_games
+  add column if not exists first_moneyline integer,
+  add column if not exists second_moneyline integer,
+  add column if not exists odds_bookmaker text,
+  add column if not exists odds_updated_at timestamptz;
 
 create table if not exists public.fieldhouse_bracket_entries (
   id uuid primary key default gen_random_uuid(),
@@ -135,6 +150,37 @@ alter table public.fieldhouse_postseason_awards
 alter table public.fieldhouse_postseason_awards
   add constraint fieldhouse_postseason_awards_award_key_check
   check (award_key in ('league_champion','regional_champion','toilet_champion'));
+
+-- One platform field serves every league, so tournament odds are claimed once
+-- per sport rather than once per league. A 12-hour floor caps the provider at
+-- two informational moneyline pulls per tournament day, and the worker makes
+-- no odds request unless at least one eligible game has not tipped.
+create or replace function public.claim_fieldhouse_tournament_odds_refresh(
+  p_tournament_id uuid,
+  p_min_age_seconds integer default 43200
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  claimed boolean := false;
+begin
+  update public.fieldhouse_tournaments
+  set odds_refresh_claimed_at=clock_timestamp()
+  where id=p_tournament_id
+    and status in ('published','in_progress')
+    and (
+      odds_refresh_claimed_at is null
+      or odds_refresh_claimed_at < clock_timestamp()-make_interval(secs=>greatest(43200,p_min_age_seconds))
+    )
+  returning true into claimed;
+  return coalesce(claimed,false);
+end;
+$$;
+revoke all on function public.claim_fieldhouse_tournament_odds_refresh(uuid,integer) from public,anon,authenticated;
+grant execute on function public.claim_fieldhouse_tournament_odds_refresh(uuid,integer) to service_role;
 
 create index if not exists fieldhouse_games_event_idx
   on public.fieldhouse_tournament_games (odds_event_id) where odds_event_id is not null;
