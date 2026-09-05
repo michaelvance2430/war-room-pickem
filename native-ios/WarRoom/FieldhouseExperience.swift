@@ -1941,7 +1941,10 @@ struct FieldhouseNativePreviewView: View {
         let reviewBracket = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
         let reviewHellfire = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-hellfire")
         var displayState = initialState
-        if reviewRound { displayState.officialPostseasonField = .previewRound(for: initialLeague) }
+        if reviewRound || reviewBracket {
+            displayState.officialPostseasonField = .previewRound(for: initialLeague)
+            displayState.phase = .postseason
+        }
         if reviewScorecard { Self.seedPostseasonScorecardPreview(&displayState, league: initialLeague) }
         _state = State(initialValue: displayState)
         _lastVerifiedState = State(initialValue: displayState)
@@ -2114,8 +2117,10 @@ struct FieldhouseNativePreviewView: View {
                 return
             }
             var initialState = Self.makePreviewState(for: initialLeague)
-            if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-round") {
+            if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-round")
+                || ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket") {
                 initialState.officialPostseasonField = .previewRound(for: initialLeague)
+                initialState.phase = .postseason
             }
             let initialScope = FieldhouseStateScope(
                 userID: UUID(uuidString: "F13D0000-0000-4000-8000-000000000002")!,
