@@ -25,6 +25,7 @@ function assertHardenedDefiners(source, label) {
 
 assertHardenedDefiners(sql, "Fieldhouse postseason SQL");
 assertHardenedDefiners(schema, "Fieldhouse weekly schema SQL");
+assertHardenedDefiners(liveStandings, "Fieldhouse live standings SQL");
 
 function classifyRegionalField(scores, brassSize = Math.min(4, Math.floor(scores.length / 2))) {
   if (brassSize === 0) return scores.map(() => "no_brass");

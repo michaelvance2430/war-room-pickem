@@ -16,7 +16,7 @@ returns table (
 )
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $function$
 declare
   v_first_tip timestamptz;
