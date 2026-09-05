@@ -50,10 +50,12 @@ create table if not exists private.patreon_founding_supporters (
 comment on table private.patreon_founding_supporters is
   'Permanent Founding Ten registry. Patreon identities are bound only after creator review of historical support order; numbers are never recycled.';
 
--- Mike has confirmed this historical placement. Bind patreon_user_id only
--- after Tbone Soulstache connects and the exact Patreon identity is verified.
+-- Mike has confirmed these historical placements. Bind patreon_user_id only
+-- after each supporter connects and the exact Patreon identity is verified.
 insert into private.patreon_founding_supporters (supporter_number, display_label)
-values (2, 'Tbone Soulstache')
+values
+  (1, 'Big Balls Ben'),
+  (2, 'Tbone Soulstache')
 on conflict (supporter_number) do nothing;
 
 comment on table private.patreon_connections is

@@ -11,7 +11,7 @@ Patreon linking recognizes a user's relationship with War Room Pick'Em. It does 
 - Only the first ten historical paid supporters receive **FOUNDING TEN · #01** through **#10**.
 - Order comes from creator-reviewed Patreon history, never OAuth connection order.
 - Numbers are permanent and never recycled. Current status remains a separate **ACTIVE SUPPORTER**, **PAYMENT ISSUE**, or **FORMER SUPPORTER** label.
-- The private registry reserves **#02 for Tbone Soulstache**. It intentionally has no Patreon user ID until that exact identity connects and Mike verifies the match.
+- The private registry reserves **#01 for Big Balls Ben** and **#02 for Tbone Soulstache**. Both intentionally have no Patreon user ID until each exact identity connects and Mike verifies the match.
 - Never match a founder by display name alone. Bind the verified Patreon user ID in the private registry after review.
 
 ## Flow
@@ -50,7 +50,7 @@ Never put these values in Swift, source control, screenshots, chat, or a public 
 3. Deploy `patreon-oauth` with gateway JWT verification disabled because Patreon's HTTPS callback has no Supabase JWT. The function performs its own authentication: War Room JWTs for app actions and single-use state for callbacks.
 4. Test link, status refresh, duplicate-Patreon-account rejection, cancellation, expired state, token refresh, and disconnect with a non-production test account.
 5. Verify the private schema is not exposed through the Data API.
-6. Review Patreon membership history, fill the remaining Founding Ten order, and bind each exact Patreon user ID. Do not guess #01.
+6. Review Patreon membership history, fill positions #03 through #10, and bind each exact Patreon user ID. Do not guess an identity match from a nickname.
 7. Add an App Review note explaining that linking only recognizes supporter status and unlocks no digital content or gameplay functionality.
 8. Flip `PatreonConnectionFeature.isEnabled` to `true` only after the live round trip passes.
 9. Update the privacy policy and App Store privacy answers for the Patreon user ID, display name, avatar, membership status, Founding Ten number, and encrypted OAuth credentials before release.
