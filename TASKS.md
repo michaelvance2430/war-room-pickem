@@ -8,6 +8,9 @@
 
 ## Done
 
+- [x] ~~Lock Fieldhouse postseason tie law~~ (2026-09-05)
+  - Selection Sunday now expands the Championship or Toilet Bowl field for every player tied at its four-player regional boundary. Regional, league, and Toilet Bowl awards use postseason points, then regular-season points; exact ties produce co-champions with hardware for every winner and never use UUID ordering. A Fieldhouse-specific multi-winner trophy projection preserves the existing CFB/NFL one-winner storage contract. Boundary fixtures, co-champion fixtures, the Build 21 authority verifier, and the native iOS build pass. Database changes remain review-only and production is untouched.
+
 - [x] ~~Build 21 weapon scoring parity~~ (2026-09-05)
   - NFL postseason JDAM now uses a server-authored 8-of-13 decision threshold, applies 1.5× or 0.5× to weighted raw playoff points, records a detailed permanent receipt, and updates standings atomically. Direct client writes to the guarded postseason records are revoked by the review-only upgrade. Seven/eight boundary tests, the native simulator build, and the focused regression suite pass. Fieldhouse Hellfire rules remain unchanged and covered by the existing Build 21 authority verifier. The SQL remains review-only and has not touched production.
 

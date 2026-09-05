@@ -47,10 +47,12 @@ enum LegacyCareerRecords {
     static func trophies(for userId: UUID, merging live: [ProfileTrophy]) -> [ProfileTrophy] {
         var seen = Set<String>()
         var result = live.filter { trophy in
-            let key = "\(trophy.winnerUserId?.uuidString.lowercased() ?? userId.uuidString.lowercased())|\(trophy.seasonYear)|\(trophy.trophyType.lowercased())"
+            let key = "\(trophy.leagueId.uuidString.lowercased())|\(trophy.winnerUserId?.uuidString.lowercased() ?? userId.uuidString.lowercased())|\(trophy.seasonYear)|\(trophy.trophyType.lowercased())"
             return seen.insert(key).inserted
         }
         let seeds = legacyTrophies.filter { $0.winnerUserId == userId }
+        // A live row replaces the old archive seed even though the archive used
+        // a synthetic league ID. Live rows from two real leagues remain distinct.
         for trophy in seeds where !result.contains(where: { $0.seasonYear == trophy.seasonYear && $0.trophyType == trophy.trophyType }) {
             result.append(trophy)
         }

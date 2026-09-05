@@ -192,15 +192,14 @@ create index if not exists fieldhouse_postseason_totals_leaderboard_idx
   on public.fieldhouse_postseason_totals (tournament_id, league_id, total_points desc, user_id);
 create index if not exists fieldhouse_postseason_qualifiers_path_idx
   on public.fieldhouse_postseason_qualifiers (tournament_id, league_id, path, fieldhouse_region, regular_rank);
-create unique index if not exists fieldhouse_one_league_champion_idx
-  on public.fieldhouse_postseason_awards(tournament_id,league_id,award_key)
-  where award_key='league_champion';
-create unique index if not exists fieldhouse_one_regional_champion_idx
-  on public.fieldhouse_postseason_awards(tournament_id,league_id,award_key,player_region)
-  where award_key='regional_champion';
-create unique index if not exists fieldhouse_one_toilet_champion_idx
-  on public.fieldhouse_postseason_awards(tournament_id,league_id,award_key)
-  where award_key='toilet_champion';
+-- A real tie remains a tie. The old one-winner indexes made co-champions
+-- impossible and forced the award function to choose a user UUID. Keep one
+-- receipt per winning player instead.
+drop index if exists public.fieldhouse_one_league_champion_idx;
+drop index if exists public.fieldhouse_one_regional_champion_idx;
+drop index if exists public.fieldhouse_one_toilet_champion_idx;
+create unique index if not exists fieldhouse_award_recipient_idx
+  on public.fieldhouse_postseason_awards(tournament_id,league_id,award_key,user_id);
 
 alter table public.fieldhouse_tournaments enable row level security;
 alter table public.fieldhouse_tournament_teams enable row level security;
@@ -349,22 +348,34 @@ begin
 
     with regional_order as (
       select m.user_id,m.fieldhouse_region,m.total_points,
-        row_number() over(
-          partition by m.fieldhouse_region order by m.total_points desc,m.user_id
+        rank() over(
+          partition by m.fieldhouse_region order by m.total_points desc
         )::integer regular_rank,
         count(*) over(partition by m.fieldhouse_region)::integer region_count
       from public.memberships m
       where m.league_id=league_row.id and coalesce(m.is_bot,false)=false
+    ), thresholds as (
+      select fieldhouse_region,
+        least(4,count(*)/2)::integer as brass_size,
+        (array_agg(total_points order by total_points desc))[least(4,count(*)/2)::integer] as top_cutoff,
+        (array_agg(total_points order by total_points asc))[least(4,count(*)/2)::integer] as bottom_cutoff
+      from regional_order
+      group by fieldhouse_region
     ), classified as (
-      select *,least(4,region_count/2)::integer as brass_size from regional_order
+      select r.*,t.brass_size,t.top_cutoff,t.bottom_cutoff
+      from regional_order r
+      join thresholds t using(fieldhouse_region)
     )
     insert into public.fieldhouse_postseason_qualifiers(
       tournament_id,league_id,user_id,fieldhouse_region,path,regular_rank,regular_points,frozen_at
     )
     select p_tournament_id,league_row.id,user_id,fieldhouse_region,
       case
-        when regular_rank<=brass_size then 'championship'
-        when regular_rank>region_count-brass_size then 'toilet_bowl'
+        -- Ties at either four-player boundary expand that field. Championship
+        -- takes precedence only if a very small/all-tied region overlaps both
+        -- boundaries, so one player can never enter both paths.
+        when brass_size>0 and total_points>=top_cutoff then 'championship'
+        when brass_size>0 and total_points<=bottom_cutoff then 'toilet_bowl'
         else 'no_brass'
       end,
       regular_rank,total_points,now()
@@ -1115,6 +1126,11 @@ begin
   if v_status<>'final' then raise exception 'Tournament is not final'; end if;
   perform public.score_fieldhouse_postseason(p_tournament_id);
 
+  -- Finalization is repeatable. Rebuild this tournament's award receipts from
+  -- the authoritative totals so a corrected official result cannot leave stale
+  -- hardware behind.
+  delete from public.fieldhouse_postseason_awards where tournament_id=p_tournament_id;
+
   with totals as (
     select p.league_id,p.user_id,q.fieldhouse_region,p.total_points,
       q.regular_points,l.championship_trophy_id
@@ -1124,14 +1140,12 @@ begin
     join public.leagues l on l.id=p.league_id
     where p.tournament_id=p_tournament_id and q.path='championship'
   ), regional as (
-    select *,row_number() over(partition by league_id,fieldhouse_region order by total_points desc,regular_points desc,user_id) place
+    select *,dense_rank() over(partition by league_id,fieldhouse_region order by total_points desc,regular_points desc) place
     from totals where fieldhouse_region is not null
   )
   insert into public.fieldhouse_postseason_awards(tournament_id,league_id,user_id,award_key,player_region,trophy_id,total_points)
   select p_tournament_id,league_id,user_id,'regional_champion',fieldhouse_region,
-    'fieldhouse-regional-'||lower(fieldhouse_region),total_points from regional where place=1
-  on conflict(tournament_id,league_id,award_key,player_region) where award_key='regional_champion' do update set
-    user_id=excluded.user_id,trophy_id=excluded.trophy_id,total_points=excluded.total_points,awarded_at=now();
+    'fieldhouse-regional-'||lower(fieldhouse_region),total_points from regional where place=1;
   get diagnostics v_region_awards=row_count;
 
   with totals as (
@@ -1142,13 +1156,11 @@ begin
     join public.leagues l on l.id=p.league_id
     where p.tournament_id=p_tournament_id and q.path='championship'
   ), ranked as (
-    select *,row_number() over(partition by league_id order by total_points desc,regular_points desc,user_id) place from totals
+    select *,dense_rank() over(partition by league_id order by total_points desc,regular_points desc) place from totals
   )
   insert into public.fieldhouse_postseason_awards(tournament_id,league_id,user_id,award_key,player_region,trophy_id,total_points)
   select p_tournament_id,league_id,user_id,'league_champion',null,
-    coalesce(championship_trophy_id,'fieldhouse-champion'),total_points from ranked where place=1
-  on conflict(tournament_id,league_id,award_key) where award_key='league_champion' do update set
-    user_id=excluded.user_id,trophy_id=excluded.trophy_id,total_points=excluded.total_points,awarded_at=now();
+    coalesce(championship_trophy_id,'fieldhouse-champion'),total_points from ranked where place=1;
   get diagnostics v_league_awards=row_count;
 
   with totals as (
@@ -1158,86 +1170,13 @@ begin
       on q.tournament_id=p.tournament_id and q.league_id=p.league_id and q.user_id=p.user_id
     where p.tournament_id=p_tournament_id and q.path='toilet_bowl'
   ), ranked as (
-    select *,row_number() over(partition by league_id order by total_points desc,regular_points desc,user_id) place
+    select *,dense_rank() over(partition by league_id order by total_points desc,regular_points desc) place
     from totals
   )
   insert into public.fieldhouse_postseason_awards(tournament_id,league_id,user_id,award_key,player_region,trophy_id,total_points)
   select p_tournament_id,league_id,user_id,'toilet_champion',null,'toilet_bowl',total_points
-  from ranked where place=1
-  on conflict(tournament_id,league_id,award_key) where award_key='toilet_champion' do update set
-    user_id=excluded.user_id,trophy_id=excluded.trophy_id,total_points=excluded.total_points,awarded_at=now();
+  from ranked where place=1;
   get diagnostics v_toilet_awards=row_count;
-
-  -- The postseason awards table is the scoring receipt. The shared
-  -- league_trophies table is the permanent public hardware shelf consumed by
-  -- CFB, NFL, NCAAM and NCAAW profiles. Engrave both from the same final rows
-  -- so the profile can never disagree with the authoritative tournament total.
-  insert into public.league_trophies(
-    league_id,season_year,trophy_type,winner_name,winner_user_id,
-    subtitle,notes,awarded_at,trophy_design_id
-  )
-  select
-    a.league_id,t.season_key,
-    'fieldhouse_region_'||lower(a.player_region),
-    coalesce(nullif(trim(p.display_name),''),'Player'),a.user_id,
-    a.player_region||' Regional Champion · '||t.season_key::text,
-    'Won the '||a.player_region||' Region with '||a.total_points||' official tournament points.',
-    a.awarded_at,a.trophy_id
-  from public.fieldhouse_postseason_awards a
-  join public.fieldhouse_tournaments t on t.id=a.tournament_id
-  left join public.profiles p on p.id=a.user_id
-  where a.tournament_id=p_tournament_id and a.award_key='regional_champion'
-  on conflict(league_id,season_year,trophy_type) do update set
-    winner_name=excluded.winner_name,
-    winner_user_id=excluded.winner_user_id,
-    subtitle=excluded.subtitle,
-    notes=excluded.notes,
-    awarded_at=excluded.awarded_at,
-    trophy_design_id=excluded.trophy_design_id;
-
-  insert into public.league_trophies(
-    league_id,season_year,trophy_type,winner_name,winner_user_id,
-    subtitle,notes,awarded_at,trophy_design_id
-  )
-  select
-    a.league_id,t.season_key,'championship',
-    coalesce(nullif(trim(p.display_name),''),'Player'),a.user_id,
-    case t.sport_id when 'ncaaw' then 'NCAAW Fieldhouse Champion · ' else 'NCAAM Fieldhouse Champion · ' end||t.season_key::text,
-    'Won the Fieldhouse with '||a.total_points||' official tournament points.',
-    a.awarded_at,a.trophy_id
-  from public.fieldhouse_postseason_awards a
-  join public.fieldhouse_tournaments t on t.id=a.tournament_id
-  left join public.profiles p on p.id=a.user_id
-  where a.tournament_id=p_tournament_id and a.award_key='league_champion'
-  on conflict(league_id,season_year,trophy_type) do update set
-    winner_name=excluded.winner_name,
-    winner_user_id=excluded.winner_user_id,
-    subtitle=excluded.subtitle,
-    notes=excluded.notes,
-    awarded_at=excluded.awarded_at,
-    trophy_design_id=excluded.trophy_design_id;
-
-  insert into public.league_trophies(
-    league_id,season_year,trophy_type,winner_name,winner_user_id,
-    subtitle,notes,awarded_at,trophy_design_id
-  )
-  select
-    a.league_id,t.season_key,'toilet_bowl',
-    coalesce(nullif(trim(p.display_name),''),'Player'),a.user_id,
-    'Fieldhouse Toilet Bowl Champion · '||t.season_key::text,
-    'Won the bottom-field bracket race with '||a.total_points||' official tournament points.',
-    a.awarded_at,a.trophy_id
-  from public.fieldhouse_postseason_awards a
-  join public.fieldhouse_tournaments t on t.id=a.tournament_id
-  left join public.profiles p on p.id=a.user_id
-  where a.tournament_id=p_tournament_id and a.award_key='toilet_champion'
-  on conflict(league_id,season_year,trophy_type) do update set
-    winner_name=excluded.winner_name,
-    winner_user_id=excluded.winner_user_id,
-    subtitle=excluded.subtitle,
-    notes=excluded.notes,
-    awarded_at=excluded.awarded_at,
-    trophy_design_id=excluded.trophy_design_id;
 
   return jsonb_build_object(
     'ok',true,
@@ -1250,6 +1189,39 @@ end;
 $$;
 revoke all on function public.finalize_fieldhouse_postseason_awards(uuid) from public,anon,authenticated;
 grant execute on function public.finalize_fieldhouse_postseason_awards(uuid) to service_role;
+
+-- league_trophies intentionally retains its football-era one-winner key.
+-- Fieldhouse hardware is projected from the multi-recipient award receipts so
+-- co-champions remain visible without breaking CFB/NFL upserts.
+create or replace view public.fieldhouse_profile_trophies
+with (security_invoker=true) as
+select
+  a.id,
+  a.league_id,
+  t.season_key as season_year,
+  case a.award_key
+    when 'regional_champion' then 'fieldhouse_region_'||lower(a.player_region)
+    when 'league_champion' then 'championship'
+    else 'toilet_bowl'
+  end as trophy_type,
+  coalesce(nullif(trim(p.display_name),''),'Player') as winner_name,
+  a.user_id as winner_user_id,
+  case a.award_key
+    when 'regional_champion' then a.player_region||' Regional Champion · '||t.season_key::text
+    when 'league_champion' then (case t.sport_id when 'ncaaw' then 'NCAAW Fieldhouse Champion · ' else 'NCAAM Fieldhouse Champion · ' end)||t.season_key::text
+    else 'Fieldhouse Toilet Bowl Champion · '||t.season_key::text
+  end as subtitle,
+  case a.award_key
+    when 'regional_champion' then 'Won the '||a.player_region||' Region with '||a.total_points||' official tournament points.'
+    when 'league_champion' then 'Won the Fieldhouse with '||a.total_points||' official tournament points.'
+    else 'Won the bottom-field bracket race with '||a.total_points||' official tournament points.'
+  end as notes,
+  a.awarded_at,
+  a.trophy_id as trophy_design_id
+from public.fieldhouse_postseason_awards a
+join public.fieldhouse_tournaments t on t.id=a.tournament_id
+left join public.profiles p on p.id=a.user_id;
+grant select on public.fieldhouse_profile_trophies to authenticated;
 
 create or replace function public.record_fieldhouse_tournament_result(
   p_tournament_id uuid,

@@ -2236,7 +2236,8 @@ enum SupabaseAPI {
             URLQueryItem(name: "order", value: "season_year.desc"),
         ]
         let live = try await send(authorizedRequest(url: components.url!, token: token), as: [ProfileTrophy].self)
-        return LegacyCareerRecords.trophies(for: userId, merging: live)
+        let fieldhouse = await fieldhouseTrophies(token: token, filter: "winner_user_id", value: userId.uuidString.lowercased())
+        return LegacyCareerRecords.trophies(for: userId, merging: live + fieldhouse)
     }
 
     static func leagueTrophies(token: String, leagueId: UUID) async throws -> [ProfileTrophy] {
@@ -2246,7 +2247,23 @@ enum SupabaseAPI {
             URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
             URLQueryItem(name: "order", value: "season_year.desc"),
         ]
-        return try await send(authorizedRequest(url: components.url!, token: token), as: [ProfileTrophy].self)
+        let live = try await send(authorizedRequest(url: components.url!, token: token), as: [ProfileTrophy].self)
+        let fieldhouse = await fieldhouseTrophies(token: token, filter: "league_id", value: leagueId.uuidString.lowercased())
+        return (live + fieldhouse).sorted { $0.seasonYear > $1.seasonYear }
+    }
+
+    /// Fieldhouse permits honest co-champions, while the legacy football shelf
+    /// has a one-winner-per-trophy key. This projection is optional until the
+    /// review-only Build 21 schema is installed, so existing CFB/NFL profiles
+    /// remain available during a staged rollout.
+    private static func fieldhouseTrophies(token: String, filter: String, value: String) async -> [ProfileTrophy] {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/fieldhouse_profile_trophies"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,league_id,season_year,trophy_type,winner_name,winner_user_id,subtitle,notes,awarded_at,trophy_design_id"),
+            URLQueryItem(name: filter, value: "eq.\(value)"),
+            URLQueryItem(name: "order", value: "season_year.desc"),
+        ]
+        return (try? await send(authorizedRequest(url: components.url!, token: token), as: [ProfileTrophy].self)) ?? []
     }
 
     static func favoriteTeam(token: String, userId: UUID, sportId: String = "cfb") async throws -> FavoriteTeam? {

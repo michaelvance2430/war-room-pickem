@@ -164,6 +164,16 @@ struct WarRoomTests {
         #expect(trophies.filter { $0.seasonYear == 2025 && $0.trophyType == "crystal_ball" }.count == 1)
     }
 
+    @Test func careerTrophiesPreserveHardwareWonInSeparateLiveLeagues() {
+        let player = UUID()
+        let firstLeague = ProfileTrophy(id: UUID(), leagueId: UUID(), seasonYear: 2027, trophyType: "championship", winnerName: "Player", winnerUserId: player, subtitle: nil, notes: nil, awardedAt: "2027-04-06T23:00:00Z", trophyDesignId: "m-fieldhouse-cup")
+        let secondLeague = ProfileTrophy(id: UUID(), leagueId: UUID(), seasonYear: 2027, trophyType: "championship", winnerName: "Player", winnerUserId: player, subtitle: nil, notes: nil, awardedAt: "2027-04-06T23:00:00Z", trophyDesignId: "m-fieldhouse-cup")
+
+        let trophies = LegacyCareerRecords.trophies(for: player, merging: [firstLeague, secondLeague])
+
+        #expect(trophies.count == 2)
+    }
+
     @Test func bettingLinesAlwaysResolveWithoutATie() {
         #expect(noPushSpread(3) == 3.5)
         #expect(noPushSpread(-4) == 4.5)
