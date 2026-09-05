@@ -1003,6 +1003,15 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(FieldhousePostseasonScoreEngine.bracketWeight(for: "title"), 32)
     }
 
+    func testTournamentScorecardIdentifiesServerFreshnessWithoutInventingAnUpdate() {
+        var state = FieldhouseSeasonState()
+        XCTAssertEqual(state.postseasonScoreFreshnessLabel, "WAITING FOR FIRST OFFICIAL RESULT")
+
+        state.postseasonScoreUpdatedAt = "2026-04-07T03:15:00Z"
+        XCTAssertTrue(state.postseasonScoreFreshnessLabel.hasPrefix("SERVER UPDATED "))
+        XCTAssertFalse(state.postseasonScoreFreshnessLabel.contains("WAITING"))
+    }
+
     func testExpandedTournamentContainsSeventyFiveBracketDecisions() {
         XCTAssertEqual(FieldhousePostseasonRound.allCases.map(\.gameCount).reduce(0, +), 75)
         XCTAssertEqual(FieldhousePostseasonRound.openingRound.gameCount, 12)

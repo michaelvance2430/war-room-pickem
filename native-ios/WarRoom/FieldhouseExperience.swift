@@ -1353,6 +1353,13 @@ struct FieldhouseSeasonState: Codable, Equatable {
     func postseasonPoints(for userID: UUID) -> Int {
         postseasonLeaderboardTotals[userID] ?? 0
     }
+    var postseasonScoreFreshnessLabel: String {
+        guard let value = postseasonScoreUpdatedAt,
+              let date = ISO8601DateFormatter().date(from: value) else {
+            return "WAITING FOR FIRST OFFICIAL RESULT"
+        }
+        return "SERVER UPDATED \(date.formatted(date: .abbreviated, time: .shortened).uppercased())"
+    }
     var postseasonEligibilityLabel: String {
         switch postseasonEligibilityPath {
         case "championship": "CHAMPIONSHIP FIELD"
@@ -2581,7 +2588,7 @@ private struct FieldhouseHomePage: View {
             if state.postseasonScorecardIsActive {
                 Button { showingTournamentScorecard = true } label: {
                     FieldhouseAction(
-                        kicker: "TOURNAMENT SCORECARD · LIVE",
+                        kicker: "TOURNAMENT SCORECARD · \(state.postseasonScoreFreshnessLabel)",
                             title: "\(state.postseasonTotalPoints) POSTSEASON POINTS",
                             detail: "\(state.postseasonEligibilityLabel) · bracket \(state.postseasonBracketAdjustedPoints) · round picks \(state.postseasonFreshRoundPoints). Tap for the permanent receipt.",
                         icon: "chart.line.uptrend.xyaxis"
@@ -2746,7 +2753,7 @@ private struct FieldhouseTournamentScorecardView: View {
                 ScrollView {
                     VStack(spacing: 14) {
                         FieldhouseHero(
-                            kicker: "\(state.postseasonEligibilityLabel) · PERMANENT RECEIPT",
+                            kicker: "\(state.postseasonEligibilityLabel) · \(state.postseasonScoreFreshnessLabel)",
                             title: "\(state.postseasonTotalPoints) POINTS",
                             detail: "One authoritative total for your homepage, standings, regional race, and championship result.",
                             icon: "checklist.checked"
@@ -2784,7 +2791,7 @@ private struct FieldhouseTournamentScorecardView: View {
                         .padding(16)
                         .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 18))
                         .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.38)))
-                        Text("Scores refresh as official tournament games become final. No separate homepage or standings math is permitted.")
+                        Text("\(state.postseasonScoreFreshnessLabel). Scores refresh as official tournament games become final. No separate homepage or standings math is permitted.")
                             .font(.caption.weight(.bold)).foregroundStyle(.white.opacity(0.54))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -3962,7 +3969,7 @@ private struct FieldhouseStandingsPage: View {
                 cutMetric("ROUNDS", state.postseasonFreshRoundPoints, "1 EACH", .white)
                 cutMetric("TOTAL", state.postseasonTotalPoints, "LIVE", accent)
             }
-            Text("Every number comes from the same authoritative postseason scoreboard used by the homepage and final trophies.")
+            Text("\(state.postseasonScoreFreshnessLabel). Every number comes from the same authoritative postseason scoreboard used by the homepage and final trophies.")
                 .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
         }
         .padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16))
