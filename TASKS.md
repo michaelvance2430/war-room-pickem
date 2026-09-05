@@ -8,6 +8,9 @@
 
 ## Done
 
+- [x] ~~Harden Build 21 privileged database functions~~ (2026-09-05)
+  - Pinned every review-only Fieldhouse `SECURITY DEFINER` function to an empty search path and hardened the existing NFL publish, bracket-save, reset, and result-scoring functions before they can bypass direct-write restrictions. Added regression checks that fail if a mutable public search path returns. All three Build 21 authority/scoring verifiers and the diff integrity check pass; nothing was executed against production.
+
 - [x] ~~Add the Build 21 multi-sport season-closeout authority~~ (2026-09-05)
   - Replaced the CFB-only receipt contract with a review-only sport-aware closeout RPC for CFB, NFL, NCAAM, and NCAAW. It preserves the legacy CFB entry point, supports honest co-champion arrays, requires an Official-season receipt, validates each sport's trophy catalog, and checks final evidence against the correct football or Fieldhouse authority. The existing CFB consumer now uses the generic RPC. Multi-sport, CFB regression, Fieldhouse authority, and targeted lint checks pass; production was inspected read-only and not changed. Attaching the NFL ceremony remains separate because the current code has no authoritative rule mapping Final Thirteen results to league and Toilet Bowl winners.
 

@@ -29,7 +29,7 @@ create or replace function public.assign_fieldhouse_region()
 returns trigger
 language plpgsql
 security definer
-set search_path=public
+set search_path=''
 as $$
 declare v_sport text; v_region text;
 begin
@@ -141,7 +141,7 @@ create or replace function public.claim_live_football_score_refresh(
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   claimed boolean := false;
@@ -178,7 +178,7 @@ create or replace function public.create_league_with_commissioner_seat(
 returns json
 language plpgsql
 security definer
-set search_path = 'public'
+set search_path = ''
 as $$
 declare
   v_uid uuid := auth.uid();

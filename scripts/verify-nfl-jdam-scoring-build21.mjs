@@ -6,6 +6,12 @@ const model = readFileSync("native-ios/WarRoom/NflPostseason.swift", "utf8");
 const view = readFileSync("native-ios/WarRoom/NflPostseasonCommandView.swift", "utf8");
 const api = readFileSync("native-ios/WarRoom/SupabaseAPI.swift", "utf8");
 
+assert.doesNotMatch(sql, /set search_path\s*=\s*(?:'public'|public(?:\s*,\s*pg_temp)?)/i);
+assert.match(sql, /alter function public\.publish_nfl_postseason_slate\(uuid,integer,jsonb\)\s+set search_path = ''/);
+assert.match(sql, /alter function public\.save_nfl_postseason_bracket\(uuid,integer,jsonb,boolean\)\s+set search_path = ''/);
+assert.match(sql, /alter function public\.reset_league_season_guarded\(uuid,text\)\s+set search_path = ''/);
+assert.match(sql, /create or replace function public\.save_nfl_postseason_results[\s\S]*security definer\s+set search_path=''/);
+
 assert.match(sql, /select l\.sport_id='nfl' and l\.commissioner_id=v_uid[\s\S]*for update/);
 assert.match(sql, /v_correct>=8 then 1\.50 else 0\.50/);
 assert.match(sql, /v_adjusted:=round\(v_raw\*v_multiplier\)::integer/);

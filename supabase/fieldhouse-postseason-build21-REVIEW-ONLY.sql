@@ -162,7 +162,7 @@ create or replace function public.claim_fieldhouse_tournament_odds_refresh(
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   claimed boolean := false;
@@ -285,7 +285,7 @@ create or replace function public.freeze_fieldhouse_postseason_qualifiers(p_tour
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_uid uuid := auth.uid();
@@ -397,7 +397,7 @@ create or replace function public.validate_fieldhouse_bracket_picks(
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   g record;
@@ -434,7 +434,7 @@ create or replace function public.save_fieldhouse_bracket(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_uid uuid := auth.uid();
@@ -488,7 +488,7 @@ create or replace function public.lock_fieldhouse_brackets_at_tip()
 returns integer
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare v_count integer;
 begin
@@ -600,7 +600,7 @@ create or replace function public.import_fieldhouse_official_field(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_uid uuid := auth.uid();
@@ -847,7 +847,7 @@ create or replace function public.sync_fieldhouse_official_schedule(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_uid uuid := auth.uid();
@@ -966,7 +966,7 @@ create or replace function public.save_fieldhouse_round_picks(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_uid uuid:=auth.uid();
@@ -1034,7 +1034,7 @@ create or replace function public.score_fieldhouse_postseason(p_tournament_id uu
 returns jsonb
 language plpgsql
 security definer
-set search_path=public
+set search_path=''
 as $$
 declare v_final boolean; v_brackets integer; v_rounds integer;
 begin
@@ -1115,7 +1115,7 @@ revoke all on function public.score_fieldhouse_postseason(uuid) from public,anon
 grant execute on function public.score_fieldhouse_postseason(uuid) to service_role;
 
 create or replace function public.finalize_fieldhouse_postseason_awards(p_tournament_id uuid)
-returns jsonb language plpgsql security definer set search_path=public as $$
+returns jsonb language plpgsql security definer set search_path='' as $$
 declare
   v_status text;
   v_season_key integer;
@@ -1286,7 +1286,7 @@ create or replace function public.record_fieldhouse_tournament_result(
   p_second_score integer,
   p_completed_at timestamptz
 )
-returns jsonb language plpgsql security definer set search_path=public as $$
+returns jsonb language plpgsql security definer set search_path='' as $$
 declare
   g public.fieldhouse_tournament_games%rowtype;
   v_first text;

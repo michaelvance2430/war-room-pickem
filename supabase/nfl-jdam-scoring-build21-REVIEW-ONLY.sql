@@ -47,6 +47,12 @@ alter table public.nfl_postseason_scorecards
 -- complete 14-team field; make it privileged before removing direct writes.
 alter function public.publish_nfl_postseason_slate(uuid,integer,jsonb)
   security definer;
+alter function public.publish_nfl_postseason_slate(uuid,integer,jsonb)
+  set search_path = '';
+alter function public.save_nfl_postseason_bracket(uuid,integer,jsonb,boolean)
+  set search_path = '';
+alter function public.reset_league_season_guarded(uuid,text)
+  set search_path = '';
 revoke insert,update on public.nfl_postseason_slates
   from authenticated;
 revoke insert,update on public.nfl_postseason_entries
@@ -62,7 +68,7 @@ create or replace function public.save_nfl_postseason_results(
 returns public.nfl_postseason_results
 language plpgsql
 security definer
-set search_path=public,pg_temp
+set search_path=''
 as $function$
 declare
   v_uid uuid:=(select auth.uid());

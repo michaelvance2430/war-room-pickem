@@ -16,6 +16,16 @@ const client = readFileSync(new URL("../native-ios/WarRoom/FieldhouseExperience.
 const bracketPicker = readFileSync(new URL("../native-ios/WarRoom/FieldhouseBracketPicker.swift", import.meta.url), "utf8");
 const content = readFileSync(new URL("../native-ios/WarRoom/ContentView.swift", import.meta.url), "utf8");
 
+function assertHardenedDefiners(source, label) {
+  const definers = source.match(/security definer/gi) ?? [];
+  const hardened = source.match(/security definer\s+set search_path\s*=\s*''/gi) ?? [];
+  assert.equal(hardened.length, definers.length, `${label} must pin every SECURITY DEFINER function to an empty search_path`);
+  assert.doesNotMatch(source, /set search_path\s*=\s*(?:'public'|public(?:\s*,\s*pg_temp)?)/i);
+}
+
+assertHardenedDefiners(sql, "Fieldhouse postseason SQL");
+assertHardenedDefiners(schema, "Fieldhouse weekly schema SQL");
+
 function classifyRegionalField(scores, brassSize = Math.min(4, Math.floor(scores.length / 2))) {
   if (brassSize === 0) return scores.map(() => "no_brass");
   const descending = [...scores].sort((a, b) => b - a);
