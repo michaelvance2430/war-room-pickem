@@ -130,6 +130,8 @@ assert.match(client, /lastVerifiedState = hydrated/);
 assert.match(client, /ROOM PICK COUNTS REFRESHING/);
 assert.doesNotMatch(client, /14 \+ index|11 \+ index/);
 assert.match(client, /Never allow Foundry preview scores or picks to leak/);
+assert.doesNotMatch(client, /postseasonFreshRoundPoints = snapshot\.roundEntries\.reduce/);
+assert.match(client, /The generated postseason total is the only score authority used/);
 assert.match(client, /else if let scoringCard = snapshot\.scoringCard/);
 assert.match(client, /if auth\.user != nil && auth\.token != nil \{\s*YouView\(onBack:/);
 assert.match(client, /if state\.officialPostseasonField != nil \{\s*clearLiveProjection\(\)\s*refreshLifecycle\(at: Date\(\)\)\s*return\s*\}/);
