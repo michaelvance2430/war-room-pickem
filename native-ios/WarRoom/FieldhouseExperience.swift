@@ -1721,6 +1721,19 @@ enum FieldhouseStateHydrator {
             state.championshipTrophyID = trophyID
         }
 
+        // Authenticated state starts empty and is populated only from server
+        // authority below. Never allow Foundry preview scores or picks to leak
+        // into a real league that has not produced a scoring card yet.
+        state.scoringGames = []
+        state.scoringResults = [:]
+        state.scoringSelections = [:]
+        state.scoringConfidences = [:]
+        state.scoringBestBetGame = nil
+        state.scoringPropAnswer = ""
+        state.scoringUsedHellfire = false
+        state.lastCertifiedWindow = nil
+        state.lastCertifiedPoints = nil
+
         if let scorecard = snapshot.latestScorecard,
            snapshot.scoringCard == nil || snapshot.scoringCard?.weekNumber == scorecard.weekNumber {
             let orderedScoringGames = scorecard.card.cardGames.sorted { $0.sortOrder < $1.sortOrder }
@@ -1753,24 +1766,24 @@ enum FieldhouseStateHydrator {
             state.scoringUsedHellfire = scorecard.pick.isChaos
             state.lastCertifiedWindow = scorecard.weekNumber
             state.lastCertifiedPoints = scorecard.totalPoints
-        } else if let scoringCard = snapshot.scoringCard, let scoringPick = snapshot.scoringPick {
+        } else if let scoringCard = snapshot.scoringCard {
             let orderedScoringGames = scoringCard.cardGames.sorted { $0.sortOrder < $1.sortOrder }
             state.scoringWindow = scoringCard.weekNumber
             state.scoringGames = orderedScoringGames.map { FieldhouseGame(cardGame: $0, window: scoringCard.weekNumber) }
             state.scoringResults = [:]
             let scoringIndex = Dictionary(uniqueKeysWithValues: orderedScoringGames.enumerated().map { ($0.element.id, $0.offset) })
-            state.scoringSelections = Dictionary(uniqueKeysWithValues: scoringPick.pickGames.compactMap { picked in
+            state.scoringSelections = Dictionary(uniqueKeysWithValues: (snapshot.scoringPick?.pickGames ?? []).compactMap { picked in
                 guard let index = scoringIndex[picked.cardGameId] else { return nil }
                 let game = orderedScoringGames[index]
                 return (index, picked.side == "home" ? game.homeTeam : game.awayTeam)
             })
-            state.scoringConfidences = Dictionary(uniqueKeysWithValues: scoringPick.pickGames.compactMap { picked in
+            state.scoringConfidences = Dictionary(uniqueKeysWithValues: (snapshot.scoringPick?.pickGames ?? []).compactMap { picked in
                 scoringIndex[picked.cardGameId].map { ($0, picked.confidence) }
             })
-            state.scoringBestBetGame = scoringPick.pickGames.first(where: \.isBestBet).flatMap { scoringIndex[$0.cardGameId] }
+            state.scoringBestBetGame = snapshot.scoringPick?.pickGames.first(where: \.isBestBet).flatMap { scoringIndex[$0.cardGameId] }
             state.scoringProp = FieldhousePropKind.allCases.first(where: { $0.question == scoringCard.propQuestion }) ?? .teamScores90
-            state.scoringPropAnswer = scoringPick.propChoice ?? ""
-            state.scoringUsedHellfire = scoringPick.isChaos
+            state.scoringPropAnswer = snapshot.scoringPick?.propChoice ?? ""
+            state.scoringUsedHellfire = snapshot.scoringPick?.isChaos == true
         }
 
         guard let card = snapshot.card else {
@@ -2133,19 +2146,23 @@ struct FieldhouseNativePreviewView: View {
                 preferredLeagueID: liveContext.membership.leagueId
             )
             let hydrated = FieldhouseStateHydrator.hydrate(snapshot: verified, userID: liveContext.userID, cached: state)
-            if let certified = verified.latestScorecard, certified.weekNumber >= state.scoringWindow {
-                state.scoringWindow = hydrated.scoringWindow
-                state.scoringGames = hydrated.scoringGames
-                state.scoringResults = hydrated.scoringResults
-                state.scoringSelections = hydrated.scoringSelections
-                state.scoringConfidences = hydrated.scoringConfidences
-                state.scoringBestBetGame = hydrated.scoringBestBetGame
-                state.scoringProp = hydrated.scoringProp
-                state.scoringPropAnswer = hydrated.scoringPropAnswer
-                state.scoringUsedHellfire = hydrated.scoringUsedHellfire
-                state.lastCertifiedWindow = hydrated.lastCertifiedWindow
-                state.lastCertifiedPoints = hydrated.lastCertifiedPoints
-            }
+            let priorScoringWindow = state.scoringWindow
+            let priorScoringResults = state.scoringResults
+            state.scoringWindow = hydrated.scoringWindow
+            state.scoringGames = hydrated.scoringGames
+            state.scoringResults = hydrated.scoringResults.isEmpty
+                && !hydrated.scoringGames.isEmpty
+                && hydrated.scoringWindow == priorScoringWindow
+                ? priorScoringResults
+                : hydrated.scoringResults
+            state.scoringSelections = hydrated.scoringSelections
+            state.scoringConfidences = hydrated.scoringConfidences
+            state.scoringBestBetGame = hydrated.scoringBestBetGame
+            state.scoringProp = hydrated.scoringProp
+            state.scoringPropAnswer = hydrated.scoringPropAnswer
+            state.scoringUsedHellfire = hydrated.scoringUsedHellfire
+            state.lastCertifiedWindow = hydrated.lastCertifiedWindow
+            state.lastCertifiedPoints = hydrated.lastCertifiedPoints
             state.officialPostseasonField = hydrated.officialPostseasonField
             state.postseasonBracketPicks = hydrated.postseasonBracketPicks
             state.bracketSubmitted = hydrated.bracketSubmitted
@@ -2225,7 +2242,8 @@ struct FieldhouseNativePreviewView: View {
                     && state.lastCertifiedWindow != projectionWeek
                 liveProjectionStale = feed.stale == true
             } catch {
-                if liveProjectionWeek == projectionWeek, liveProjectionActive {
+                if liveProjectionWeek == projectionWeek,
+                   liveProjectionActive || liveRoomPickCounts != nil {
                     liveProjectionStale = true
                 } else {
                     clearLiveProjection()

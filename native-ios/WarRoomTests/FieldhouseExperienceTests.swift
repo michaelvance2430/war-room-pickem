@@ -328,6 +328,45 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertTrue(state.publishedGames.isEmpty)
         XCTAssertTrue(state.sideSelections.isEmpty)
         XCTAssertFalse(state.picksLocked)
+        XCTAssertTrue(state.scoringGames.isEmpty)
+        XCTAssertTrue(state.scoringResults.isEmpty)
+        XCTAssertTrue(state.scoringSelections.isEmpty)
+        XCTAssertNil(state.lastCertifiedWindow)
+        XCTAssertNil(state.lastCertifiedPoints)
+    }
+
+    func testAuthenticatedMemberWhoMissedPicksStillGetsTheRealLiveBoard() {
+        let userID = UUID()
+        let gameID = UUID()
+        let membership = LeagueMembership(
+            leagueId: UUID(), role: "member", isModerator: false, isDeputy: false,
+            totalPoints: 0, weeklyPoints: [], weeksPlayed: 0, division: "West", joinedAt: nil,
+            atsCorrect: 0, atsTotal: 0, currentStreak: 0, bestWeek: 0, worstWeek: 0,
+            perfectWeeks: 0, bestBetHits: 0, bestBetTotal: 0, propHits: 0, propTotal: 0,
+            leagues: LeagueSummary(name: "Men's Fieldhouse", code: "MEN1", sportId: "ncaam", currentWeek: 2, commissionerId: UUID(), crystalBallEnabled: true, championshipTrophyId: nil, mode: nil, regularSeasonWeeks: 18, maxHumanMembers: 100, sportSettings: LeagueSportSettings(fieldhouseLeague: "ncaam"))
+        )
+        let scoringCard = WeekCard(
+            id: UUID(), weekNumber: 1, lockTime: "2026-11-05T00:30:00Z",
+            propQuestion: FieldhousePropKind.teamScores90.question,
+            propOptionA: "YES", propOptionB: "NO", propPoints: 3,
+            cardGames: [
+                CardGame(id: gameID, sortOrder: 0, awayTeam: "UConn Huskies", homeTeam: "Duke Blue Devils", spread: -3.5, favorite: "home", startTime: "2026-11-05T00:30:00Z", awayRank: 2, homeRank: 1, isRivalry: false)
+            ]
+        )
+        let snapshot = FieldhouseAuthenticatedSnapshot(
+            membership: membership, card: nil, pick: nil, favoriteTeam: nil,
+            crystalBall: nil, scoringCard: scoringCard, scoringPick: nil
+        )
+
+        let state = FieldhouseStateHydrator.hydrate(
+            snapshot: snapshot, userID: userID, now: Date(timeIntervalSince1970: 0)
+        )
+
+        XCTAssertEqual(state.scoringWindow, 1)
+        XCTAssertEqual(state.scoringGames.map(\.id), [gameID.uuidString.lowercased()])
+        XCTAssertTrue(state.scoringSelections.isEmpty)
+        XCTAssertTrue(state.scoringConfidences.isEmpty)
+        XCTAssertEqual(state.scoringPoints, 0)
     }
 
     func testAuthenticatedPickWritePlanUsesAllTenStableGameIDsAndHellfireReceipt() throws {
