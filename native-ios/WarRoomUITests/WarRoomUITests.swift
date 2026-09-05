@@ -53,6 +53,26 @@ final class WarRoomUITests: XCTestCase {
     }
 
     @MainActor
+    func testFieldhousePicksIdentifiesAndSurfacesCurrentPostseasonRound() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--fieldhouse-preview", "--fieldhouse-review", "--fieldhouse-review-round"]
+        app.launch()
+
+        let status = app.staticTexts["fieldhouse.header.status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 3))
+        XCTAssertTrue(status.label.contains("POSTSEASON"))
+        XCTAssertTrue(status.label.contains("FIRST ROUND"))
+
+        let back = app.buttons["fieldhouse.postseason.round.back"]
+        XCTAssertTrue(back.waitForExistence(timeout: 2))
+        back.tap()
+
+        let currentRound = app.buttons["fieldhouse.postseason.current-round"]
+        XCTAssertTrue(currentRound.waitForExistence(timeout: 2))
+        XCTAssertTrue(currentRound.isHittable, "The current postseason round must be visible without a scavenger hunt.")
+    }
+
+    @MainActor
     func testNflJdamStrikeFeedOpensItsDedicatedVideo() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--strike-preview-nfl"]

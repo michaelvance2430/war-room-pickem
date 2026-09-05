@@ -2506,6 +2506,27 @@ private struct FieldhouseHeader: View {
     let state: FieldhouseSeasonState
     let canGoBack: Bool
     let back: () -> Void
+    private var statusLine: String {
+        guard state.postseasonIsActive else {
+            return "WINDOW \(state.window) · FOUR REGIONS · ONE ROAD TO THE MIDDLE"
+        }
+        guard let round = state.activePostseasonRound else {
+            return "POSTSEASON · TOURNAMENT COMPLETE · PERMANENT RECEIPT"
+        }
+        let title = FieldhouseBracketEngine.roundTitle(round)
+        let gameCount = state.officialPostseasonField?.games.filter { $0.roundKey == round }.count ?? 0
+        let phase: String
+        if !state.postseasonRoundScheduleIsReady(round) {
+            phase = "TIMES PENDING"
+        } else if state.postseasonRoundIsLocked(round) {
+            phase = "LIVE BOARD"
+        } else if state.postseasonRoundSubmitted.contains(round) {
+            phase = "PICKS FILED"
+        } else {
+            phase = "PICKS OPEN"
+        }
+        return "POSTSEASON · \(title) · \(gameCount) GAMES · \(phase)"
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
@@ -2519,7 +2540,11 @@ private struct FieldhouseHeader: View {
                 Spacer(); Text("NATIVE FIELDHOUSE").font(.system(size: 8, weight: .black)).tracking(1.2).foregroundStyle(.white.opacity(0.42))
             }
             Text(state.league.displayName).font(.system(size: 29, weight: .black)).fontWidth(.condensed)
-            Text("WINDOW \(state.window) · FOUR REGIONS · ONE ROAD TO THE MIDDLE").font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.55))
+            Text(statusLine)
+                .font(.system(size: 9, weight: .black)).tracking(1)
+                .foregroundStyle(state.postseasonIsActive ? accent : .white.opacity(0.55))
+                .lineLimit(1).minimumScaleFactor(0.72)
+                .accessibilityIdentifier("fieldhouse.header.status")
         }
         .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 13)
         .background(.black.opacity(0.78)).overlay(alignment: .bottom) { Rectangle().fill(LinearGradient(colors: [.clear, accent, .clear], startPoint: .leading, endPoint: .trailing)).frame(height: 2) }
@@ -4246,6 +4271,7 @@ private struct FieldhouseBracketsPage: View {
             Button { confirmingBracketHellfire = true } label: {
                 FieldhouseAction(kicker: "BRACKET HELLFIRE · 1/1", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch the AI Crazy Pick", detail: state.bracketHellfireUsed ? "All 75 decisions are sealed. No reroll." : "One-way door. AI fills an erratic 76-team bracket and seals all 75 decisions. Hit 60% for 1.5×; miss it and raw points are cut in half.", icon: "wand.and.stars")
             }.buttonStyle(.plain).disabled(state.bracketHellfireUsed || state.postseasonBracketIsLocked() || (state.officialPostseasonField == nil && state.isAuthenticatedSession))
+            activeRoundCommand
             FieldhouseHero(kicker: "MARCH COMMAND · 76 TEAMS · 75 DECISIONS", title: "ROAD TO CENTER COURT", detail: "Twelve Opening Round games feed the familiar field of 64. Every winner advances through the real bracket path.", icon: "point.3.connected.trianglepath.dotted")
             if state.isCreator {
                 VStack(spacing: 10) {
@@ -4258,25 +4284,6 @@ private struct FieldhouseBracketsPage: View {
                 }
             }
             postseasonPaths
-            if let round = state.activePostseasonRound, let field = state.officialPostseasonField {
-                let required = field.games.filter { $0.roundKey == round }.count
-                let complete = (state.postseasonRoundPicks[round] ?? [:]).count == required
-                let filed = state.postseasonRoundSubmitted.contains(round)
-                let locked = state.postseasonRoundIsLocked(round)
-                let scheduleReady = state.postseasonRoundScheduleIsReady(round)
-                Button { showingRoundPicker = true } label: {
-                    FieldhouseAction(
-                        kicker: !scheduleReady ? "OFFICIAL SCHEDULE PENDING" : locked && !filed ? "ROUND LOCKED · NO CARD FILED" : filed ? "ROUND CARD COMPLETE" : "ACTION REQUIRED · \(FieldhouseBracketEngine.roundTitle(round))",
-                        title: !scheduleReady ? "Tip Times Not Final" : locked ? "Open Live Round Board" : filed ? "Review My Round Picks" : "Make My Round Picks",
-                        detail: !scheduleReady
-                            ? "The matchup is ready. Picks open only after every official tip time is on file."
-                            : "\((state.postseasonRoundPicks[round] ?? [:]).count)/\(required) winners selected · one point each · \(locked ? "round is live." : "locks at first tip.")",
-                        icon: !scheduleReady ? "clock.fill" : locked ? "lock.fill" : complete ? "checkmark.seal.fill" : "basketball.fill"
-                    )
-                }.buttonStyle(.plain)
-            } else if state.isAuthenticatedSession {
-                FieldhouseAction(kicker: "ROUND PICKS", title: "Next round pending", detail: "The next card opens automatically after every team in the prior round is official.", icon: "clock.fill")
-            }
             Button { showingBracketPicker = true } label: {
                 FieldhouseAction(
                     kicker: state.postseasonBracketIsLocked() ? "PERMANENT BRACKET RECEIPT" : state.bracketSubmitted ? "BRACKET FILED · EDITABLE UNTIL TIP" : "SELECTION SUNDAY · PICKS OPEN",
@@ -4296,6 +4303,31 @@ private struct FieldhouseBracketsPage: View {
                 FieldhouseNationalBracketMap()
             }
             Text("REGULAR SEASON HELLFIRE: 2/2 · BRACKET HELLFIRE: 1 TOTAL · NO EDITS · NO REROLLS").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.48))
+        }
+    }
+
+    @ViewBuilder private var activeRoundCommand: some View {
+        if let round = state.activePostseasonRound, let field = state.officialPostseasonField {
+            let required = field.games.filter { $0.roundKey == round }.count
+            let complete = (state.postseasonRoundPicks[round] ?? [:]).count == required
+            let filed = state.postseasonRoundSubmitted.contains(round)
+            let locked = state.postseasonRoundIsLocked(round)
+            let scheduleReady = state.postseasonRoundScheduleIsReady(round)
+            Button { showingRoundPicker = true } label: {
+                FieldhouseAction(
+                    kicker: !scheduleReady ? "CURRENT ROUND · OFFICIAL SCHEDULE PENDING" : locked && !filed ? "CURRENT ROUND · LOCKED · NO CARD FILED" : locked ? "CURRENT ROUND · LIVE BOARD" : filed ? "CURRENT ROUND · PICKS FILED" : "CURRENT ROUND · ACTION REQUIRED",
+                    title: !scheduleReady ? "\(FieldhouseBracketEngine.roundTitle(round)) Times Not Final" : locked ? "Open \(FieldhouseBracketEngine.roundTitle(round)) Board" : filed ? "Review \(FieldhouseBracketEngine.roundTitle(round)) Picks" : "Make \(FieldhouseBracketEngine.roundTitle(round)) Picks",
+                    detail: !scheduleReady
+                        ? "The matchup is ready. Picks open only after every official tip time is on file."
+                        : "\((state.postseasonRoundPicks[round] ?? [:]).count)/\(required) winners selected · one point each · \(locked ? "scores update as games finish." : "locks at first tip.")",
+                    icon: !scheduleReady ? "clock.fill" : locked ? "play.rectangle.on.rectangle.fill" : complete ? "checkmark.seal.fill" : "basketball.fill",
+                    signalColor: !scheduleReady ? .orange : locked ? accent : filed ? .green : .red
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("fieldhouse.postseason.current-round")
+        } else if state.isAuthenticatedSession {
+            FieldhouseAction(kicker: "CURRENT ROUND", title: "Next Round Pending", detail: "The next card opens automatically after every team in the prior round is official.", icon: "clock.fill", signalColor: .orange)
         }
     }
 

@@ -664,7 +664,10 @@ struct FieldhouseRoundPickerView: View {
                 Button(action: close) {
                     Image(systemName: "chevron.left").font(.headline.weight(.black))
                         .frame(width: 40, height: 40).background(.white.opacity(0.10), in: Circle())
-                }.buttonStyle(.plain)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back to postseason command")
+                .accessibilityIdentifier("fieldhouse.postseason.round.back")
                 VStack(alignment: .leading, spacing: 2) {
                     Text(locked ? "LIVE ROUND BOARD" : scheduleReady ? "FRESH ROUND PICKS" : "OFFICIAL SCHEDULE PENDING").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(accent)
                     Text(FieldhouseBracketEngine.roundTitle(roundKey)).font(.headline.weight(.black)).fontWidth(.condensed)
