@@ -1223,6 +1223,10 @@ declare
   v_awards jsonb;
   v_next_round text;
 begin
+  -- Tournament games often end within seconds of one another. Serialize final
+  -- result writes for this tournament so the last game can reliably observe
+  -- every earlier final, open the next round once, and recalculate one score.
+  perform pg_advisory_xact_lock(hashtextextended(p_tournament_id::text,0));
   select * into g from public.fieldhouse_tournament_games
   where tournament_id=p_tournament_id and game_id=p_game_id for update;
   if not found then raise exception 'Tournament game not found'; end if;

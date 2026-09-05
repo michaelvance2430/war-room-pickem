@@ -88,6 +88,7 @@ assert.match(sql, /A started or completed game time cannot be changed/);
 assert.match(sql, /perform private\.queue_fieldhouse_round_notifications\(v_tournament_id,v_active_round\)/);
 assert.match(sql, /v_first_tip is null or v_missing_tips<>0 then return 0/);
 assert.match(sql, /if not exists\([\s\S]*pending\.round_key=g\.round_key[\s\S]*v_next_round:=case g\.round_key/);
+assert.match(sql, /pg_advisory_xact_lock\(hashtextextended\(p_tournament_id::text,0\)\)/);
 assert.match(client, /The bracket graph and every player's permanent picks remain untouched/);
 assert.match(schema, /add column if not exists fieldhouse_region text/);
 assert.match(schema, /'East','West','South','Midwest'/);
