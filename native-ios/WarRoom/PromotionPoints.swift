@@ -6,7 +6,11 @@ enum PromotionPoints {
     }
 
     static func total(for achievements: [ProfileAchievement]) -> Int {
-        achievements.reduce(0) { $0 + points(for: $1.code) }
+        // Cheevos are career unlocks, not repeatable league currency. The
+        // database historically keys them by league, so the same code can have
+        // more than one receipt when a player competes in several rooms. Keep
+        // those receipts intact, but never let duplicate codes inflate rank.
+        Set(achievements.map(\.code)).reduce(0) { $0 + points(for: $1) }
     }
 
     private static let pointsByCode: [String: Int] = Dictionary(uniqueKeysWithValues: raw.split(separator: "\n").compactMap { line in
@@ -199,4 +203,25 @@ cfb_bowl_curious=10
 cfb_bowl_bound=10
 worlds_greatest_cavalry_scout=200
 """
+}
+
+enum CompetitiveLeaguePolicy {
+    static let minimumActivePlayers = 8
+    static let minimumLockedCards = 4
+
+    /// Seventy-five percent, rounded up. Integer math keeps the rule identical
+    /// in Swift and Postgres without floating-point drift.
+    static func requiredLockedCards(eligibleCards: Int) -> Int {
+        guard eligibleCards > 0 else { return 0 }
+        return (eligibleCards * 3 + 3) / 4
+    }
+
+    static func playerQualifies(lockedCards: Int, eligibleCards: Int) -> Bool {
+        guard lockedCards >= minimumLockedCards else { return false }
+        return lockedCards >= requiredLockedCards(eligibleCards: eligibleCards)
+    }
+
+    static func isOfficial(activePlayers: Int) -> Bool {
+        activePlayers >= minimumActivePlayers
+    }
 }

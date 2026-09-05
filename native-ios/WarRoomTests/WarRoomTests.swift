@@ -349,6 +349,30 @@ struct WarRoomTests {
         #expect(!codes.contains("road_dog"))
     }
 
+    @Test func competitiveLeagueRequiresEightPlayersAtSeventyFivePercent() {
+        #expect(CompetitiveLeaguePolicy.requiredLockedCards(eligibleCards: 10) == 8)
+        #expect(CompetitiveLeaguePolicy.requiredLockedCards(eligibleCards: 9) == 7)
+        #expect(!CompetitiveLeaguePolicy.playerQualifies(lockedCards: 7, eligibleCards: 10))
+        #expect(CompetitiveLeaguePolicy.playerQualifies(lockedCards: 8, eligibleCards: 10))
+        #expect(!CompetitiveLeaguePolicy.playerQualifies(lockedCards: 1, eligibleCards: 1))
+        #expect(!CompetitiveLeaguePolicy.isOfficial(activePlayers: 7))
+        #expect(CompetitiveLeaguePolicy.isOfficial(activePlayers: 8))
+    }
+
+    @Test func duplicateLeagueCheevosNeverMultiplyCareerRankPoints() {
+        let firstLeague = UUID()
+        let secondLeague = UUID()
+        let rows = [
+            ProfileAchievement(leagueId: firstLeague, code: "championship_ring", title: "Championship Ring", flavor: "First room", earnedAt: "2026-12-01T00:00:00Z"),
+            ProfileAchievement(leagueId: secondLeague, code: "championship_ring", title: "Championship Ring", flavor: "Second room", earnedAt: "2027-12-01T00:00:00Z"),
+        ]
+        #expect(PromotionPoints.total(for: rows) == 200)
+
+        let merged = LegacyCareerRecords.achievements(for: UUID(), merging: rows)
+        #expect(merged.count == 1)
+        #expect(merged.first?.leagueId == secondLeague)
+    }
+
     @Test func favoriteTeamIdsResolveForBoardLoyalty() {
         #expect(FootballTeamCatalog.team(forTeamId: "ohio-state", sportId: "cfb")?.name == "Ohio State")
         #expect(FootballTeamCatalog.team(forTeamId: "cfb-notre-dame", sportId: "cfb")?.name == "Notre Dame")

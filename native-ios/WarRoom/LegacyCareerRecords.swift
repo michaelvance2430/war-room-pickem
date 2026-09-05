@@ -32,8 +32,13 @@ enum LegacyCareerRecords {
     ]
 
     static func achievements(for userId: UUID, merging live: [ProfileAchievement]) -> [ProfileAchievement] {
-        var result = live
-        let known = Set(live.map(\.code))
+        // A code is one career unlock even when old league-scoped rows contain
+        // several receipts for it. Preserve the newest receipt for display.
+        var seen = Set<String>()
+        var result = live.sorted { $0.earnedAt > $1.earnedAt }.filter {
+            seen.insert($0.code).inserted
+        }
+        let known = Set(result.map(\.code))
         result.append(contentsOf: (cheevosByUser[userId] ?? []).filter { !known.contains($0.code) })
         return result.sorted { $0.earnedAt > $1.earnedAt }
     }

@@ -1118,13 +1118,28 @@ create or replace function public.finalize_fieldhouse_postseason_awards(p_tourna
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare
   v_status text;
+  v_season_key integer;
+  v_sport_id text;
+  v_league_id uuid;
   v_region_awards integer := 0;
   v_league_awards integer := 0;
   v_toilet_awards integer := 0;
 begin
-  select status into v_status from public.fieldhouse_tournaments where id=p_tournament_id;
+  select status,season_key,sport_id into v_status,v_season_key,v_sport_id
+  from public.fieldhouse_tournaments where id=p_tournament_id;
   if v_status<>'final' then raise exception 'Tournament is not final'; end if;
   perform public.score_fieldhouse_postseason(p_tournament_id);
+
+  -- Qualification is league-owned even though several rooms can share the
+  -- same NCAA tournament. Demo rooms remain playable but receive no permanent
+  -- regional, league, or Toilet Bowl hardware.
+  for v_league_id in
+    select distinct q.league_id
+    from public.fieldhouse_postseason_qualifiers q
+    where q.tournament_id=p_tournament_id
+  loop
+    perform private.certify_league_competitive_season(v_league_id,v_season_key,v_sport_id);
+  end loop;
 
   -- Finalization is repeatable. Rebuild this tournament's award receipts from
   -- the authoritative totals so a corrected official result cannot leave stale
@@ -1138,6 +1153,9 @@ begin
     join public.fieldhouse_postseason_qualifiers q
       on q.tournament_id=p.tournament_id and q.league_id=p.league_id and q.user_id=p.user_id
     join public.leagues l on l.id=p.league_id
+    join public.league_competitive_seasons cs
+      on cs.league_id=p.league_id and cs.season_key=v_season_key
+     and cs.sport_id=v_sport_id and cs.status='official'
     where p.tournament_id=p_tournament_id and q.path='championship'
   ), regional as (
     select *,dense_rank() over(partition by league_id,fieldhouse_region order by total_points desc,regular_points desc) place
@@ -1154,6 +1172,9 @@ begin
     join public.fieldhouse_postseason_qualifiers q
       on q.tournament_id=p.tournament_id and q.league_id=p.league_id and q.user_id=p.user_id
     join public.leagues l on l.id=p.league_id
+    join public.league_competitive_seasons cs
+      on cs.league_id=p.league_id and cs.season_key=v_season_key
+     and cs.sport_id=v_sport_id and cs.status='official'
     where p.tournament_id=p_tournament_id and q.path='championship'
   ), ranked as (
     select *,dense_rank() over(partition by league_id order by total_points desc,regular_points desc) place from totals
@@ -1168,6 +1189,9 @@ begin
     from public.fieldhouse_postseason_totals p
     join public.fieldhouse_postseason_qualifiers q
       on q.tournament_id=p.tournament_id and q.league_id=p.league_id and q.user_id=p.user_id
+    join public.league_competitive_seasons cs
+      on cs.league_id=p.league_id and cs.season_key=v_season_key
+     and cs.sport_id=v_sport_id and cs.status='official'
     where p.tournament_id=p_tournament_id and q.path='toilet_bowl'
   ), ranked as (
     select *,dense_rank() over(partition by league_id order by total_points desc,regular_points desc) place
@@ -1325,6 +1349,7 @@ commit;
 
 -- Required deployment order:
 -- 1. fieldhouse-build21-schema-REVIEW-ONLY.sql
--- 2. fieldhouse-postseason-build21-REVIEW-ONLY.sql
--- 3. atomic card publish/save/scoring SQL
--- 4. fieldhouse-odds, football-scores, autonomous-football-results functions
+-- 2. competitive-league-qualification-build21-REVIEW-ONLY.sql
+-- 3. fieldhouse-postseason-build21-REVIEW-ONLY.sql
+-- 4. atomic card publish/save/scoring SQL
+-- 5. fieldhouse-odds, football-scores, autonomous-football-results functions

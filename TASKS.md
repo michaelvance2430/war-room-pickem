@@ -8,6 +8,9 @@
 
 ## Done
 
+- [x] ~~Make eight active players the official-league threshold~~ (2026-09-05)
+  - Build 21 defines an active human as a non-bot player who locked at least 75% of completed eligible regular-season cards, rounded up, with a four-card minimum. Eight qualifying humans make a season official; smaller rooms remain fully playable demos but cannot create permanent hardware. Career promotion points and the visible Cheevo cabinet now count each achievement code once even when historical league-scoped rows contain duplicates. Fieldhouse final awards are filtered through the server-owned qualification receipt. Native tests and the Build 21 authority verifier pass; the database migration remains review-only and production is untouched.
+
 - [x] ~~Lock Fieldhouse postseason tie law~~ (2026-09-05)
   - Selection Sunday now expands the Championship or Toilet Bowl field for every player tied at its four-player regional boundary. Regional, league, and Toilet Bowl awards use postseason points, then regular-season points; exact ties produce co-champions with hardware for every winner and never use UUID ordering. A Fieldhouse-specific multi-winner trophy projection preserves the existing CFB/NFL one-winner storage contract. Boundary fixtures, co-champion fixtures, the Build 21 authority verifier, and the native iOS build pass. Database changes remain review-only and production is untouched.
 
