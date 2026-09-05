@@ -2252,7 +2252,7 @@ struct FieldhouseNativePreviewView: View {
                         )
                     }
                 } else if desk == .profile {
-                    if auth.user != nil && auth.token != nil {
+                    if auth.user != nil && auth.token != nil && !ProcessInfo.processInfo.arguments.contains("--fieldhouse-preview") {
                         YouView(onBack: { desk = .home })
                     } else {
                         NavigationStack {
@@ -4227,9 +4227,13 @@ private struct FieldhousePicksPage: View {
             laneButton(
                 .makePicks,
                 label: state.cardKind == .conferenceChampionship || state.phase == .conferenceChampionships ? "CHAMPIONSHIP" : "WEEK \(state.window)",
-                title: state.picksLocked ? "LOCKED BOARD" : (state.pickWindowIsClosed(at: now) ? "WINDOW CLOSED" : "MAKE PICKS"),
+                title: !state.cardIsPublished
+                    ? "CARD PENDING"
+                    : state.picksLocked
+                        ? "PICKS COMPLETE"
+                        : (state.pickWindowIsClosed(at: now) ? "WINDOW CLOSED" : "MAKE PICKS"),
                 icon: state.picksLocked || state.pickWindowIsClosed(at: now) ? "lock.fill" : "checkmark.seal.fill",
-                urgent: state.hasOutstandingPickTask(at: now)
+                statusColor: !state.cardIsPublished ? nil : (state.picksLocked ? .green : .red)
             )
         }
         .padding(6)
@@ -4237,17 +4241,17 @@ private struct FieldhousePicksPage: View {
         .overlay(RoundedRectangle(cornerRadius: 17).stroke(accent.opacity(0.34)))
     }
 
-    private func laneButton(_ target: FieldhousePicksLane, label: String, title: String, icon: String, urgent: Bool = false) -> some View {
+    private func laneButton(_ target: FieldhousePicksLane, label: String, title: String, icon: String, statusColor: Color? = nil) -> some View {
         Button { lane = target } label: {
             VStack(spacing: 4) {
                 Text(label).font(.system(size: 8, weight: .black)).tracking(1.2)
                 Label(title, systemImage: icon).font(.caption.weight(.black))
             }
-            .foregroundStyle(urgent ? .white : (lane == target ? .black : .white.opacity(0.62)))
+            .foregroundStyle(statusColor != nil ? .white : (lane == target ? .black : .white.opacity(0.62)))
             .frame(maxWidth: .infinity).padding(.vertical, 11)
-            .background(urgent ? Color.red : (lane == target ? accent : .clear), in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(urgent ? Color.white.opacity(0.72) : .clear, lineWidth: urgent ? 2 : 0))
-            .shadow(color: urgent ? .red.opacity(0.75) : .clear, radius: urgent ? 10 : 0)
+            .background(statusColor ?? (lane == target ? accent : .clear), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(statusColor == nil ? .clear : Color.white.opacity(0.72), lineWidth: statusColor == nil ? 0 : 2))
+            .shadow(color: statusColor?.opacity(0.72) ?? .clear, radius: statusColor == nil ? 0 : 10)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("fieldhouse.picks.lane.\(target.rawValue)")
