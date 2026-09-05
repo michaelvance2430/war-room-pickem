@@ -172,6 +172,22 @@ begin
           and scorecard.user_id=recipient
       )
     ) then raise exception 'Final NFL scorecard is missing for a recipient'; end if;
+    if v_champions<>coalesce((
+      select array_agg(award.user_id order by award.user_id)
+      from public.nfl_postseason_awards award
+      where award.league_id=p_league_id and award.season_key=p_season_key
+        and award.award_key='championship'
+    ),'{}'::uuid[]) then
+      raise exception 'NFL Championship recipients must match the authoritative Final Thirteen awards';
+    end if;
+    if v_toilet<>coalesce((
+      select array_agg(award.user_id order by award.user_id)
+      from public.nfl_postseason_awards award
+      where award.league_id=p_league_id and award.season_key=p_season_key
+        and award.award_key='toilet_bowl'
+    ),'{}'::uuid[]) then
+      raise exception 'NFL Toilet Bowl recipients must match the authoritative Final Thirteen awards';
+    end if;
   else
     begin
       v_tournament_id:=coalesce(
@@ -220,7 +236,9 @@ begin
     ) then raise exception 'Fieldhouse Toilet Bowl award is missing or mismatched'; end if;
   end if;
 
-  if v_sport_id in ('cfb','nfl') then
+  -- CFB still projects through the legacy one-winner-per-type trophy shelf.
+  -- NFL co-champions use nfl_postseason_awards and were validated above.
+  if v_sport_id='cfb' then
     if exists (
       select 1 from unnest(v_champions) recipient
       where not exists (

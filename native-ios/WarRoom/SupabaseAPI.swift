@@ -1675,6 +1675,18 @@ enum SupabaseAPI {
         return try await send(authorizedRequest(url:components.url!,token:token),as:[NflPostseasonScorecard].self).first
     }
 
+    static func nflPostseasonFieldStatus(token: String, leagueId: UUID, userId: UUID, seasonKey: Int) async throws -> NflPostseasonFieldStatus? {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/nfl_postseason_field_status"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "season_status,active_human_count,total_human_count,field,seed,division_snapshot,regular_season_points"),
+            URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())"),
+            URLQueryItem(name: "season_key", value: "eq.\(seasonKey)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [NflPostseasonFieldStatus].self).first
+    }
+
     static func saveCrystalBallPick(token: String, leagueId: UUID, userId: UUID, teamName: String) async throws {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/crystal_ball_picks"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "on_conflict", value: "league_id,user_id")]
@@ -2273,8 +2285,9 @@ enum SupabaseAPI {
             URLQueryItem(name: "order", value: "season_year.desc"),
         ]
         let live = try await send(authorizedRequest(url: components.url!, token: token), as: [ProfileTrophy].self)
-        let fieldhouse = await fieldhouseTrophies(token: token, filter: "winner_user_id", value: userId.uuidString.lowercased())
-        return LegacyCareerRecords.trophies(for: userId, merging: live + fieldhouse)
+        async let fieldhouse = projectedTrophies(token: token, resource: "fieldhouse_profile_trophies", filter: "winner_user_id", value: userId.uuidString.lowercased())
+        async let nfl = projectedTrophies(token: token, resource: "nfl_profile_trophies", filter: "winner_user_id", value: userId.uuidString.lowercased())
+        return LegacyCareerRecords.trophies(for: userId, merging: live + (await fieldhouse) + (await nfl))
     }
 
     static func leagueTrophies(token: String, leagueId: UUID) async throws -> [ProfileTrophy] {
@@ -2285,16 +2298,17 @@ enum SupabaseAPI {
             URLQueryItem(name: "order", value: "season_year.desc"),
         ]
         let live = try await send(authorizedRequest(url: components.url!, token: token), as: [ProfileTrophy].self)
-        let fieldhouse = await fieldhouseTrophies(token: token, filter: "league_id", value: leagueId.uuidString.lowercased())
-        return (live + fieldhouse).sorted { $0.seasonYear > $1.seasonYear }
+        async let fieldhouse = projectedTrophies(token: token, resource: "fieldhouse_profile_trophies", filter: "league_id", value: leagueId.uuidString.lowercased())
+        async let nfl = projectedTrophies(token: token, resource: "nfl_profile_trophies", filter: "league_id", value: leagueId.uuidString.lowercased())
+        return (live + (await fieldhouse) + (await nfl)).sorted { $0.seasonYear > $1.seasonYear }
     }
 
     /// Fieldhouse permits honest co-champions, while the legacy football shelf
     /// has a one-winner-per-trophy key. This projection is optional until the
     /// review-only Build 21 schema is installed, so existing CFB/NFL profiles
     /// remain available during a staged rollout.
-    private static func fieldhouseTrophies(token: String, filter: String, value: String) async -> [ProfileTrophy] {
-        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/fieldhouse_profile_trophies"), resolvingAgainstBaseURL: false)!
+    private static func projectedTrophies(token: String, resource: String, filter: String, value: String) async -> [ProfileTrophy] {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/\(resource)"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: "id,league_id,season_year,trophy_type,winner_name,winner_user_id,subtitle,notes,awarded_at,trophy_design_id"),
             URLQueryItem(name: filter, value: "eq.\(value)"),

@@ -7,6 +7,7 @@ struct NflPostseasonCloudView: View {
     @State private var entry: NflPostseasonEntry?
     @State private var results: [String:String] = [:]
     @State private var scorecard: NflPostseasonScorecard?
+    @State private var fieldStatus: NflPostseasonFieldStatus?
     @State private var picks: [String:String] = [:]
     @State private var loading = true
     @State private var saving = false
@@ -29,6 +30,7 @@ struct NflPostseasonCloudView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     hero
+                    postseasonFieldPanel
                     if loading { ProgressView("Opening postseason command…").tint(.cyan).frame(maxWidth:.infinity).padding(30) }
                     else if let slate {
                         if let scorecard { scorecardPanel(scorecard) }
@@ -95,6 +97,48 @@ struct NflPostseasonCloudView: View {
             .overlay(RoundedRectangle(cornerRadius:7).stroke(.white.opacity(0.18)))
     }
 
+    private var postseasonFieldPanel: some View {
+        let status = fieldStatus
+        let color: Color = {
+            guard let status else { return .white }
+            guard status.isOfficial else { return .orange }
+            switch status.field {
+            case "championship": return .cyan
+            case "toilet": return .purple
+            default: return .white
+            }
+        }()
+        let title: String = {
+            guard let status else { return "WEEK 18 FIELD PENDING" }
+            guard status.isOfficial else { return "DEMO SEASON · NO PERMANENT HARDWARE" }
+            switch status.field {
+            case "championship": return "CHAMPIONSHIP FIELD"
+            case "toilet": return "TOILET BOWL FIELD"
+            default: return "OPEN PLAY · POINTS & CHEEVOS"
+            }
+        }()
+        let detail: String = {
+            guard let status else { return "Your division path freezes after the final regular-season card is scored." }
+            guard status.isOfficial else {
+                return "\(status.activeHumanCount)/\(NflPostseasonFieldPolicy.minimumActivePlayers) active players qualified. Final Thirteen remains playable, but this room cannot issue permanent hardware."
+            }
+            if status.field == "championship" || status.field == "toilet" {
+                let division = SportIdentity("nfl").divisionLabel(status.divisionSnapshot)
+                let seed = status.seed.map { " · SEED #\($0)" } ?? ""
+                return "\(division)\(seed) · Final Thirteen points decide the trophy. Regular-season points break a tie."
+            }
+            return "You can still score Final Thirteen points and earn Cheevos, but this season's permanent trophies are outside your frozen field."
+        }()
+        return VStack(alignment: .leading, spacing: 7) {
+            Label(title, systemImage: status?.field == "championship" ? "trophy.fill" : "flag.checkered")
+                .font(.caption.weight(.black)).tracking(1.25).foregroundStyle(color)
+            Text(detail).font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.66))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).padding(14)
+        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
+        .overlay(RoundedRectangle(cornerRadius: 7).stroke(color.opacity(0.42)))
+    }
+
     private var noFieldPanel: some View {
         VStack(spacing:14){
             Image(systemName:"rectangle.3.group.bubble.left.fill").font(.system(size:42,weight:.black)).foregroundStyle(.cyan)
@@ -152,7 +196,7 @@ struct NflPostseasonCloudView: View {
 
     private func resultMark(_ game:NflBracketGame,team:NflPostseasonTeam)->String { guard let result=results[game.id] else{return "ADVANCE"};return result==team.id ? "✓ CORRECT":"PICK" }
     private func select(_ team:NflPostseasonTeam,in game:NflBracketGame){picks[game.id]=team.id;NflBracketEngine.clearedDownstream(after:game.id,picks:&picks)}
-    @MainActor private func load() async { defer{loading=false};guard let token=auth.token,let user=auth.user else{return};do{var loaded=try await SupabaseAPI.nflPostseasonSlate(token:token,leagueId:membership.leagueId,seasonKey:seasonKey);if loaded==nil && membership.leagues.mode=="foundry" && isCommissioner{loaded=try await SupabaseAPI.publishNflPostseasonSlate(token:token,leagueId:membership.leagueId,seasonKey:seasonKey,teams:Self.foundryField)};slate=loaded;if loaded != nil && membership.leagues.mode=="foundry" && isCommissioner{foundryBotsSeeded=try await SupabaseAPI.seedFoundryNflPostseason(token:token,leagueId:membership.leagueId,seasonKey:seasonKey).botsSeeded};async let loadedEntry=SupabaseAPI.nflPostseasonEntry(token:token,leagueId:membership.leagueId,userId:user.id,seasonKey:seasonKey);async let loadedResults=SupabaseAPI.nflPostseasonResults(token:token,leagueId:membership.leagueId,seasonKey:seasonKey);async let loadedScore=SupabaseAPI.nflPostseasonScorecard(token:token,leagueId:membership.leagueId,userId:user.id,seasonKey:seasonKey);entry=try await loadedEntry;picks=entry?.picks ?? [:];results=(try await loadedResults)?.winners ?? [:];scorecard=try await loadedScore}catch{errorMessage=error.localizedDescription} }
+    @MainActor private func load() async { defer{loading=false};guard let token=auth.token,let user=auth.user else{return};do{var loaded=try await SupabaseAPI.nflPostseasonSlate(token:token,leagueId:membership.leagueId,seasonKey:seasonKey);if loaded==nil && membership.leagues.mode=="foundry" && isCommissioner{loaded=try await SupabaseAPI.publishNflPostseasonSlate(token:token,leagueId:membership.leagueId,seasonKey:seasonKey,teams:Self.foundryField)};slate=loaded;if loaded != nil && membership.leagues.mode=="foundry" && isCommissioner{foundryBotsSeeded=try await SupabaseAPI.seedFoundryNflPostseason(token:token,leagueId:membership.leagueId,seasonKey:seasonKey).botsSeeded};async let loadedEntry=SupabaseAPI.nflPostseasonEntry(token:token,leagueId:membership.leagueId,userId:user.id,seasonKey:seasonKey);async let loadedResults=SupabaseAPI.nflPostseasonResults(token:token,leagueId:membership.leagueId,seasonKey:seasonKey);async let loadedScore=SupabaseAPI.nflPostseasonScorecard(token:token,leagueId:membership.leagueId,userId:user.id,seasonKey:seasonKey);entry=try await loadedEntry;picks=entry?.picks ?? [:];results=(try await loadedResults)?.winners ?? [:];scorecard=try await loadedScore;fieldStatus=try? await SupabaseAPI.nflPostseasonFieldStatus(token:token,leagueId:membership.leagueId,userId:user.id,seasonKey:seasonKey)}catch{errorMessage=error.localizedDescription} }
     @MainActor private func lockBracket(usedJdam:Bool) async -> Bool {guard let token=auth.token else{return false};saving=true;errorMessage=nil;do{entry=try await SupabaseAPI.lockNflPostseasonBracket(token:token,leagueId:membership.leagueId,seasonKey:seasonKey,picks:picks,usedJdam:usedJdam);saving=false;return true}catch{errorMessage=error.localizedDescription;saving=false;return false}}
     @MainActor private func deployJdam() async {guard let teams=slate?.teams else{return};picks=NflBracketEngine.jdamPicks(teams:teams);guard complete else{errorMessage="JDAM could not resolve the bracket. Reopen postseason command and try again.";return};if await lockBracket(usedJdam:true){strikePresentation=WeaponStrikeCatalog.presentation(for:"nfl")}}
     static var foundryField:[NflPostseasonTeam]{["AFC","NFC"].flatMap{conference in FootballTeamCatalog.nfl.filter{$0.conference.hasPrefix(conference)}.prefix(7).enumerated().map{index,team in .init(id:FootballTeamCatalog.normalizedTeamId(team.name),name:team.name,conference:conference,seed:index+1)}}}

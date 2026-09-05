@@ -51,6 +51,46 @@ struct NflExperienceTests {
         #expect(Set(NflBracketEngine.requiredKeys).count == 13)
     }
 
+    @Test func nflPostseasonBerthsComeFromEachDivision() {
+        #expect(NflPostseasonFieldPolicy.berths(activePlayersInDivision: 1) == 0)
+        #expect(NflPostseasonFieldPolicy.berths(activePlayersInDivision: 2) == 1)
+        #expect(NflPostseasonFieldPolicy.berths(activePlayersInDivision: 6) == 3)
+        #expect(NflPostseasonFieldPolicy.berths(activePlayersInDivision: 8) == 4)
+        #expect(NflPostseasonFieldPolicy.berths(activePlayersInDivision: 25) == 4)
+
+        #expect(NflPostseasonFieldPolicy.field(divisionRank: 1, activePlayersInDivision: 8) == "championship")
+        #expect(NflPostseasonFieldPolicy.field(divisionRank: 4, activePlayersInDivision: 8) == "championship")
+        #expect(NflPostseasonFieldPolicy.field(divisionRank: 5, activePlayersInDivision: 8) == "toilet")
+        #expect(NflPostseasonFieldPolicy.field(divisionRank: 8, activePlayersInDivision: 8) == "toilet")
+        #expect(NflPostseasonFieldPolicy.field(divisionRank: 5, activePlayersInDivision: 11) == "eliminated")
+        #expect(NflPostseasonFieldPolicy.field(divisionRank: 7, activePlayersInDivision: 11) == "eliminated")
+        #expect(NflPostseasonFieldPolicy.field(divisionRank: 8, activePlayersInDivision: 11) == "toilet")
+    }
+
+    @Test func finalThirteenPointsWinAndRegularSeasonOnlyBreaksTies() {
+        let first = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let second = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let third = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+        let candidates = [
+            NflPostseasonFieldCandidate(id: first, postseasonPoints: 20, regularSeasonPoints: 500),
+            NflPostseasonFieldCandidate(id: second, postseasonPoints: 24, regularSeasonPoints: 300),
+            NflPostseasonFieldCandidate(id: third, postseasonPoints: 24, regularSeasonPoints: 290),
+        ]
+        #expect(NflPostseasonFieldPolicy.winners(from: candidates) == [second])
+    }
+
+    @Test func exactFinalThirteenAndRegularSeasonTieCreatesCoChampions() {
+        let first = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let second = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let third = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+        let candidates = [
+            NflPostseasonFieldCandidate(id: first, postseasonPoints: 24, regularSeasonPoints: 300),
+            NflPostseasonFieldCandidate(id: second, postseasonPoints: 24, regularSeasonPoints: 300),
+            NflPostseasonFieldCandidate(id: third, postseasonPoints: 23, regularSeasonPoints: 600),
+        ]
+        #expect(NflPostseasonFieldPolicy.winners(from: candidates) == [first, second])
+    }
+
     @Test func jdamCompletesAValidBracket() {
         let picks = NflBracketEngine.jdamPicks(teams: field)
         #expect(Set(picks.keys) == Set(NflBracketEngine.requiredKeys))

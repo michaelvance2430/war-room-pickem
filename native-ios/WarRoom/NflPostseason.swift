@@ -64,6 +64,62 @@ struct NflPostseasonScorecard: Decodable, Sendable {
     }
 }
 
+struct NflPostseasonFieldStatus: Decodable, Sendable {
+    let seasonStatus: String
+    let activeHumanCount: Int
+    let totalHumanCount: Int
+    let field: String
+    let seed: Int?
+    let divisionSnapshot: String?
+    let regularSeasonPoints: Int?
+
+    var isOfficial: Bool { seasonStatus == "official" }
+
+    enum CodingKeys: String, CodingKey {
+        case seasonStatus = "season_status"
+        case activeHumanCount = "active_human_count"
+        case totalHumanCount = "total_human_count"
+        case field, seed
+        case divisionSnapshot = "division_snapshot"
+        case regularSeasonPoints = "regular_season_points"
+    }
+}
+
+struct NflPostseasonFieldCandidate: Equatable, Sendable {
+    let id: UUID
+    let postseasonPoints: Int
+    let regularSeasonPoints: Int
+}
+
+enum NflPostseasonFieldPolicy {
+    static let minimumActivePlayers = 8
+    static let maximumBerthsPerDivision = 4
+
+    static func berths(activePlayersInDivision count: Int) -> Int {
+        min(maximumBerthsPerDivision, max(0, count) / 2)
+    }
+
+    static func field(divisionRank: Int, activePlayersInDivision count: Int) -> String {
+        let berthCount = berths(activePlayersInDivision: count)
+        guard berthCount > 0, divisionRank > 0, divisionRank <= count else { return "eliminated" }
+        if divisionRank <= berthCount { return "championship" }
+        if divisionRank > count - berthCount { return "toilet" }
+        return "eliminated"
+    }
+
+    /// Final Thirteen points decide the field. Regular-season points are the
+    /// only tiebreaker; an exact remaining tie deliberately returns co-winners.
+    static func winners(from candidates: [NflPostseasonFieldCandidate]) -> [UUID] {
+        guard let bestPostseason = candidates.map(\.postseasonPoints).max() else { return [] }
+        let postseasonLeaders = candidates.filter { $0.postseasonPoints == bestPostseason }
+        guard let bestRegularSeason = postseasonLeaders.map(\.regularSeasonPoints).max() else { return [] }
+        return postseasonLeaders
+            .filter { $0.regularSeasonPoints == bestRegularSeason }
+            .map(\.id)
+            .sorted { $0.uuidString < $1.uuidString }
+    }
+}
+
 enum NflJdamScoring {
     static let decisionCount = 13
     static let successThreshold = 8
