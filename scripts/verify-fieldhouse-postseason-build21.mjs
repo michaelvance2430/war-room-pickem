@@ -7,6 +7,7 @@ const liveStandings = readFileSync(new URL("../supabase/fieldhouse-live-standing
 const worker = readFileSync(new URL("../supabase/functions/fieldhouse-tournament-results/index.ts", import.meta.url), "utf8");
 const weeklyWorker = readFileSync(new URL("../supabase/functions/autonomous-football-results/index.ts", import.meta.url), "utf8");
 const fieldhouseOdds = readFileSync(new URL("../supabase/functions/fieldhouse-odds/index.ts", import.meta.url), "utf8");
+const atomicPickSave = readFileSync(new URL("../supabase/atomic-pick-save.sql", import.meta.url), "utf8");
 const atomicScoring = readFileSync(new URL("../supabase/atomic-week-scoring.sql", import.meta.url), "utf8");
 const api = readFileSync(new URL("../native-ios/WarRoom/SupabaseAPI.swift", import.meta.url), "utf8");
 const client = readFileSync(new URL("../native-ios/WarRoom/FieldhouseExperience.swift", import.meta.url), "utf8");
@@ -66,6 +67,10 @@ assert.match(sql, /insert into public\.league_trophies\(/);
 assert.match(sql, /create or replace function public\.freeze_fieldhouse_postseason_qualifiers/);
 assert.match(sql, /Every published Fieldhouse card must be certified before Selection Sunday/);
 assert.match(sql, /from public\.week_cards card[\s\S]*from public\.week_results result/);
+assert.match(sql, /card\.card_kind='conference_championship'/);
+assert.match(sql, /card\.week_number=league_row\.regular_season_weeks\+1/);
+assert.match(sql, /card\.prop_question is null/);
+assert.match(sql, /from public\.week_results result\s*where result\.league_id=league\.id/);
 assert.match(sql, /when regular_rank<=brass_size then 'championship'/);
 assert.match(sql, /when regular_rank>region_count-brass_size then 'toilet_bowl'/);
 assert.match(sql, /else 'no_brass'/);
@@ -95,6 +100,16 @@ assert.match(sql, /if not exists\([\s\S]*pending\.round_key=g\.round_key[\s\S]*v
 assert.match(sql, /pg_advisory_xact_lock\(hashtextextended\(p_tournament_id::text,0\)\)/);
 assert.match(client, /The bracket graph and every player's permanent picks remain untouched/);
 assert.match(schema, /add column if not exists fieldhouse_region text/);
+assert.match(schema, /add column if not exists card_kind text not null default 'weekly'/);
+assert.match(schema, /check \(card_kind in \('weekly','conference_championship'\)\)/);
+assert.match(schema, /add column if not exists fieldhouse_conference text/);
+assert.match(schema, /create or replace function public\.publish_fieldhouse_championship_card/);
+assert.match(schema, /jsonb_array_length\(p_games\) <> 4/);
+for (const conference of ["acc", "big12", "big10", "sec"]) {
+  assert.match(schema, new RegExp(`'${conference}'`));
+}
+assert.match(schema, /p_week_number <> v_regular_weeks \+ 1/);
+assert.match(schema, /grant execute on function public\.publish_fieldhouse_championship_card\(uuid,integer,jsonb\) to authenticated/);
 assert.match(schema, /'East','West','South','Midwest'/);
 assert.match(schema, /create trigger assign_fieldhouse_region_before_insert/);
 assert.match(schema, /greatest\(1, coalesce\(l\.games_per_week, 5\)\)/);
@@ -161,7 +176,15 @@ assert.doesNotMatch(fieldhouseOdds, /action: "odds_pull"/);
 assert.match(client, /FieldhouseSpreadRule\.isHalfPoint/);
 assert.match(client, /"bookmaker": game\.bookmaker \?\? "Fieldhouse"/);
 assert.match(weeklyWorker, /away_score:game\.awayScore,home_score:game\.homeScore/);
+assert.match(weeklyWorker, /week_number,card_kind,prop_question,prop_option_a,prop_option_b,published_at/);
+assert.match(weeklyWorker, /const championship=card\.card_kind==="conference_championship"/);
+assert.match(weeklyWorker, /winner:championship\?\(game\.homeScore>game\.awayScore\?"home":"away"\):game\.ats/);
+assert.match(weeklyWorker, /p_prop_result:championship\?null/);
+assert.match(atomicPickSave, /v_expected_count := case\s+when v_card\.card_kind = 'conference_championship' then 4/);
+assert.match(atomicPickSave, /Championship Week does not use a prop/);
+assert.match(atomicPickSave, /Hellfire is not available during Championship Week/);
 assert.match(atomicScoring, /add column if not exists away_score integer/);
+assert.match(atomicScoring, /Championship Week does not use a prop result/);
 assert.match(atomicScoring, /x\.away_score,\s*x\.home_score,\s*case when x\.away_score is not null then 'odds_api'/);
 assert.ok(client.includes(`TOURNAMENT SCORECARD · \\(state.postseasonScoreFreshnessLabel)`));
 assert.match(client, /SERVER UPDATED/);
@@ -179,7 +202,7 @@ assert.match(client, /func postseasonBracketIsLocked\(at now: Date = Date\(\)\)/
 assert.match(client, /func outstandingPickTaskCount\(at date: Date\) -> Int/);
 assert.match(client, /outstandingPickTaskCount: state\.outstandingPickTaskCount\(at: context\.date\)/);
 assert.match(client, /if state\.postseasonIsActive \{\s*FieldhouseBracketsPage\(/);
-assert.match(client, /\(reviewBracket \|\| reviewRound\) \? \.picks/);
+assert.match(client, /\(reviewBracket \|\| reviewRound \|\| reviewChampionship\) \? \.picks/);
 assert.match(client, /case "picks":[\s\S]*desk = \.picks/);
 assert.match(client, /locked: state\.postseasonRoundIsLocked\(round\)/);
 assert.match(client, /locked: state\.postseasonBracketIsLocked\(\)/);
@@ -210,6 +233,13 @@ assert.match(content, /FieldhouseAuthenticatedContainer\(notificationDestination
 assert.match(content, /fieldhouseNotificationDestination = route/);
 assert.match(content, /handleNotificationDestination\(_ route: WarRoomNotificationRoute\)[\s\S]*try\? await auth\.validAccessToken\(\)/);
 assert.match(client, /!route\.routesToFieldhousePostseasonOverview/);
+assert.match(client, /enum FieldhouseCardKind/);
+assert.match(client, /case conferenceChampionship = "conference_championship"/);
+assert.match(client, /Set\(conferences\) == Set\(FieldhouseChampionshipConference\.allCases\)/);
+assert.match(client, /PICK THE CHAMPION · STRAIGHT UP/);
+assert.match(client, /Pick each conference champion straight up, assign confidence 4–3–2–1, and mark one Best Bet/);
+assert.match(client, /guard cardKind\.allowsHellfire/);
+assert.match(client, /if cardKind == \.conferenceChampionship \{\s*window = regularSeasonWeeks \+ 1/);
 assert.doesNotMatch(sql, /grant (insert|update|delete).*authenticated/i);
 assert.doesNotMatch(sql, /drop table|truncate/i);
 

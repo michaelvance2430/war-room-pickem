@@ -466,6 +466,60 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(FieldhouseGame(cardGame: decoded, window: 1).bookmaker, "DraftKings")
     }
 
+    func testAuthenticatedSnapshotHydratesChampionshipWeekAsFourStraightUpGames() {
+        let userID = UUID()
+        let membership = LeagueMembership(
+            leagueId: UUID(), role: "commissioner", isModerator: false, isDeputy: false,
+            totalPoints: 0, weeklyPoints: [], weeksPlayed: 18, division: "East",
+            fieldhouseRegion: "East", joinedAt: nil,
+            atsCorrect: 0, atsTotal: 0, currentStreak: 0, bestWeek: 0, worstWeek: 0,
+            perfectWeeks: 0, bestBetHits: 0, bestBetTotal: 0, propHits: 0, propTotal: 0,
+            leagues: LeagueSummary(
+                name: "Men's Fieldhouse", code: "MEN1", sportId: "ncaam",
+                currentWeek: 19, commissionerId: userID, crystalBallEnabled: true,
+                championshipTrophyId: nil, mode: nil, regularSeasonWeeks: 18,
+                maxHumanMembers: 100,
+                sportSettings: LeagueSportSettings(fieldhouseLeague: "ncaam")
+            )
+        )
+        let cardGames = FieldhouseChampionshipConference.allCases.enumerated().map { index, conference in
+            CardGame(
+                id: UUID(), sortOrder: index, awayTeam: "Away \(index)", homeTeam: "Home \(index)",
+                spread: 0, favorite: "home", startTime: "2027-03-13T\(18 + index):00:00Z",
+                awayRank: nil, homeRank: nil, isRivalry: false,
+                fieldhouseConference: conference.rawValue
+            )
+        }
+        let snapshot = FieldhouseAuthenticatedSnapshot(
+            membership: membership,
+            card: WeekCard(
+                id: UUID(), weekNumber: 19,
+                cardKind: FieldhouseCardKind.conferenceChampionship.rawValue,
+                lockTime: "2027-03-13T18:00:00Z",
+                propQuestion: nil, propOptionA: nil, propOptionB: nil, propPoints: 0,
+                cardGames: cardGames
+            ),
+            pick: nil, favoriteTeam: nil, crystalBall: nil
+        )
+
+        let state = FieldhouseStateHydrator.hydrate(
+            snapshot: snapshot, userID: userID, now: Date(timeIntervalSince1970: 0)
+        )
+
+        XCTAssertEqual(state.phase, .conferenceChampionships)
+        XCTAssertEqual(state.cardKind, .conferenceChampionship)
+        XCTAssertEqual(state.publishedGames.count, 4)
+        XCTAssertEqual(
+            state.publishedGames.compactMap(\.championshipConference),
+            FieldhouseChampionshipConference.allCases
+        )
+        XCTAssertNil(state.publishedProp)
+        XCTAssertFalse(state.cardKind.requiresProp)
+        XCTAssertFalse(state.cardKind.allowsHellfire)
+        XCTAssertTrue(state.sideSelections.isEmpty)
+        XCTAssertTrue(state.confidenceSelections.isEmpty)
+    }
+
     func testAuthenticatedSnapshotWithoutACardClearsOnlyLeagueCardState() {
         let userID = UUID()
         var cached = FieldhouseSeasonState()
@@ -1307,5 +1361,116 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(FieldhouseLateEntryRule.entryScore(existingScores: scores), 15)
         XCTAssertTrue(FieldhouseLateEntryRule.acceptsEntries(during: .conferenceChampionships))
         XCTAssertFalse(FieldhouseLateEntryRule.acceptsEntries(during: .postseason))
+    }
+
+    func testChampionshipWeekRequiresExactlyTheFourApprovedConferenceGames() {
+        var state = FieldhouseSeasonState()
+        state.phase = .conferenceChampionships
+        state.window = state.regularSeasonWeeks + 1
+
+        let complete = FieldhouseGameCatalog.championshipGames(for: .ncaam)
+        XCTAssertTrue(state.publishChampionshipCard(games: complete))
+        XCTAssertEqual(state.cardKind, .conferenceChampionship)
+        XCTAssertEqual(state.publishedGames.compactMap(\.championshipConference), [.acc, .big12, .big10, .sec])
+        XCTAssertNil(state.publishedProp)
+
+        var missingConference = complete
+        missingConference[3] = missingConference[3].assigned(to: .acc)
+        var invalidState = FieldhouseSeasonState()
+        invalidState.phase = .conferenceChampionships
+        XCTAssertFalse(invalidState.publishChampionshipCard(games: missingConference))
+        XCTAssertFalse(invalidState.publishChampionshipCard(games: Array(complete.prefix(3))))
+    }
+
+    func testChampionshipWeekStartsBlankAndLocksWithFourUniqueConfidencesWithoutProp() throws {
+        var state = FieldhouseSeasonState()
+        state.phase = .conferenceChampionships
+        state.window = state.regularSeasonWeeks + 1
+        let games = FieldhouseChampionshipConference.allCases.enumerated().map { index, conference in
+            FieldhouseGame(
+                id: UUID().uuidString.lowercased(),
+                away: "Away \(index)", home: "Home \(index)", spread: "Away \(index) -3.5",
+                tip: "SAT · \(index + 1):00 PM", dayOffset: 5, tipHour: 13 + index,
+                championshipConference: conference
+            )
+        }
+        XCTAssertTrue(state.publishChampionshipCard(games: games))
+        XCTAssertTrue(state.sideSelections.isEmpty)
+        XCTAssertTrue(state.confidenceSelections.isEmpty)
+        XCTAssertNil(state.bestBetGame)
+        XCTAssertNil(state.propAnswer)
+
+        for index in games.indices {
+            state.sideSelections[index] = games[index].home
+            state.confidenceSelections[index] = index + 1
+        }
+        state.bestBetGame = 3
+        XCTAssertTrue(state.cardIsComplete)
+
+        let plan = try FieldhousePickWritePlan(state: state)
+        XCTAssertEqual(plan.picks.count, 4)
+        XCTAssertEqual(Set(plan.picks.map(\.confidence)), Set(1...4))
+        XCTAssertNil(plan.propChoice)
+        XCTAssertFalse(plan.usedHellfire)
+        XCTAssertTrue(state.lockPicks(at: state.pickLockDate.addingTimeInterval(-1)))
+    }
+
+    func testChampionshipWeekScoresStraightUpAndCapsAtFourteenPoints() {
+        let game = FieldhouseGame(
+            id: UUID().uuidString.lowercased(),
+            away: "Alabama Crimson Tide", home: "Georgia Bulldogs",
+            spread: "Georgia Bulldogs -7.5", tip: "SUN · 3:00 PM",
+            championshipConference: .sec
+        )
+        let result = FieldhouseGameResult(
+            gameID: game.id, awayScore: 70, homeScore: 71, phase: .final
+        )
+        XCTAssertEqual(result.coverWinner(in: game), "Alabama Crimson Tide")
+        XCTAssertEqual(result.straightUpWinner(in: game), "Georgia Bulldogs")
+        XCTAssertEqual(
+            FieldhouseScoreEngine.points(
+                games: [game], results: [game.id: result], selections: [0: game.home],
+                confidences: [0: 4], bestBetGame: 0, prop: nil, propAnswer: nil,
+                cardKind: .conferenceChampionship
+            ),
+            8
+        )
+
+        let games = FieldhouseGameCatalog.championshipGames(for: .ncaaw)
+        let results = Dictionary(uniqueKeysWithValues: games.map {
+            ($0.id, FieldhouseGameResult(gameID: $0.id, awayScore: 71, homeScore: 70, phase: .final))
+        })
+        XCTAssertEqual(
+            FieldhouseScoreEngine.points(
+                games: games, results: results,
+                selections: Dictionary(uniqueKeysWithValues: games.indices.map { ($0, games[$0].away) }),
+                confidences: [0: 1, 1: 2, 2: 3, 3: 4], bestBetGame: 3,
+                prop: nil, propAnswer: nil, gameMultiplier: 2,
+                cardKind: .conferenceChampionship
+            ),
+            14
+        )
+    }
+
+    func testChampionshipWeekRejectsHellfireAndDoesNotOpenAnotherCardAfterPromotion() {
+        var state = FieldhouseSeasonState()
+        state.phase = .conferenceChampionships
+        state.window = state.regularSeasonWeeks + 1
+        state.scoringResults = Dictionary(uniqueKeysWithValues: state.scoringGames.map {
+            ($0.id, FieldhouseGameResult(gameID: $0.id, awayScore: 80, homeScore: 70, phase: .final))
+        })
+        let games = FieldhouseGameCatalog.championshipGames(for: .ncaam)
+        XCTAssertTrue(state.publishChampionshipCard(games: games))
+        XCTAssertFalse(state.deployRegularSeasonHellfire(at: state.pickLockDate.addingTimeInterval(-1)))
+        for index in games.indices {
+            state.sideSelections[index] = games[index].away
+            state.confidenceSelections[index] = index + 1
+        }
+        state.bestBetGame = 3
+        XCTAssertTrue(state.lockPicks(at: state.pickLockDate.addingTimeInterval(-1)))
+        XCTAssertTrue(state.advanceToNextWindow(at: state.pickLockDate))
+        XCTAssertEqual(state.scoringCardKind, .conferenceChampionship)
+        XCTAssertEqual(state.window, state.regularSeasonWeeks + 1)
+        XCTAssertFalse(state.canBuildCard)
     }
 }

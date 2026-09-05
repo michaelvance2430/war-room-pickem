@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 type Game = { id:string; away_team:string; home_team:string; spread:number; favorite:"home"|"away"; start_time?:string|null; is_rivalry?:boolean|null };
 type Score = { id:string; completed:boolean; homeTeam:string; awayTeam:string; commenceTime?:string|null; lastUpdate?:string|null; scores:{name:string;score:string}[] };
 type Final = Game & { homeScore:number; awayScore:number; ats:"home"|"away"|"push" };
-type CardRow = { league_id:string; week_number:number; prop_question?:string|null; prop_option_a:string; prop_option_b:string; leagues:{sport_id?:string|null}|{sport_id?:string|null}[]; card_games:Game[] };
+type CardRow = { league_id:string; week_number:number; card_kind?:"weekly"|"conference_championship"|null; prop_question?:string|null; prop_option_a?:string|null; prop_option_b?:string|null; leagues:{sport_id?:string|null}|{sport_id?:string|null}[]; card_games:Game[] };
 type ScoredRow = { league_id:string; week_number:number };
 
 const DAY_MS=86_400_000;
@@ -26,12 +26,12 @@ const homeDog=(game:Final)=>game.favorite==="away";
 const awayDog=(game:Final)=>game.favorite==="home";
 const numericHeader=(value:string|null)=>value==null||value===""?null:Number(value);
 const sportForCard=(card:CardRow)=>{const relation=Array.isArray(card.leagues)?card.leagues[0]:card.leagues;const sport=String(relation?.sport_id||"cfb").toLowerCase();return ["ncaam","ncaaw"].includes(sport)?sport:(sport==="nfl"?"nfl":"cfb");};
-const cardSize=(sport:string)=>["ncaam","ncaaw"].includes(sport)?10:5;
+const cardSize=(card:CardRow)=>card.card_kind==="conference_championship"?4:(["ncaam","ncaaw"].includes(sportForCard(card))?10:5);
 const providerSportKey=(sport:string)=>sport==="nfl"?"americanfootball_nfl":sport==="ncaam"?"basketball_ncaab":sport==="ncaaw"?"basketball_wncaab":"americanfootball_ncaaf";
 
 export function isScheduleEligible(card:CardRow,now=Date.now()):boolean{
   const starts=(card.card_games||[]).map((game)=>Date.parse(game.start_time||"")).filter(Number.isFinite);
-  if(starts.length!==cardSize(sportForCard(card)))return false;
+  if(starts.length!==cardSize(card))return false;
   return Math.max(...starts)>=now-SCORE_LOOKBACK_MS&&Math.min(...starts)<=now+SCORE_LOOKAHEAD_MS;
 }
 
@@ -109,7 +109,7 @@ Deno.serve(async(request:Request)=>{
   if(request.method!=="POST")return new Response("Method not allowed",{status:405});
   try{
     const db=createClient(required("SUPABASE_URL"),required("SUPABASE_SERVICE_ROLE_KEY"),{auth:{persistSession:false,autoRefreshToken:false}});
-    const {data:cards,error}=await db.from("week_cards").select("id,league_id,week_number,prop_question,prop_option_a,prop_option_b,published_at,leagues!inner(sport_id),card_games(id,away_team,home_team,spread,favorite,start_time,is_rivalry)").order("published_at",{ascending:false}).limit(100);
+    const {data:cards,error}=await db.from("week_cards").select("id,league_id,week_number,card_kind,prop_question,prop_option_a,prop_option_b,published_at,leagues!inner(sport_id),card_games(id,away_team,home_team,spread,favorite,start_time,is_rivalry,fieldhouse_conference)").order("published_at",{ascending:false}).limit(100);
     if(error)throw error;
     const cardRows=((cards||[]) as CardRow[]).filter((card)=>isScheduleEligible(card));
     const leagueIds=[...new Set(cardRows.map((card:CardRow)=>card.league_id))];
@@ -137,7 +137,7 @@ Deno.serve(async(request:Request)=>{
     }
     for(const card of pending){
       const sport=sportForCard(card);
-      const expected=cardSize(sport);
+      const expected=cardSize(card);
       const games=(card.card_games||[]) as Game[];if(games.length!==expected){waiting.push(`${card.league_id}:${card.week_number}:invalid-card`);continue;}
       const finals:Final[]=[];
       for(const game of games){
@@ -147,8 +147,9 @@ Deno.serve(async(request:Request)=>{
         finals.push({...game,homeScore:home,awayScore:away,ats:ats(game,home,away)});
       }
       if(finals.length!==expected){waiting.push(`${card.league_id}:${card.week_number}:finals-${finals.length}`);continue;}
-      const yes=settleAutomaticProp(card.prop_question||"",finals);if(yes==null){waiting.push(`${card.league_id}:${card.week_number}:unsupported-prop`);continue;}
-      const {data:receipt,error:scoreError}=await db.rpc("score_league_week_atomic",{p_league_id:card.league_id,p_week_number:card.week_number,p_results:finals.map((game)=>({game_id:game.id,winner:game.ats,away_score:game.awayScore,home_score:game.homeScore})),p_prop_result:yes?card.prop_option_a:card.prop_option_b});
+      const championship=card.card_kind==="conference_championship";
+      const yes=championship?null:settleAutomaticProp(card.prop_question||"",finals);if(!championship&&yes==null){waiting.push(`${card.league_id}:${card.week_number}:unsupported-prop`);continue;}
+      const {data:receipt,error:scoreError}=await db.rpc("score_league_week_atomic",{p_league_id:card.league_id,p_week_number:card.week_number,p_results:finals.map((game)=>({game_id:game.id,winner:championship?(game.homeScore>game.awayScore?"home":"away"):game.ats,away_score:game.awayScore,home_score:game.homeScore})),p_prop_result:championship?null:(yes?card.prop_option_a:card.prop_option_b)});
       if(scoreError||!receipt?.ok){waiting.push(`${card.league_id}:${card.week_number}:score-error:${scoreError?.message||"no-receipt"}`);continue;}scoredCount+=1;
     }
     return Response.json({ok:true,inspected:pending.length,scored:scoredCount,waiting});

@@ -18,8 +18,10 @@ This workflow builds the platform-owned NCAAM or NCAAW tournament field. It does
 
    `node scripts/generate-fieldhouse-official-field.mjs /tmp/ncaam-2027-input.json /tmp/ncaam-2027-ready.json --publish-ready`
 
-6. In the owner-only Fieldhouse control, import the generated file as a draft. Inspect all regions, seeds, opening feeders, game times, and Final Four paths. Publish only after that review and after every posted weekly card in every league for that sport has a certified result. Publishing is a deliberate separate action, freezes the Selection Sunday eligibility snapshot, and opens the same field for every league in that sport.
+6. Complete Championship Week before importing the Selection Sunday field. Every active league must have one certified card at `regular_season_weeks + 1` containing exactly the ACC, Big 12, Big Ten, and SEC title games. Players pick the four champions straight up, use confidence 4–3–2–1 once each, and mark one Best Bet. There is no prop and no Hellfire. Those certified points must already be included in each membership's regular-season total.
 
-7. When later-round broadcast times or Odds API event IDs become official, regenerate the same file and use **Sync Times + Event IDs**. That operation cannot replace the bracket graph or any player receipt, and it refuses to move a game time after that game has started.
+7. In the owner-only Fieldhouse control, import the generated file as a draft. Inspect all regions, seeds, opening feeders, game times, and Final Four paths. Publish only after that review and after every posted card in every active league for that sport—including Championship Week—has a certified result. Publishing is a deliberate separate action, freezes the Selection Sunday eligibility snapshot, and opens the same field for every league in that sport.
+
+8. When later-round broadcast times or Odds API event IDs become official, regenerate the same file and use **Sync Times + Event IDs**. That operation cannot replace the bracket graph or any player receipt, and it refuses to move a game time after that game has started.
 
 The generator rejects placeholders in a publish-ready file, duplicate team IDs or names, missing seeds, the wrong number of opening games, disconnected sources, malformed dates, and any graph that is not exactly 76 teams and 75 decisions. The database repeats the placeholder, blank-ID, and duplicate-name checks so a manually edited file cannot bypass them.

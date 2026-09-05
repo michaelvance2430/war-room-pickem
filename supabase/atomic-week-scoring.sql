@@ -96,7 +96,11 @@ begin
     raise exception 'Enter one valid result for every published game';
   end if;
 
-  if p_prop_result is null
+  if v_card.card_kind = 'conference_championship' then
+    if p_prop_result is not null or v_card.prop_question is not null or v_card.prop_points <> 0 then
+      raise exception 'Championship Week does not use a prop result';
+    end if;
+  elsif p_prop_result is null
      or p_prop_result not in (v_card.prop_option_a, v_card.prop_option_b) then
     raise exception 'Select a valid published prop result';
   end if;
@@ -118,7 +122,8 @@ begin
     and p.week_number = p_week_number
     and p.locked_at is not null
     and (
-      p.prop_choice not in (v_card.prop_option_a, v_card.prop_option_b)
+      (v_card.card_kind = 'conference_championship' and p.prop_choice is not null)
+      or (v_card.card_kind <> 'conference_championship' and p.prop_choice not in (v_card.prop_option_a, v_card.prop_option_b))
       or p.best_bet_game_id is null
       or (select count(*) from public.pick_games pg where pg.pick_id = p.id) <> v_game_count
       or (select count(distinct pg.card_game_id) from public.pick_games pg

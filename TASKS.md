@@ -10,6 +10,9 @@
 
 ## Done
 
+- [x] ~~Build the isolated Fieldhouse Championship Week bridge~~ (2026-09-05)
+  - Added one four-game straight-up card after the 18-week regular season for ACC, Big 12, Big Ten, and SEC champions; confidence 4–3–2–1, one Best Bet, no prop, and no Hellfire. Certified points enter regular-season totals before Selection Sunday. Native tests, focused UI tests, and the Build 21 static authority audit pass. Database and scorer files remain review-only and the live Fieldhouse gate remains off.
+
 - [x] ~~Fieldhouse authenticated persistence foundation~~ (2026-09-04)
   - Reused the shared league, card, pick, favorite-team, Crystal Ball, and trophy records; translated Fieldhouse team names to the shared home/away contract; scoped cached state by account and league; and required server read-back after every authenticated save. The live route remains gated off until scoring and real basketball feeds are complete.
 

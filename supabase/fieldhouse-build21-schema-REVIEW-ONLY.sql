@@ -4,6 +4,20 @@
 
 begin;
 
+-- Championship Week is a real scoring phase, not a ten-game weekly card with
+-- hidden controls. The discriminator keeps old football and Fieldhouse clients
+-- on the existing weekly contract while the four title games use straight-up
+-- scoring with no prop and no weapon.
+alter table public.week_cards add column if not exists card_kind text not null default 'weekly';
+alter table public.week_cards drop constraint if exists week_cards_card_kind_check;
+alter table public.week_cards add constraint week_cards_card_kind_check
+  check (card_kind in ('weekly','conference_championship'));
+
+alter table public.card_games add column if not exists fieldhouse_conference text;
+alter table public.card_games drop constraint if exists card_games_fieldhouse_conference_check;
+alter table public.card_games add constraint card_games_fieldhouse_conference_check
+  check (fieldhouse_conference is null or fieldhouse_conference in ('acc','big12','big10','sec'));
+
 -- Football divisions and basketball regions are different concepts. Do not overload
 -- the legacy North/South/East/West enum: Fieldhouse requires a real Midwest region.
 alter table public.memberships add column if not exists fieldhouse_region text;
@@ -242,6 +256,118 @@ grant execute on function public.create_league_with_commissioner_seat(
   text, text, boolean, boolean, integer, integer, integer, text
 ) to authenticated;
 
+create or replace function public.publish_fieldhouse_championship_card(
+  p_league_id uuid,
+  p_week_number integer,
+  p_games jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_card_id uuid;
+  v_sport text;
+  v_regular_weeks integer;
+  v_games jsonb;
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  if not public.is_league_ops(p_league_id) then
+    raise exception 'Commissioner or deputy required';
+  end if;
+
+  select lower(l.sport_id), l.regular_season_weeks
+    into v_sport, v_regular_weeks
+  from public.leagues l where l.id = p_league_id;
+  if not found or v_sport not in ('ncaam','ncaaw') then
+    raise exception 'Fieldhouse league required';
+  end if;
+  if p_week_number <> v_regular_weeks + 1 then
+    raise exception 'Championship Week must immediately follow the regular season';
+  end if;
+  if jsonb_typeof(p_games) <> 'array' or jsonb_array_length(p_games) <> 4 then
+    raise exception 'Publish exactly four conference championship games';
+  end if;
+  if exists (
+    select 1 from jsonb_to_recordset(p_games) as g(
+      sort_order integer, away_team text, home_team text, start_time text,
+      bookmaker text, conference_key text, away_rank integer, home_rank integer
+    )
+    where g.sort_order is null or g.sort_order < 0 or g.sort_order > 3
+       or coalesce(btrim(g.away_team),'') = ''
+       or coalesce(btrim(g.home_team),'') = ''
+       or g.away_team = g.home_team
+       or coalesce(btrim(g.start_time),'') = ''
+       or g.start_time::timestamptz <= clock_timestamp()
+       or g.conference_key not in ('acc','big12','big10','sec')
+  ) then raise exception 'Every title game needs valid teams, conference, and future tip time'; end if;
+  if (
+    select count(distinct g.sort_order)
+    from jsonb_to_recordset(p_games) as g(sort_order integer)
+  ) <> 4 or (
+    select count(distinct g.conference_key)
+    from jsonb_to_recordset(p_games) as g(conference_key text)
+  ) <> 4 then
+    raise exception 'Use ACC, Big 12, Big Ten, and SEC exactly once';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended(p_league_id::text || ':' || p_week_number::text, 0));
+  select wc.id into v_card_id
+  from public.week_cards wc
+  where wc.league_id = p_league_id and wc.week_number = p_week_number
+  for update;
+  if v_card_id is not null and exists (
+    select 1 from public.picks p
+    where p.league_id = p_league_id and p.week_number = p_week_number
+  ) then raise exception 'Championship Week is locked because player picks exist'; end if;
+  if exists (
+    select 1 from public.week_results wr
+    where wr.league_id = p_league_id and wr.week_number = p_week_number
+  ) then raise exception 'Championship Week has already been scored'; end if;
+
+  if v_card_id is null then
+    insert into public.week_cards(
+      league_id, week_number, card_kind, prop_question, prop_option_a,
+      prop_option_b, prop_points, published_at
+    ) values (
+      p_league_id, p_week_number, 'conference_championship', null, null,
+      null, 0, clock_timestamp()
+    ) returning id into v_card_id;
+  else
+    update public.week_cards set
+      card_kind = 'conference_championship', prop_question = null,
+      prop_option_a = null, prop_option_b = null, prop_points = 0,
+      published_at = clock_timestamp()
+    where id = v_card_id;
+    delete from public.card_games where week_card_id = v_card_id;
+  end if;
+
+  insert into public.card_games(
+    week_card_id, sort_order, away_team, home_team, spread, favorite,
+    start_time, bookmaker, away_rank, home_rank, fieldhouse_conference
+  )
+  select v_card_id, g.sort_order, btrim(g.away_team), btrim(g.home_team),
+         0, 'home', g.start_time, nullif(btrim(g.bookmaker),''),
+         g.away_rank, g.home_rank, g.conference_key
+  from jsonb_to_recordset(p_games) as g(
+    sort_order integer, away_team text, home_team text, start_time text,
+    bookmaker text, conference_key text, away_rank integer, home_rank integer
+  );
+
+  update public.leagues set current_week = p_week_number where id = p_league_id;
+  select jsonb_agg(jsonb_build_object(
+    'id', cg.id, 'sort_order', cg.sort_order,
+    'conference', cg.fieldhouse_conference
+  ) order by cg.sort_order) into v_games
+  from public.card_games cg where cg.week_card_id = v_card_id;
+  return jsonb_build_object('week_card_id',v_card_id,'card_kind','conference_championship','games',v_games);
+end;
+$$;
+
+revoke all on function public.publish_fieldhouse_championship_card(uuid,integer,jsonb) from public,anon;
+grant execute on function public.publish_fieldhouse_championship_card(uuid,integer,jsonb) to authenticated;
+
 -- The production notification trigger was originally hard-coded to fire when a
 -- five-game football card was complete. Fieldhouse publishes ten games, so use
 -- each league's authoritative games_per_week value instead. Event keys remain
@@ -263,7 +389,9 @@ begin
   where wc.id = new.week_card_id;
   if not found then return new; end if;
 
-  select l.name, greatest(1, coalesce(l.games_per_week, 5))
+  select l.name,
+    case when v_card.card_kind = 'conference_championship'
+      then 4 else greatest(1, coalesce(l.games_per_week, 5)) end
   into v_league_name, v_games_required
   from public.leagues l
   where l.id = v_card.league_id;
@@ -282,16 +410,23 @@ begin
   select event_key, league_id, kind, title, body, destination, week_number, deliver_at
   from (values
     ('card-built:' || v_card.id, v_card.league_id, 'card_built',
-      'Week ' || v_card.week_number || ' card is live',
-      v_league_name || ' is ready. Make your picks before the card locks.',
+      case when v_card.card_kind='conference_championship' then 'Championship Week is live'
+           else 'Week ' || v_card.week_number || ' card is live' end,
+      case when v_card.card_kind='conference_championship'
+           then v_league_name || ' has four conference titles on the board. Pick all four champions.'
+           else v_league_name || ' is ready. Make your picks before the card locks.' end,
       'picks', v_card.week_number, clock_timestamp()),
     ('card-lock-12h:' || v_card.id, v_card.league_id, 'card_lock_12h',
       'Card locks in 12 hours',
-      'Week ' || v_card.week_number || ' in ' || v_league_name || ' is closing soon. Get your picks on the record.',
+      case when v_card.card_kind='conference_championship'
+           then 'Championship Week in ' || v_league_name || ' is closing soon. Pick all four champions.'
+           else 'Week ' || v_card.week_number || ' in ' || v_league_name || ' is closing soon. Get your picks on the record.' end,
       'picks', v_card.week_number, v_lock_at - interval '12 hours'),
     ('card-lock-1h:' || v_card.id, v_card.league_id, 'card_lock_1h',
       'FINAL WARNING · 1 HOUR',
-      'Week ' || v_card.week_number || ' in ' || v_league_name || ' locks in one hour. Finish and confirm your card.',
+      case when v_card.card_kind='conference_championship'
+           then 'Championship Week in ' || v_league_name || ' locks in one hour. Finish and confirm all four picks.'
+           else 'Week ' || v_card.week_number || ' in ' || v_league_name || ' locks in one hour. Finish and confirm your card.' end,
       'picks', v_card.week_number, v_lock_at - interval '1 hour')
   ) as queued(event_key, league_id, kind, title, body, destination, week_number, deliver_at)
   where queued.kind = 'card_built' or queued.deliver_at > clock_timestamp()

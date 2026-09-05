@@ -587,6 +587,7 @@ enum AppIdentity {
 struct WeekCard: Decodable, Identifiable, Sendable {
     let id: UUID
     let weekNumber: Int
+    let cardKind: String?
     let lockTime: String?
     let propQuestion: String?
     let propOptionA: String?
@@ -594,9 +595,32 @@ struct WeekCard: Decodable, Identifiable, Sendable {
     let propPoints: Int
     let cardGames: [CardGame]
 
+    init(
+        id: UUID,
+        weekNumber: Int,
+        cardKind: String? = nil,
+        lockTime: String?,
+        propQuestion: String?,
+        propOptionA: String?,
+        propOptionB: String?,
+        propPoints: Int,
+        cardGames: [CardGame]
+    ) {
+        self.id = id
+        self.weekNumber = weekNumber
+        self.cardKind = cardKind
+        self.lockTime = lockTime
+        self.propQuestion = propQuestion
+        self.propOptionA = propOptionA
+        self.propOptionB = propOptionB
+        self.propPoints = propPoints
+        self.cardGames = cardGames
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
         case weekNumber = "week_number"
+        case cardKind = "card_kind"
         case lockTime = "lock_time"
         case propQuestion = "prop_question"
         case propOptionA = "prop_option_a"
@@ -618,6 +642,35 @@ struct CardGame: Decodable, Identifiable, Sendable {
     let awayRank: Int?
     let homeRank: Int?
     let isRivalry: Bool
+    let fieldhouseConference: String?
+
+    init(
+        id: UUID,
+        sortOrder: Int,
+        awayTeam: String,
+        homeTeam: String,
+        spread: Double,
+        favorite: String,
+        startTime: String?,
+        bookmaker: String? = nil,
+        awayRank: Int?,
+        homeRank: Int?,
+        isRivalry: Bool,
+        fieldhouseConference: String? = nil
+    ) {
+        self.id = id
+        self.sortOrder = sortOrder
+        self.awayTeam = awayTeam
+        self.homeTeam = homeTeam
+        self.spread = spread
+        self.favorite = favorite
+        self.startTime = startTime
+        self.bookmaker = bookmaker
+        self.awayRank = awayRank
+        self.homeRank = homeRank
+        self.isRivalry = isRivalry
+        self.fieldhouseConference = fieldhouseConference
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -630,6 +683,7 @@ struct CardGame: Decodable, Identifiable, Sendable {
         case awayRank = "away_rank"
         case homeRank = "home_rank"
         case isRivalry = "is_rivalry"
+        case fieldhouseConference = "fieldhouse_conference"
     }
 }
 
@@ -1185,7 +1239,7 @@ enum SupabaseAPI {
     static func weekCard(token: String, leagueId: UUID, weekNumber: Int) async throws -> WeekCard? {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/week_cards"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,week_number,lock_time,prop_question,prop_option_a,prop_option_b,prop_points,card_games(id,sort_order,away_team,home_team,spread,favorite,start_time,away_rank,home_rank,is_rivalry)"),
+            URLQueryItem(name: "select", value: "id,week_number,card_kind,lock_time,prop_question,prop_option_a,prop_option_b,prop_points,card_games(id,sort_order,away_team,home_team,spread,favorite,start_time,away_rank,home_rank,is_rivalry,fieldhouse_conference)"),
             URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
             URLQueryItem(name: "week_number", value: "eq.\(weekNumber)"),
             URLQueryItem(name: "card_games.order", value: "sort_order.asc"),
@@ -1229,7 +1283,7 @@ enum SupabaseAPI {
 
         var cardComponents = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/week_cards"), resolvingAgainstBaseURL: false)!
         cardComponents.queryItems = [
-            URLQueryItem(name: "select", value: "id,week_number,lock_time,prop_question,prop_option_a,prop_option_b,prop_points,card_games(id,sort_order,away_team,home_team,spread,favorite,start_time,away_rank,home_rank,is_rivalry)"),
+            URLQueryItem(name: "select", value: "id,week_number,card_kind,lock_time,prop_question,prop_option_a,prop_option_b,prop_points,card_games(id,sort_order,away_team,home_team,spread,favorite,start_time,away_rank,home_rank,is_rivalry,fieldhouse_conference)"),
             URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
             URLQueryItem(name: "card_games.order", value: "sort_order.asc"),
             URLQueryItem(name: "order", value: "week_number.desc"),
@@ -1580,6 +1634,30 @@ enum SupabaseAPI {
         }
     }
 
+    static func publishFieldhouseChampionshipCard(
+        token: String,
+        leagueId: UUID,
+        weekNumber: Int,
+        games: [[String: Any]]
+    ) async throws {
+        var request = authorizedRequest(
+            url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/publish_fieldhouse_championship_card"),
+            token: token
+        )
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "p_league_id": leagueId.uuidString.lowercased(),
+            "p_week_number": weekNumber,
+            "p_games": games,
+        ])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let message = (try? JSONDecoder().decode(APIError.self, from: data).message) ?? "Championship Week refused to publish. Check all four conference games."
+            throw RequestError(message: message)
+        }
+    }
+
     static func unpublishWeekCard(token: String, leagueId: UUID, weekNumber: Int) async throws {
         var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/unpublish_week_card"), token: token)
         request.httpMethod = "POST"
@@ -1916,7 +1994,7 @@ enum SupabaseAPI {
         weekNumber: Int,
         picks: [PickSubmission],
         bestBetGameId: UUID,
-        propChoice: String,
+        propChoice: String?,
         isChaos: Bool = false
     ) async throws -> SavedPickResponse {
         var request = authorizedRequest(
@@ -1936,7 +2014,7 @@ enum SupabaseAPI {
                 ]
             },
             "p_best_bet_game_id": bestBetGameId.uuidString.lowercased(),
-            "p_prop_choice": propChoice,
+            "p_prop_choice": propChoice ?? NSNull(),
             "p_is_chaos": isChaos,
         ])
         return try await send(request, as: SavedPickResponse.self)

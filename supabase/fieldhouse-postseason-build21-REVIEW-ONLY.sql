@@ -295,9 +295,12 @@ declare
   v_leagues integer := 0;
   v_players integer := 0;
   v_inserted integer := 0;
+  v_service boolean := coalesce(
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
+    ''
+  ) = 'service_role';
 begin
-  if auth.role() <> 'service_role'
-     and v_uid <> '09544d2b-6eca-4131-a321-c000586c9029'::uuid then
+  if not v_service and v_uid <> '09544d2b-6eca-4131-a321-c000586c9029'::uuid then
     raise exception 'War Room owner or service access required';
   end if;
   select sport_id into v_sport from public.fieldhouse_tournaments
@@ -305,7 +308,14 @@ begin
   if not found then raise exception 'Published Fieldhouse tournament required'; end if;
 
   for league_row in
-    select id from public.leagues where sport_id=v_sport
+    select league.id,league.regular_season_weeks
+    from public.leagues league
+    where league.sport_id=v_sport
+      and exists(
+        select 1
+        from public.week_results result
+        where result.league_id=league.id
+      )
   loop
     if exists(
       select 1 from public.fieldhouse_postseason_qualifiers
@@ -315,6 +325,18 @@ begin
       select 1 from public.memberships
       where league_id=league_row.id and coalesce(is_bot,false)=false and fieldhouse_region is null
     ) then raise exception 'Every Fieldhouse player needs a region before Selection Sunday'; end if;
+    if not exists(
+      select 1
+      from public.week_cards card
+      join public.week_results result
+        on result.league_id=card.league_id and result.week_number=card.week_number
+      where card.league_id=league_row.id
+        and card.week_number=league_row.regular_season_weeks+1
+        and card.card_kind='conference_championship'
+        and card.prop_question is null
+        and card.prop_points=0
+        and (select count(*) from public.card_games game where game.week_card_id=card.id)=4
+    ) then raise exception 'Certified Championship Week is required before Selection Sunday'; end if;
     if exists(
       select 1
       from public.week_cards card

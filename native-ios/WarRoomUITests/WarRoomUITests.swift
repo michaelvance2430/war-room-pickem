@@ -73,6 +73,24 @@ final class WarRoomUITests: XCTestCase {
     }
 
     @MainActor
+    func testFieldhouseChampionshipWeekShowsFourStraightUpPicksWithoutPropOrHellfire() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--fieldhouse-preview", "--fieldhouse-review", "--fieldhouse-review-championship"]
+        app.launch()
+
+        let makePicks = app.buttons["fieldhouse.picks.lane.makePicks"]
+        XCTAssertTrue(makePicks.waitForExistence(timeout: 3))
+        makePicks.tap()
+
+        XCTAssertTrue(app.staticTexts["FOUR TITLES.\nONE LAST MOVE."].waitForExistence(timeout: 2))
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "PICK THE CHAMPION · STRAIGHT UP")).count, 4)
+        XCTAssertTrue(app.staticTexts["CONFIDENCE"].exists)
+        XCTAssertTrue(app.staticTexts["BEST BET"].exists)
+        XCTAssertFalse(app.staticTexts["PROP"].exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "HELLFIRE")).firstMatch.exists)
+    }
+
+    @MainActor
     func testNflJdamStrikeFeedOpensItsDedicatedVideo() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--strike-preview-nfl"]

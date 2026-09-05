@@ -64,7 +64,10 @@ begin
   from public.card_games
   where week_card_id = v_card.id;
 
-  v_expected_count := case when lower(v_league.sport_id) in ('cbb','ncaam','ncaaw') then 10 else 5 end;
+  v_expected_count := case
+    when v_card.card_kind = 'conference_championship' then 4
+    when lower(v_league.sport_id) in ('cbb','ncaam','ncaaw') then 10
+    else 5 end;
   if v_game_count <> v_expected_count then
     raise exception 'Week card must contain exactly % games', v_expected_count;
   end if;
@@ -85,7 +88,11 @@ begin
   if p_best_bet_game_id is null then
     raise exception 'Mark one Best Bet';
   end if;
-  if p_prop_choice is null or p_prop_choice not in (v_card.prop_option_a, v_card.prop_option_b) then
+  if v_card.card_kind = 'conference_championship' then
+    if p_prop_choice is not null or v_card.prop_question is not null or v_card.prop_points <> 0 then
+      raise exception 'Championship Week does not use a prop';
+    end if;
+  elsif p_prop_choice is null or p_prop_choice not in (v_card.prop_option_a, v_card.prop_option_b) then
     raise exception 'Choose a valid weekly prop';
   end if;
 
@@ -136,6 +143,9 @@ begin
   end if;
 
   if coalesce(p_is_chaos, false) then
+    if v_card.card_kind = 'conference_championship' then
+      raise exception 'Hellfire is not available during Championship Week';
+    end if;
     if lower(v_league.sport_id) not in ('cfb','nfl','cbb','ncaam','ncaaw') then
       raise exception 'This regular-season weapon is not available in this sport';
     end if;

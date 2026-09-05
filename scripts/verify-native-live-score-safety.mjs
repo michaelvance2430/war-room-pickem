@@ -65,9 +65,11 @@ assert.match(autonomous, /row\.homeTeam/);
 assert.doesNotMatch(autonomous, /row\.home_team/);
 assert.match(autonomous, /isScheduleEligible/);
 assert.match(autonomous, /SCORE_LOOKAHEAD_MS/);
-assert.match(autonomous, /const cardSize=\(sport:string\)=>\["ncaam","ncaaw"\]\.includes\(sport\)\?10:5/);
-assert.match(autonomous, /starts\.length!==cardSize\(sportForCard\(card\)\)/);
+assert.match(autonomous, /const cardSize=\(card:CardRow\)=>card\.card_kind==="conference_championship"\?4:/);
+assert.match(autonomous, /starts\.length!==cardSize\(card\)/);
 assert.match(autonomous, /sport==="ncaam"\?"basketball_ncaab":sport==="ncaaw"\?"basketball_wncaab"/);
+assert.match(autonomous, /winner:championship\?\(game\.homeScore>game\.awayScore\?"home":"away"\):game\.ats/);
+assert.match(autonomous, /p_prop_result:championship\?null:/);
 assert.doesNotMatch(autonomous, /\.gte\("published_at",cutoff\)/);
 assert.match(autonomous, /order\("published_at",\{ascending:false\}\)\.limit\(100\)/);
 

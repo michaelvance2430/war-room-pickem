@@ -49,15 +49,24 @@ enum FieldhouseCardReminderSchedule {
 enum FieldhouseNotificationScheduler {
     private static let center = UNUserNotificationCenter.current()
 
-    static func cardPublished(leagueID: UUID, leagueName: String, week: Int, lockAt: Date, now: Date = Date()) async {
+    static func cardPublished(
+        leagueID: UUID,
+        leagueName: String,
+        week: Int,
+        lockAt: Date,
+        cardKind: FieldhouseCardKind = .weekly,
+        now: Date = Date()
+    ) async {
         let authorization = await center.notificationSettings().authorizationStatus
         guard authorization == .authorized || authorization == .provisional else { return }
 
         let builtID = "fieldhouse.card-built.\(leagueID.uuidString).\(week)"
         if !UserDefaults.standard.bool(forKey: builtID) {
             let content = notificationContent(
-                title: "Week \(week) card built",
-                body: "\(leagueName) is open. Make and lock your 10 picks before the first tip.",
+                title: cardKind == .conferenceChampionship ? "Championship Week is live" : "Week \(week) card built",
+                body: cardKind == .conferenceChampionship
+                    ? "\(leagueName) has four conference titles on the board. Pick all four champions."
+                    : "\(leagueName) is open. Make and lock your 10 picks before the first tip.",
                 leagueID: leagueID,
                 week: week,
                 kind: "fieldhouse_card_built"
@@ -71,8 +80,10 @@ enum FieldhouseNotificationScheduler {
         if let reminder = FieldhouseCardReminderSchedule.oneHour(lockAt: lockAt, now: now, leagueID: leagueID, week: week) {
             center.removePendingNotificationRequests(withIdentifiers: [reminder.identifier])
             let content = notificationContent(
-                title: "1 HOUR · WEEK \(week) LOCKS",
-                body: "\(leagueName) closes at first tip. Finish and lock your card.",
+                title: cardKind == .conferenceChampionship ? "1 HOUR · CHAMPIONSHIP PICKS LOCK" : "1 HOUR · WEEK \(week) LOCKS",
+                body: cardKind == .conferenceChampionship
+                    ? "\(leagueName) closes at first tip. Finish and confirm all four champions."
+                    : "\(leagueName) closes at first tip. Finish and lock your card.",
                 leagueID: leagueID,
                 week: week,
                 kind: "fieldhouse_card_lock_1h"
@@ -208,6 +219,35 @@ enum FieldhouseSeasonPhase: String, Codable {
     case regularSeason = "REGULAR SEASON"
     case conferenceChampionships = "CONFERENCE CHAMPIONSHIPS"
     case postseason = "POSTSEASON"
+}
+
+enum FieldhouseCardKind: String, Codable {
+    case weekly = "weekly"
+    case conferenceChampionship = "conference_championship"
+
+    var requiredGameCount: Int {
+        self == .conferenceChampionship ? 4 : FieldhouseGameCatalog.weeklyCardSize
+    }
+    var requiresProp: Bool { self == .weekly }
+    var allowsHellfire: Bool { self == .weekly }
+    var usesStraightUpScoring: Bool { self == .conferenceChampionship }
+}
+
+enum FieldhouseChampionshipConference: String, CaseIterable, Identifiable, Codable {
+    case acc
+    case big12
+    case big10
+    case sec
+
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .acc: "ACC"
+        case .big12: "BIG 12"
+        case .big10: "BIG TEN"
+        case .sec: "SEC"
+        }
+    }
 }
 
 enum FieldhouseLeague: String, CaseIterable, Identifiable, Codable {
@@ -409,6 +449,16 @@ enum FieldhouseAuthenticatedRepository {
         membership: LeagueMembership,
         state: FieldhouseSeasonState
     ) async throws {
+        if state.cardKind == .conferenceChampionship {
+            let plan = try FieldhouseChampionshipCardWritePlan(state: state)
+            try await SupabaseAPI.publishFieldhouseChampionshipCard(
+                token: token,
+                leagueId: membership.leagueId,
+                weekNumber: state.window,
+                games: plan.games
+            )
+            return
+        }
         let plan = try FieldhouseCardWritePlan(state: state)
         try await SupabaseAPI.publishWeekCard(
             token: token,
@@ -531,6 +581,36 @@ struct FieldhouseCardWritePlan {
     }
 }
 
+struct FieldhouseChampionshipCardWritePlan {
+    let games: [[String: Any]]
+
+    init(state: FieldhouseSeasonState) throws {
+        guard state.isCommissioner,
+              state.cardKind == .conferenceChampionship,
+              state.cardIsPublished,
+              state.publishedGames.count == FieldhouseCardKind.conferenceChampionship.requiredGameCount,
+              Set(state.publishedGames.compactMap(\.championshipConference)) == Set(FieldhouseChampionshipConference.allCases) else {
+            throw FieldhouseRepositoryError(message: "Publish exactly one ACC, Big 12, Big Ten, and SEC championship game.")
+        }
+        let formatter = ISO8601DateFormatter()
+        self.games = try state.publishedGames.enumerated().map { index, game in
+            guard let conference = game.championshipConference else {
+                throw FieldhouseRepositoryError(message: "Every Championship Week game needs its conference label.")
+            }
+            return [
+                "sort_order": index,
+                "away_team": game.away,
+                "home_team": game.home,
+                "start_time": formatter.string(from: game.tipDate(in: state.window)),
+                "bookmaker": game.bookmaker ?? "Fieldhouse",
+                "conference_key": conference.rawValue,
+                "away_rank": NSNull(),
+                "home_rank": NSNull()
+            ]
+        }
+    }
+}
+
 enum FieldhouseReleaseGate {
     // Keep the live route dark until authenticated writes, scoring, and the
     // complete NCAAM/NCAAW release checklist have all passed.
@@ -650,17 +730,21 @@ struct FieldhouseAuthenticatedContainer: View {
 struct FieldhousePickWritePlan {
     let picks: [PickSubmission]
     let bestBetGameID: UUID
-    let propChoice: String
+    let propChoice: String?
     let usedHellfire: Bool
 
     init(state: FieldhouseSeasonState) throws {
-        let required = FieldhouseGameCatalog.weeklyCardSize
+        let required = state.cardKind.requiredGameCount
         guard state.cardIsComplete, state.publishedGames.count == required,
               let bestBetIndex = state.bestBetGame,
               state.publishedGames.indices.contains(bestBetIndex),
-              let bestBetID = UUID(uuidString: state.publishedGames[bestBetIndex].id),
-              let propChoice = state.propAnswer else {
-            throw FieldhouseRepositoryError(message: "Complete all ten picks, confidence points, Best Bet, and the prop before locking the card.")
+              let bestBetID = UUID(uuidString: state.publishedGames[bestBetIndex].id) else {
+            throw FieldhouseRepositoryError(message: state.cardKind == .conferenceChampionship
+                ? "Pick all four champions, use confidence 4–3–2–1 once each, and mark one Best Bet."
+                : "Complete all ten picks, confidence points, Best Bet, and the prop before locking the card.")
+        }
+        if state.cardKind.requiresProp && state.propAnswer == nil {
+            throw FieldhouseRepositoryError(message: "Answer the floor prop before locking the card.")
         }
 
         let picks = try state.publishedGames.enumerated().map { index, game -> PickSubmission in
@@ -677,8 +761,8 @@ struct FieldhousePickWritePlan {
         }
         self.picks = picks
         self.bestBetGameID = bestBetID
-        self.propChoice = propChoice
-        self.usedHellfire = state.hellfireDeployedOnCurrentCard
+        self.propChoice = state.propAnswer
+        self.usedHellfire = state.cardKind.allowsHellfire && state.hellfireDeployedOnCurrentCard
     }
 }
 
@@ -877,8 +961,9 @@ struct FieldhouseGame: Identifiable, Equatable, Codable {
     let tipHour: Int
     let tipMinute: Int
     let bookmaker: String?
+    let championshipConference: FieldhouseChampionshipConference?
 
-    init(id: String, away: String, home: String, spread: String, tip: String, dayOffset: Int = 3, tipHour: Int = 19, tipMinute: Int = 0, bookmaker: String? = nil) {
+    init(id: String, away: String, home: String, spread: String, tip: String, dayOffset: Int = 3, tipHour: Int = 19, tipMinute: Int = 0, bookmaker: String? = nil, championshipConference: FieldhouseChampionshipConference? = nil) {
         self.id = id
         self.away = away
         self.home = home
@@ -888,6 +973,7 @@ struct FieldhouseGame: Identifiable, Equatable, Codable {
         self.tipHour = tipHour
         self.tipMinute = tipMinute
         self.bookmaker = bookmaker
+        self.championshipConference = championshipConference
     }
 
     func tipDate(in window: Int) -> Date {
@@ -932,6 +1018,14 @@ enum FieldhouseSpreadRule {
 }
 
 extension FieldhouseGame {
+    func assigned(to conference: FieldhouseChampionshipConference) -> FieldhouseGame {
+        FieldhouseGame(
+            id: id, away: away, home: home, spread: spread, tip: tip,
+            dayOffset: dayOffset, tipHour: tipHour, tipMinute: tipMinute,
+            bookmaker: bookmaker, championshipConference: conference
+        )
+    }
+
     init?(oddsGame: OddsGame, window: Int) {
         guard let rawTip = oddsGame.commenceTime,
               let tipDate = footballKickoffDate(rawTip),
@@ -960,7 +1054,8 @@ extension FieldhouseGame {
             dayOffset: dayOffset,
             tipHour: calendar.component(.hour, from: tipDate),
             tipMinute: calendar.component(.minute, from: tipDate),
-            bookmaker: oddsGame.bookmaker
+            bookmaker: oddsGame.bookmaker,
+            championshipConference: nil
         )
     }
 
@@ -1003,7 +1098,8 @@ extension FieldhouseGame {
             dayOffset: dayOffset,
             tipHour: hour,
             tipMinute: minute,
-            bookmaker: cardGame.bookmaker
+            bookmaker: cardGame.bookmaker,
+            championshipConference: cardGame.fieldhouseConference.flatMap(FieldhouseChampionshipConference.init(rawValue:))
         )
     }
 }
@@ -1028,6 +1124,11 @@ struct FieldhouseGameResult: Equatable, Codable {
 
     func straightUpWinner(in game: FieldhouseGame) -> String? {
         guard isFinal, awayScore != homeScore else { return nil }
+        return awayScore > homeScore ? game.away : game.home
+    }
+
+    func projectedStraightUpLeader(in game: FieldhouseGame) -> String? {
+        guard awayScore != homeScore else { return nil }
         return awayScore > homeScore ? game.away : game.home
     }
 
@@ -1095,15 +1196,20 @@ enum FieldhouseScoreEngine {
         bestBetGame: Int?,
         prop: FieldhousePropKind?,
         propAnswer: String?,
-        gameMultiplier: Int = 1
+        gameMultiplier: Int = 1,
+        cardKind: FieldhouseCardKind = .weekly
     ) -> Int {
         var total = 0
+        let effectiveGameMultiplier = cardKind.allowsHellfire ? gameMultiplier : 1
         for (index, game) in games.enumerated() {
-            guard let result = results[game.id], let winner = result.coverWinner(in: game),
+            guard let result = results[game.id],
+                  let winner = cardKind.usesStraightUpScoring
+                    ? result.straightUpWinner(in: game)
+                    : result.coverWinner(in: game),
                   selections[index] == winner, let confidence = confidences[index] else { continue }
-            total += confidence * (bestBetGame == index ? 2 : 1) * gameMultiplier
+            total += confidence * (bestBetGame == index ? 2 : 1) * effectiveGameMultiplier
         }
-        if let prop, let propAnswer,
+        if cardKind.requiresProp, let prop, let propAnswer,
            let correctAnswer = FieldhousePropEvaluator.answer(for: prop, games: games, results: results),
            propAnswer == (correctAnswer ? "YES" : "NO") {
             total += 3
@@ -1118,7 +1224,8 @@ enum FieldhouseLiveStandingsEngine {
         board: [FieldhouseLiveBoardPick],
         games: [FieldhouseGame],
         results: [String: FieldhouseGameResult],
-        prop: FieldhousePropKind?
+        prop: FieldhousePropKind?,
+        cardKind: FieldhouseCardKind = .weekly
     ) -> [UUID: Int] {
         let indexedGames = Dictionary(uniqueKeysWithValues: games.enumerated().compactMap { index, game in
             UUID(uuidString: game.id).map { ($0, (index, game)) }
@@ -1134,14 +1241,16 @@ enum FieldhouseLiveStandingsEngine {
             for pick in slip.pickGames {
                 guard let (_, game) = indexedGames[pick.cardGameId],
                       let result = results[game.id],
-                      let leader = result.projectedCoverWinner(in: game) else { continue }
+                      let leader = cardKind.usesStraightUpScoring
+                        ? result.projectedStraightUpLeader(in: game)
+                        : result.projectedCoverWinner(in: game) else { continue }
                 let selectedTeam = pick.side.lowercased() == "away" ? game.away : game.home
                 guard selectedTeam == leader else { continue }
                 liveWeek += pick.confidence * (pick.isBestBet ? 2 : 1)
             }
-            if slip.isHellfire { liveWeek *= 2 }
+            if cardKind.allowsHellfire && slip.isHellfire { liveWeek *= 2 }
 
-            if let prop,
+            if cardKind.requiresProp, let prop,
                let choice = slip.propChoice,
                let answer = FieldhousePropEvaluator.answer(for: prop, games: games, results: results),
                choice.uppercased() == (answer ? "YES" : "NO") {
@@ -1266,6 +1375,13 @@ enum FieldhouseGameCatalog {
     static func games(for league: FieldhouseLeague) -> [FieldhouseGame] {
         league == .ncaaw ? ncaawWindowOne : windowOne
     }
+
+    static func championshipGames(for league: FieldhouseLeague) -> [FieldhouseGame] {
+        let source = games(for: league)
+        return zip(FieldhouseChampionshipConference.allCases, source.prefix(4)).map { conference, game in
+            game.assigned(to: conference)
+        }
+    }
 }
 
 enum FieldhousePropKind: String, CaseIterable, Identifiable, Codable {
@@ -1302,7 +1418,10 @@ struct FieldhouseSeasonState: Codable, Equatable {
     var championshipTrophyID = FieldhouseTrophyCatalog.ncaam[0].id
     // Basketball is double-buffered: one week scores while the next accepts picks.
     var window = 2
+    var regularSeasonWeeks = 18
+    var cardKind: FieldhouseCardKind = .weekly
     var scoringWindow = 1
+    var scoringCardKind: FieldhouseCardKind = .weekly
     var scoringGames = Array(FieldhouseGameCatalog.windowOne.prefix(FieldhouseGameCatalog.weeklyCardSize))
     var scoringResults: [String: FieldhouseGameResult] = [
         "gonzaga-duke": FieldhouseGameResult(gameID: "gonzaga-duke", awayScore: 78, homeScore: 76, phase: .final),
@@ -1494,22 +1613,27 @@ struct FieldhouseSeasonState: Codable, Equatable {
             bestBetGame: scoringBestBetGame,
             prop: scoringProp,
             propAnswer: scoringPropAnswer,
-            gameMultiplier: scoringUsedHellfire ? 2 : 1
+            gameMultiplier: scoringCardKind.allowsHellfire && scoringUsedHellfire ? 2 : 1,
+            cardKind: scoringCardKind
         )
     }
     var scoringPropResult: Bool? {
-        FieldhousePropEvaluator.answer(for: scoringProp, games: scoringGames, results: scoringResults)
+        guard scoringCardKind.requiresProp else { return nil }
+        return FieldhousePropEvaluator.answer(for: scoringProp, games: scoringGames, results: scoringResults)
     }
     var scoringIsComplete: Bool {
-        !scoringGames.isEmpty && scoringFinalGames == scoringGames.count && scoringPropResult != nil
+        !scoringGames.isEmpty && scoringFinalGames == scoringGames.count && (!scoringCardKind.requiresProp || scoringPropResult != nil)
     }
     func scoringGamePoints(at index: Int) -> Int? {
         guard scoringGames.indices.contains(index),
               let result = scoringResults[scoringGames[index].id], result.isFinal,
-              let winner = result.coverWinner(in: scoringGames[index]),
+              let winner = scoringCardKind.usesStraightUpScoring
+                ? result.straightUpWinner(in: scoringGames[index])
+                : result.coverWinner(in: scoringGames[index]),
               let selection = scoringSelections[index], let confidence = scoringConfidences[index] else { return nil }
         guard selection == winner else { return 0 }
-        return confidence * (scoringBestBetGame == index ? 2 : 1) * (scoringUsedHellfire ? 2 : 1)
+        let weaponMultiplier = scoringCardKind.allowsHellfire && scoringUsedHellfire ? 2 : 1
+        return confidence * (scoringBestBetGame == index ? 2 : 1) * weaponMultiplier
     }
     func roomPicksAreVisible(for gameID: String) -> Bool {
         guard let result = scoringResults[gameID] else { return false }
@@ -1520,7 +1644,14 @@ struct FieldhouseSeasonState: Codable, Equatable {
     }
     var canRebalanceRegions: Bool { !seasonHasStarted }
     var canSelectChampionshipTrophy: Bool { !seasonHasStarted }
-    var canBuildCard: Bool { isCommissioner && !cardIsPublished }
+    var canBuildCard: Bool {
+        guard isCommissioner, !cardIsPublished, phase != .postseason else { return false }
+        if phase == .conferenceChampionships,
+           scoringCardKind == .conferenceChampionship {
+            return false
+        }
+        return true
+    }
     var playerPicksAreComplete: Bool { cardIsPublished && picksLocked }
     func outstandingPickTaskCount(at date: Date) -> Int {
         if postseasonIsActive {
@@ -1543,10 +1674,11 @@ struct FieldhouseSeasonState: Codable, Equatable {
         WarRoomPostseasonRule.status(rank: rank, playerCount: regionPlayerCount)
     }
     var cardIsComplete: Bool {
-        let count = FieldhouseGameCatalog.weeklyCardSize
+        let count = cardKind.requiredGameCount
         guard cardIsPublished, publishedGames.count == count, sideSelections.count == count,
               confidenceSelections.count == count, Set(confidenceSelections.values) == Set(1...count),
-              bestBetGame != nil, propAnswer != nil else { return false }
+              bestBetGame != nil else { return false }
+        if cardKind.requiresProp && propAnswer == nil { return false }
         return (0..<count).allSatisfy { sideSelections[$0] != nil && confidenceSelections[$0] != nil }
     }
 
@@ -1580,7 +1712,7 @@ struct FieldhouseSeasonState: Codable, Equatable {
 
     @discardableResult
     mutating func deployRegularSeasonHellfire(at date: Date) -> Bool {
-        guard regularHellfiresRemaining > 0, !picksLocked, canEditPicks(at: date),
+        guard cardKind.allowsHellfire, regularHellfiresRemaining > 0, !picksLocked, canEditPicks(at: date),
               publishedGames.count == FieldhouseGameCatalog.weeklyCardSize,
               publishedGames.allSatisfy({ $0.favoriteTeam != nil }) else { return false }
 
@@ -1601,12 +1733,13 @@ struct FieldhouseSeasonState: Codable, Equatable {
     @discardableResult
     mutating func advanceToNextWindow(at date: Date) -> Bool {
         guard scoringIsComplete, picksLocked, date >= pickLockDate,
-              publishedGames.count == FieldhouseGameCatalog.weeklyCardSize,
-              let publishedProp, let propAnswer else { return false }
+              publishedGames.count == cardKind.requiredGameCount else { return false }
+        if cardKind.requiresProp && (publishedProp == nil || propAnswer == nil) { return false }
 
         lastCertifiedWindow = scoringWindow
         lastCertifiedPoints = scoringPoints
         scoringWindow = window
+        scoringCardKind = cardKind
         scoringGames = publishedGames
         scoringResults = Dictionary(uniqueKeysWithValues: publishedGames.map {
             ($0.id, FieldhouseGameResult(gameID: $0.id, awayScore: 0, homeScore: 0, phase: .scheduled))
@@ -1614,11 +1747,17 @@ struct FieldhouseSeasonState: Codable, Equatable {
         scoringSelections = sideSelections
         scoringConfidences = confidenceSelections
         scoringBestBetGame = bestBetGame
-        scoringProp = publishedProp
-        scoringPropAnswer = propAnswer
+        if let publishedProp { scoringProp = publishedProp }
+        scoringPropAnswer = propAnswer ?? ""
         scoringUsedHellfire = hellfireDeployedOnCurrentCard
 
-        window += 1
+        if cardKind == .conferenceChampionship {
+            window = regularSeasonWeeks + 1
+            cardKind = .conferenceChampionship
+        } else {
+            window += 1
+            cardKind = .weekly
+        }
         cardIsPublished = false
         publishedGames = []
         self.publishedProp = nil
@@ -1675,7 +1814,37 @@ struct FieldhouseSeasonState: Codable, Equatable {
                   FieldhouseSpreadRule.isHalfPoint($0.favoriteSpread ?? 0)
               }) else { return false }
         publishedGames = games
+        cardKind = .weekly
         publishedProp = prop
+        cardIsPublished = true
+        sideSelections = [:]
+        confidenceSelections = [:]
+        bestBetGame = nil
+        propAnswer = nil
+        picksLocked = false
+        hellfireDeployedOnCurrentCard = false
+        return true
+    }
+
+    @discardableResult
+    mutating func publishChampionshipCard(games: [FieldhouseGame]) -> Bool {
+        let conferences = games.compactMap(\.championshipConference)
+        guard phase == .conferenceChampionships,
+              games.count == FieldhouseCardKind.conferenceChampionship.requiredGameCount,
+              Set(games.map(\.id)).count == games.count,
+              Set(conferences) == Set(FieldhouseChampionshipConference.allCases),
+              games.allSatisfy({
+                  (0...6).contains($0.dayOffset) &&
+                  (0...23).contains($0.tipHour) &&
+                  (0...59).contains($0.tipMinute)
+              }) else { return false }
+        publishedGames = games.sorted {
+            guard let lhs = $0.championshipConference,
+                  let rhs = $1.championshipConference else { return $0.id < $1.id }
+            return FieldhouseChampionshipConference.allCases.firstIndex(of: lhs)! < FieldhouseChampionshipConference.allCases.firstIndex(of: rhs)!
+        }
+        cardKind = .conferenceChampionship
+        publishedProp = nil
         cardIsPublished = true
         sideSelections = [:]
         confidenceSelections = [:]
@@ -1722,6 +1891,7 @@ enum FieldhouseStateHydrator {
         if state.league != league { state.selectLeague(league) }
 
         state.window = max(1, snapshot.membership.leagues.currentWeek)
+        state.regularSeasonWeeks = snapshot.membership.leagues.regularSeasonWeeks
         state.isCommissioner = snapshot.membership.isCommissioner(userId: userID)
         if !snapshot.standings.isEmpty {
             state.playerCount = snapshot.standings.count
@@ -1736,7 +1906,13 @@ enum FieldhouseStateHydrator {
         }
         state.crystalBallChampion = snapshot.crystalBall?.teamName
         state.officialPostseasonField = snapshot.officialField
-        if snapshot.officialField != nil { state.phase = .postseason }
+        if snapshot.officialField != nil {
+            state.phase = .postseason
+        } else if state.window > state.regularSeasonWeeks {
+            state.phase = .conferenceChampionships
+        } else {
+            state.phase = .regularSeason
+        }
         state.postseasonBracketPicks = snapshot.bracketEntry?.picks ?? state.postseasonBracketPicks
         state.bracketSubmitted = snapshot.bracketEntry?.submittedAt != nil
         state.bracketLocked = snapshot.bracketEntry?.lockedAt != nil
@@ -1776,6 +1952,7 @@ enum FieldhouseStateHydrator {
         // authority below. Never allow Foundry preview scores or picks to leak
         // into a real league that has not produced a scoring card yet.
         state.scoringGames = []
+        state.scoringCardKind = .weekly
         state.scoringResults = [:]
         state.scoringSelections = [:]
         state.scoringConfidences = [:]
@@ -1789,6 +1966,7 @@ enum FieldhouseStateHydrator {
            snapshot.scoringCard == nil || snapshot.scoringCard?.weekNumber == scorecard.weekNumber {
             let orderedScoringGames = scorecard.card.cardGames.sorted { $0.sortOrder < $1.sortOrder }
             state.scoringWindow = scorecard.weekNumber
+            state.scoringCardKind = FieldhouseCardKind(rawValue: scorecard.card.cardKind ?? "") ?? .weekly
             state.scoringGames = orderedScoringGames.map { FieldhouseGame(cardGame: $0, window: scorecard.weekNumber) }
             state.scoringResults = Dictionary(uniqueKeysWithValues: scorecard.result.gameResults.compactMap { result in
                 guard let game = orderedScoringGames.first(where: { $0.id == result.cardGameId }),
@@ -1814,12 +1992,13 @@ enum FieldhouseStateHydrator {
             state.scoringBestBetGame = scorecard.pick.pickGames.first(where: \.isBestBet).flatMap { scoringIndex[$0.cardGameId] }
             state.scoringProp = FieldhousePropKind.allCases.first(where: { $0.question == scorecard.card.propQuestion }) ?? .teamScores90
             state.scoringPropAnswer = scorecard.pick.propChoice ?? ""
-            state.scoringUsedHellfire = scorecard.pick.isChaos
+            state.scoringUsedHellfire = state.scoringCardKind.allowsHellfire && scorecard.pick.isChaos
             state.lastCertifiedWindow = scorecard.weekNumber
             state.lastCertifiedPoints = scorecard.totalPoints
         } else if let scoringCard = snapshot.scoringCard {
             let orderedScoringGames = scoringCard.cardGames.sorted { $0.sortOrder < $1.sortOrder }
             state.scoringWindow = scoringCard.weekNumber
+            state.scoringCardKind = FieldhouseCardKind(rawValue: scoringCard.cardKind ?? "") ?? .weekly
             state.scoringGames = orderedScoringGames.map { FieldhouseGame(cardGame: $0, window: scoringCard.weekNumber) }
             state.scoringResults = [:]
             let scoringIndex = Dictionary(uniqueKeysWithValues: orderedScoringGames.enumerated().map { ($0.element.id, $0.offset) })
@@ -1834,11 +2013,12 @@ enum FieldhouseStateHydrator {
             state.scoringBestBetGame = snapshot.scoringPick?.pickGames.first(where: \.isBestBet).flatMap { scoringIndex[$0.cardGameId] }
             state.scoringProp = FieldhousePropKind.allCases.first(where: { $0.question == scoringCard.propQuestion }) ?? .teamScores90
             state.scoringPropAnswer = snapshot.scoringPick?.propChoice ?? ""
-            state.scoringUsedHellfire = snapshot.scoringPick?.isChaos == true
+            state.scoringUsedHellfire = state.scoringCardKind.allowsHellfire && snapshot.scoringPick?.isChaos == true
         }
 
         guard let card = snapshot.card else {
             state.cardIsPublished = false
+            state.cardKind = state.phase == .conferenceChampionships ? .conferenceChampionship : .weekly
             state.publishedGames = []
             state.publishedProp = nil
             state.sideSelections = [:]
@@ -1851,6 +2031,7 @@ enum FieldhouseStateHydrator {
         }
 
         let orderedGames = card.cardGames.sorted { $0.sortOrder < $1.sortOrder }
+        state.cardKind = FieldhouseCardKind(rawValue: card.cardKind ?? "") ?? .weekly
         state.publishedGames = orderedGames.map { FieldhouseGame(cardGame: $0, window: state.window) }
         state.publishedProp = FieldhousePropKind.allCases.first { $0.question == card.propQuestion }
         state.cardIsPublished = !orderedGames.isEmpty
@@ -1957,7 +2138,8 @@ struct FieldhouseNativePreviewView: View {
         let initialState = Self.makePreviewState(for: initialLeague)
         let reviewRound = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-round")
         let reviewScorecard = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-scorecard")
-        let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review") || reviewRound || reviewScorecard
+        let reviewChampionship = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-championship")
+        let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review") || reviewRound || reviewScorecard || reviewChampionship
         let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
         let reviewLocker = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-locker")
         let reviewProfile = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-profile")
@@ -1973,7 +2155,7 @@ struct FieldhouseNativePreviewView: View {
         _lastVerifiedState = State(initialValue: displayState)
         _standings = State(initialValue: [])
         _notificationDestination = .constant(nil)
-        _desk = State(initialValue: (reviewBracket || reviewRound) ? .picks : (reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home))))
+        _desk = State(initialValue: (reviewBracket || reviewRound || reviewChampionship) ? .picks : (reviewProfile ? .profile : (reviewLocker ? .locker : (reviewPicks ? .picks : .home))))
         _strikePresentation = State(initialValue: reviewHellfire ? StrikePresentation(resourceName: initialLeague == .ncaaw ? "hellfire-fieldhouse-ncaaw-1" : "hellfire-fieldhouse-1") : nil)
         _showingEntrance = State(initialValue: !reviewMode)
     }
@@ -2003,6 +2185,7 @@ struct FieldhouseNativePreviewView: View {
         let reviewMode = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review")
             || ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-scorecard")
         let reviewPicks = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-picks")
+        let reviewChampionship = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-championship")
         let reviewTrophies = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-trophies")
         if reviewMode {
             initialState.favoriteTeam = league == .ncaaw ? "South Carolina Gamecocks" : "Duke Blue Devils"
@@ -2013,6 +2196,12 @@ struct FieldhouseNativePreviewView: View {
                 games: Array(FieldhouseGameCatalog.games(for: league).prefix(FieldhouseGameCatalog.weeklyCardSize)),
                 prop: .teamScores90
             )
+        }
+        if reviewChampionship {
+            initialState.phase = .conferenceChampionships
+            initialState.regularSeasonWeeks = 18
+            initialState.window = 19
+            _ = initialState.publishChampionshipCard(games: FieldhouseGameCatalog.championshipGames(for: league))
         }
         if reviewTrophies { initialState.seasonHasStarted = false }
         if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-scorecard") {
@@ -2305,7 +2494,8 @@ struct FieldhouseNativePreviewView: View {
                     board: board,
                     games: state.scoringGames,
                     results: state.scoringResults,
-                    prop: state.scoringProp
+                    prop: state.scoringCardKind.requiresProp ? state.scoringProp : nil,
+                    cardKind: state.scoringCardKind
                 )
                 liveRoomPickCounts = FieldhouseRoomPickEngine.counts(board: board, games: state.scoringGames)
                 liveProjectionWeek = projectionWeek
@@ -2712,11 +2902,21 @@ private struct FieldhouseHomePage: View {
                 .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingCardBuilder) {
-            FieldhouseCardBuilder(window: state.window) { games, prop in
-                if state.publishCard(games: games, prop: prop) {
-                    persist(.publishCard)
-                    showingCardBuilder = false
-                    scheduleCardNotifications()
+            if state.phase == .conferenceChampionships {
+                FieldhouseChampionshipCardBuilder(window: state.window) { games in
+                    if state.publishChampionshipCard(games: games) {
+                        persist(.publishCard)
+                        showingCardBuilder = false
+                        scheduleCardNotifications()
+                    }
+                }
+            } else {
+                FieldhouseCardBuilder(window: state.window) { games, prop in
+                    if state.publishCard(games: games, prop: prop) {
+                        persist(.publishCard)
+                        showingCardBuilder = false
+                        scheduleCardNotifications()
+                    }
                 }
             }
         }
@@ -2749,7 +2949,8 @@ private struct FieldhouseHomePage: View {
                 leagueID: FieldhousePreviewIdentity.leagueID(for: state.league),
                 leagueName: leagueName,
                 week: week,
-                lockAt: lockAt
+                lockAt: lockAt,
+                cardKind: state.cardKind
             )
         }
     }
@@ -3054,18 +3255,20 @@ private struct FieldhouseCommissionerCommand: View {
                     VStack(spacing: 12) {
                         FieldhouseHero(kicker: "COMMISSIONER CONTROL", title: "LEAGUE OPERATIONS", detail: "Players, regions, card state, and season rules from one place.", icon: "person.3.fill")
                         Button {
-                            if !state.cardIsPublished { showingCardBuilder = true }
+                            if state.canBuildCard { showingCardBuilder = true }
                         } label: {
                             commandRow(
-                                "WEEK \(state.window) · ON DECK",
-                                detail: state.cardIsPublished ? "Ten games and prop published" : "Choose ten games and an automatic floor prop",
+                                state.phase == .conferenceChampionships ? "CHAMPIONSHIP WEEK" : "WEEK \(state.window) · ON DECK",
+                                detail: state.cardIsPublished
+                                    ? (state.cardKind == .conferenceChampionship ? "Four conference title games published" : "Ten games and prop published")
+                                    : (state.phase == .conferenceChampionships ? "Post ACC, Big 12, Big Ten, and SEC title games" : "Choose ten games and an automatic floor prop"),
                                 icon: "list.bullet.clipboard.fill",
-                                status: state.cardIsPublished ? "PICKS OPEN" : "BUILD CARD",
-                                color: state.cardIsPublished ? .green : .yellow
+                                status: state.cardIsPublished ? "PICKS OPEN" : (state.canBuildCard ? "BUILD CARD" : "LOCKED"),
+                                color: state.cardIsPublished ? .green : (state.canBuildCard ? .yellow : .red)
                             )
                         }
                         .buttonStyle(.plain)
-                        .disabled(state.cardIsPublished)
+                        .disabled(!state.canBuildCard)
                         commandRow(
                             "PLAYERS",
                             detail: "\(activeStandings.count) active · late entry seed \(lateEntryScore) points",
@@ -3088,11 +3291,21 @@ private struct FieldhouseCommissionerCommand: View {
             }.navigationTitle("Commissioner Command").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarLeading) { Button("DONE") { dismiss() }.font(.caption.weight(.black)) } }
                 .sheet(isPresented: $showingCardBuilder) {
-                    FieldhouseCardBuilder(window: state.window) { games, prop in
-                        if state.publishCard(games: games, prop: prop) {
-                            persist(.publishCard)
-                            showingCardBuilder = false
-                            scheduleCardNotifications()
+                    if state.phase == .conferenceChampionships {
+                        FieldhouseChampionshipCardBuilder(window: state.window) { games in
+                            if state.publishChampionshipCard(games: games) {
+                                persist(.publishCard)
+                                showingCardBuilder = false
+                                scheduleCardNotifications()
+                            }
+                        }
+                    } else {
+                        FieldhouseCardBuilder(window: state.window) { games, prop in
+                            if state.publishCard(games: games, prop: prop) {
+                                persist(.publishCard)
+                                showingCardBuilder = false
+                                scheduleCardNotifications()
+                            }
                         }
                     }
                 }
@@ -3127,7 +3340,8 @@ private struct FieldhouseCommissionerCommand: View {
                 leagueID: FieldhousePreviewIdentity.leagueID(for: state.league),
                 leagueName: leagueName,
                 week: week,
-                lockAt: lockAt
+                lockAt: lockAt,
+                cardKind: state.cardKind
             )
         }
     }
@@ -3326,6 +3540,143 @@ private struct FieldhouseCardBuilder: View {
     }
 }
 
+private struct FieldhouseChampionshipCardBuilder: View {
+    @EnvironmentObject private var auth: AuthStore
+    @Environment(\.fieldhouseLeague) private var themedLeague
+    @Environment(\.dismiss) private var dismiss
+    private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
+    let window: Int
+    let publish: ([FieldhouseGame]) -> Void
+    @State private var loading = false
+    @State private var loadedGames: [FieldhouseGame] = []
+    @State private var selections: [FieldhouseChampionshipConference: String] = [:]
+    @State private var errorMessage: String?
+
+    private var selectedGames: [FieldhouseGame] {
+        FieldhouseChampionshipConference.allCases.compactMap { conference in
+            guard let id = selections[conference],
+                  let game = loadedGames.first(where: { $0.id == id }) else { return nil }
+            return game.assigned(to: conference)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                FieldhouseBackdrop().ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        FieldhouseHero(
+                            kicker: "REGULAR-SEASON FINALE",
+                            title: "CHAMPIONSHIP WEEK",
+                            detail: "One straight-up title pick from the ACC, Big 12, Big Ten, and SEC. No prop. No Hellfire.",
+                            icon: "trophy.fill"
+                        )
+                        Button { Task { await pullGames() } } label: {
+                            Label(loadedGames.isEmpty ? "PULL CHAMPIONSHIP GAMES" : "DIVISION I BOARD LOADED", systemImage: loadedGames.isEmpty ? "arrow.down.circle.fill" : "checkmark.circle.fill")
+                                .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
+                                .foregroundStyle(loadedGames.isEmpty ? .black : .green)
+                                .background(loadedGames.isEmpty ? accent : Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 15))
+                        }
+                        .buttonStyle(.plain).disabled(loading || !loadedGames.isEmpty)
+                        if loading { ProgressView("Loading the championship board…").tint(accent) }
+                        if let errorMessage {
+                            Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                                .font(.footnote.weight(.bold)).foregroundStyle(.red)
+                        }
+                        if !loadedGames.isEmpty {
+                            ForEach(FieldhouseChampionshipConference.allCases) { conference in
+                                conferenceSlot(conference)
+                            }
+                            VStack(alignment: .leading, spacing: 7) {
+                                Label("SCORING CONTRACT", systemImage: "checkmark.seal.fill")
+                                    .font(.caption.weight(.black)).foregroundStyle(accent)
+                                Text("Players choose four straight-up winners, assign confidence 4–3–2–1 once each, and mark one Best Bet. Certified points join the regular-season total before Selection Sunday freezes the field.")
+                                    .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.60))
+                            }
+                            .padding(14).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(accent.opacity(0.28)))
+                            Button { publish(selectedGames) } label: {
+                                Text("PUBLISH CHAMPIONSHIP WEEK").font(.headline.weight(.black))
+                                    .frame(maxWidth: .infinity).padding(16).foregroundStyle(.black)
+                                    .background(selectedGames.count == 4 ? accent : Color.gray, in: RoundedRectangle(cornerRadius: 15))
+                            }
+                            .buttonStyle(.plain).disabled(selectedGames.count != 4)
+                        }
+                    }
+                    .padding().padding(.bottom, 24)
+                }
+            }
+            .navigationTitle("Commissioner Command")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("CANCEL") { dismiss() }.font(.caption.weight(.black))
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func conferenceSlot(_ conference: FieldhouseChampionshipConference) -> some View {
+        let selectedID = selections[conference]
+        let selected = selectedID.flatMap { id in loadedGames.first(where: { $0.id == id }) }
+        let usedElsewhere = Set(selections.filter { $0.key != conference }.map(\.value))
+        return VStack(alignment: .leading, spacing: 9) {
+            Text("\(conference.displayName) CHAMPIONSHIP")
+                .font(.caption.weight(.black)).tracking(1.2).foregroundStyle(accent)
+            Menu {
+                ForEach(loadedGames) { game in
+                    Button("\(game.away) at \(game.home)") { selections[conference] = game.id }
+                        .disabled(usedElsewhere.contains(game.id))
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: selected == nil ? "circle" : "checkmark.circle.fill")
+                        .foregroundStyle(selected == nil ? .white.opacity(0.35) : .green)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(selected.map { "\($0.away) at \($0.home)" } ?? "CHOOSE THE TITLE GAME")
+                            .font(.subheadline.weight(.black)).foregroundStyle(.white)
+                        if let selected {
+                            Text(selected.displayTip(in: window)).font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.48))
+                        }
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down").foregroundStyle(accent)
+                }
+                .padding(14).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(selected == nil ? .white.opacity(0.12) : accent.opacity(0.45)))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @MainActor private func pullGames() async {
+        errorMessage = nil
+        loading = true
+        defer { loading = false }
+        guard auth.user != nil, let leagueID = auth.selectedLeagueId else {
+            loadedGames = FieldhouseGameCatalog.games(for: themedLeague)
+            selections = Dictionary(uniqueKeysWithValues: zip(FieldhouseChampionshipConference.allCases, loadedGames.prefix(4)).map { ($0.0, $0.1.id) })
+            return
+        }
+        do {
+            let token = try await auth.validAccessToken()
+            let feed = try await SupabaseAPI.fieldhouseOdds(
+                token: token, leagueId: leagueID,
+                sportId: themedLeague.favoriteSportID, window: window
+            )
+            loadedGames = feed.games.compactMap { FieldhouseGame(oddsGame: $0, window: window) }
+            if loadedGames.count < 4 {
+                throw FieldhouseRepositoryError(message: "Only \(loadedGames.count) future Division I games are posted. Wait for all four conference title matchups.")
+            }
+        } catch {
+            loadedGames = []
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
 private struct FieldhouseHomeMasthead: View {
     @Environment(\.fieldhouseLeague) private var themedLeague
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
@@ -3471,7 +3822,8 @@ private struct FieldhouseLeagueSwitcher: View {
             .padding(14)
             .background(.white.opacity(selected ? 0.10 : 0.06), in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(selected ? identity.accent.opacity(0.55) : .clear))
-        }.buttonStyle(.plain)
+        }
+        .buttonStyle(.plain)
     }
 
     private func sportTitle(_ sportID: String) -> String {
@@ -3534,8 +3886,15 @@ private struct FieldhousePicksPage: View {
                         lockedUpcomingBoard
                     } else if state.pickWindowIsClosed(at: now) {
                         expiredUpcomingBoard
-                    } else if !state.cardIsPublished || state.publishedGames.count != FieldhouseGameCatalog.weeklyCardSize {
-                        FieldhouseHero(kicker: "WEEK \(state.window) · ON DECK", title: "CARD NOT POSTED YET", detail: "Week \(state.scoringWindow) remains on the floor while the commissioner builds the next ten-game card.", icon: "hourglass")
+                    } else if !state.cardIsPublished || state.publishedGames.count != state.cardKind.requiredGameCount {
+                        FieldhouseHero(
+                            kicker: state.phase == .conferenceChampionships ? "CHAMPIONSHIP WEEK" : "WEEK \(state.window) · ON DECK",
+                            title: "CARD NOT POSTED YET",
+                            detail: state.phase == .conferenceChampionships
+                                ? "The commissioner is posting the ACC, Big 12, Big Ten, and SEC title games."
+                                : "Week \(state.scoringWindow) remains on the floor while the commissioner builds the next ten-game card.",
+                            icon: "hourglass"
+                        )
                     } else {
                         makePicksContent
                     }
@@ -3563,19 +3922,31 @@ private struct FieldhousePicksPage: View {
     }
 
     private var makePicksContent: some View {
-        VStack(spacing: 12) {
-            FieldhouseHero(kicker: "ON DECK · WEEK \(state.window)", title: "TEN GAMES.\nNO EMPTY POSSESSIONS.", detail: "Pick the spread, assign confidence 1–10, mark one Best Bet, and answer the floor prop.", icon: "list.number")
+        let championship = state.cardKind == .conferenceChampionship
+        return VStack(spacing: 12) {
+            FieldhouseHero(
+                kicker: championship ? "REGULAR-SEASON FINALE" : "ON DECK · WEEK \(state.window)",
+                title: championship ? "FOUR TITLES.\nONE LAST MOVE." : "TEN GAMES.\nNO EMPTY POSSESSIONS.",
+                detail: championship
+                    ? "Pick each conference champion straight up, assign confidence 4–3–2–1, and mark one Best Bet."
+                    : "Pick the spread, assign confidence 1–10, mark one Best Bet, and answer the floor prop.",
+                icon: championship ? "trophy.fill" : "list.number"
+            )
+            if state.cardKind.allowsHellfire {
                 Button { confirmingHellfire = true } label: {
                     FieldhouseAction(kicker: "HELLFIRE · \(state.regularHellfiresRemaining)/2 AVAILABLE", title: state.regularHellfiresRemaining == 0 ? "Hellfires Expended" : "Deploy Hellfire", detail: "One-way door: fills and locks the card. Correct game picks score double; misses cost nothing.", icon: "scope")
                 }.buttonStyle(.plain).disabled(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now)).opacity(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now) ? 0.45 : 1)
+            }
                 ForEach(Array(state.publishedGames.enumerated()), id: \.element.id) { index, game in
                     gameCard(index: index, game: game)
                 }
+            if state.cardKind.requiresProp {
                 VStack(alignment: .leading, spacing: 9) {
                     Text("FLOOR PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(accent)
                     Text(state.publishedProp?.question ?? "PROP NOT PUBLISHED").font(.headline.weight(.black))
                     HStack(spacing: 9) { propButton("YES"); propButton("NO") }
                 }.padding(15).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.28)))
+            }
                 if state.picksLocked {
                     VStack(spacing: 9) {
                         Label("WINDOW \(state.window) PICKS LOCKED", systemImage: "lock.fill").font(.headline.weight(.black)).foregroundStyle(.green)
@@ -3588,7 +3959,9 @@ private struct FieldhousePicksPage: View {
                             .foregroundStyle(.black).background(state.cardIsComplete ? accent : Color.gray, in: RoundedRectangle(cornerRadius: 15))
                     }.buttonStyle(.plain).disabled(!state.cardIsComplete)
                     if !state.cardIsComplete {
-                        Text("Pick all ten games, use confidence 1–10 once each, mark one Best Bet, and answer the prop.")
+                        Text(championship
+                             ? "Pick all four champions, use confidence 4–3–2–1 once each, and mark one Best Bet."
+                             : "Pick all ten games, use confidence 1–10 once each, mark one Best Bet, and answer the prop.")
                             .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.52)).multilineTextAlignment(.center)
                     }
                 }
@@ -3596,19 +3969,22 @@ private struct FieldhousePicksPage: View {
     }
 
     private var pickProgressHeader: some View {
+        let required = state.cardKind.requiredGameCount
         let made = state.sideSelections.count
-        let remaining = max(0, FieldhouseGameCatalog.weeklyCardSize - made)
-        let confidenceReady = state.confidenceSelections.count == FieldhouseGameCatalog.weeklyCardSize
+        let remaining = max(0, required - made)
+        let confidenceReady = state.confidenceSelections.count == required
         return VStack(spacing: 7) {
             HStack {
-                Text("\(made)/\(FieldhouseGameCatalog.weeklyCardSize) PICKS MADE").font(.caption.weight(.black))
+                Text("\(made)/\(required) PICKS MADE").font(.caption.weight(.black))
                 Spacer()
                 Text("\(remaining) REMAINING").font(.caption.weight(.black)).foregroundStyle(remaining == 0 ? .green : accent)
             }
             HStack(spacing: 8) {
                 requirementChip("CONFIDENCE", ready: confidenceReady)
                 requirementChip("BEST BET", ready: state.bestBetGame != nil)
-                requirementChip("PROP", ready: state.propAnswer != nil)
+                if state.cardKind.requiresProp {
+                    requirementChip("PROP", ready: state.propAnswer != nil)
+                }
             }
         }
         .padding(11)
@@ -3626,10 +4002,10 @@ private struct FieldhousePicksPage: View {
 
     private var laneSelector: some View {
         HStack(spacing: 8) {
-            laneButton(.liveBoard, week: state.scoringWindow, title: "LIVE BOARD", icon: "dot.radiowaves.left.and.right")
+            laneButton(.liveBoard, label: state.scoringCardKind == .conferenceChampionship ? "CHAMPIONSHIP" : "WEEK \(state.scoringWindow)", title: "LIVE BOARD", icon: "dot.radiowaves.left.and.right")
             laneButton(
                 .makePicks,
-                week: state.window,
+                label: state.cardKind == .conferenceChampionship || state.phase == .conferenceChampionships ? "CHAMPIONSHIP" : "WEEK \(state.window)",
                 title: state.picksLocked ? "LOCKED BOARD" : (state.pickWindowIsClosed(at: now) ? "WINDOW CLOSED" : "MAKE PICKS"),
                 icon: state.picksLocked || state.pickWindowIsClosed(at: now) ? "lock.fill" : "checkmark.seal.fill",
                 urgent: state.hasOutstandingPickTask(at: now)
@@ -3640,10 +4016,10 @@ private struct FieldhousePicksPage: View {
         .overlay(RoundedRectangle(cornerRadius: 17).stroke(accent.opacity(0.34)))
     }
 
-    private func laneButton(_ target: FieldhousePicksLane, week: Int, title: String, icon: String, urgent: Bool = false) -> some View {
+    private func laneButton(_ target: FieldhousePicksLane, label: String, title: String, icon: String, urgent: Bool = false) -> some View {
         Button { lane = target } label: {
             VStack(spacing: 4) {
-                Text("WEEK \(week)").font(.system(size: 8, weight: .black)).tracking(1.2)
+                Text(label).font(.system(size: 8, weight: .black)).tracking(1.2)
                 Label(title, systemImage: icon).font(.caption.weight(.black))
             }
             .foregroundStyle(urgent ? .white : (lane == target ? .black : .white.opacity(0.62)))
@@ -3651,30 +4027,36 @@ private struct FieldhousePicksPage: View {
             .background(urgent ? Color.red : (lane == target ? accent : .clear), in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(urgent ? Color.white.opacity(0.72) : .clear, lineWidth: urgent ? 2 : 0))
             .shadow(color: urgent ? .red.opacity(0.75) : .clear, radius: urgent ? 10 : 0)
-        }.buttonStyle(.plain)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("fieldhouse.picks.lane.\(target.rawValue)")
     }
 
     private var liveBoard: some View {
         VStack(spacing: 10) {
             FieldhouseHero(
-                kicker: state.scoringIsComplete ? "FINAL HORN · AUTOMATICALLY CERTIFIED" : "ON THE FLOOR · WEEK \(state.scoringWindow)",
-                title: state.scoringIsComplete ? "WEEK \(state.scoringWindow) IS FINAL" : (state.scoringLiveGames > 0 ? "THE BOARD IS LIVE" : "THE BOARD IS LOCKED"),
+                kicker: state.scoringIsComplete ? "FINAL HORN · AUTOMATICALLY CERTIFIED" : (state.scoringCardKind == .conferenceChampionship ? "CHAMPIONSHIP WEEK · ON THE FLOOR" : "ON THE FLOOR · WEEK \(state.scoringWindow)"),
+                title: state.scoringIsComplete ? (state.scoringCardKind == .conferenceChampionship ? "CHAMPIONSHIP WEEK IS FINAL" : "WEEK \(state.scoringWindow) IS FINAL") : (state.scoringLiveGames > 0 ? "THE BOARD IS LIVE" : "THE BOARD IS LOCKED"),
                 detail: "\(state.scoringFinalGames) final · \(state.scoringLiveGames) live · your scorecard: \(state.scoringPoints) points",
                 icon: state.scoringIsComplete ? "checkmark.seal.fill" : "basketball.fill"
             )
             ForEach(Array(state.scoringGames.enumerated()), id: \.element.id) { index, game in
                 let result = state.scoringResults[game.id]
                 let isFinal = result?.isFinal == true
-                let coverWinner = result?.coverWinner(in: game)
+                let winningTeam = state.scoringCardKind.usesStraightUpScoring
+                    ? result?.straightUpWinner(in: game)
+                    : result?.coverWinner(in: game)
                 HStack(spacing: 10) {
                     Image(systemName: isFinal ? "checkmark.circle.fill" : "dot.radiowaves.left.and.right")
                         .foregroundStyle(isFinal ? .green : accent)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("\(game.away) at \(game.home)").font(.caption.weight(.black))
-                        Text("\(game.spread) · \(game.displayTip(in: state.scoringWindow))")
+                        Text(state.scoringCardKind.usesStraightUpScoring
+                             ? "\(game.championshipConference?.displayName ?? "CONFERENCE") TITLE · \(game.displayTip(in: state.scoringWindow))"
+                             : "\(game.spread) · \(game.displayTip(in: state.scoringWindow))")
                             .font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.48))
-                        if let coverWinner {
-                            Text("COVERING · \(coverWinner.uppercased())")
+                        if let winningTeam {
+                            Text("\(state.scoringCardKind.usesStraightUpScoring ? "CHAMPION" : "COVERING") · \(winningTeam.uppercased())")
                                 .font(.system(size: 8, weight: .black)).foregroundStyle(.green)
                         }
                         if let gamePoints = state.scoringGamePoints(at: index) {
@@ -3707,7 +4089,9 @@ private struct FieldhousePicksPage: View {
                 .padding(13).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 13))
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(.white.opacity(0.10)))
             }
-            scoringPropReceipt
+            if state.scoringCardKind.requiresProp {
+                scoringPropReceipt
+            }
         }
     }
 
@@ -3747,7 +4131,7 @@ private struct FieldhousePicksPage: View {
     private var lockedUpcomingBoard: some View {
         VStack(spacing: 10) {
             FieldhouseHero(
-                kicker: "WEEK \(state.window) · LOCKED · AWAITING TIP",
+                kicker: state.cardKind == .conferenceChampionship ? "CHAMPIONSHIP WEEK · LOCKED" : "WEEK \(state.window) · LOCKED · AWAITING TIP",
                 title: "YOUR BOARD IS SET",
                 detail: "Your picks remain visible to you. Room selections declassify one matchup at a time when each game tips.",
                 icon: "lock.shield.fill"
@@ -3757,6 +4141,10 @@ private struct FieldhousePicksPage: View {
                     Image(systemName: "lock.fill").foregroundStyle(accent)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(game.away) at \(game.home)").font(.caption.weight(.black))
+                        if let conference = game.championshipConference {
+                            Text("\(conference.displayName) CHAMPIONSHIP · STRAIGHT UP")
+                                .font(.system(size: 8, weight: .black)).foregroundStyle(accent)
+                        }
                         Text(game.displayTip(in: state.window))
                             .font(.system(size: 9, weight: .black)).foregroundStyle(accent)
                         Text("YOUR PICK · \(state.sideSelections[index] ?? "—") · CONF \(state.confidenceSelections[index] ?? 0)")
@@ -3795,7 +4183,7 @@ private struct FieldhousePicksPage: View {
         let selected = state.sideSelections[index]
         return VStack(alignment: .leading, spacing: 11) {
             HStack {
-                Text("COURT \(index + 1) · FIRST TIP \(matchup.displayTip(in: state.window))").font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(accent)
+                Text(matchup.championshipConference.map { "\($0.displayName) CHAMPIONSHIP · \(matchup.displayTip(in: state.window))" } ?? "COURT \(index + 1) · FIRST TIP \(matchup.displayTip(in: state.window))").font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(accent)
                 Spacer()
                 Button {
                     state.bestBetGame = state.bestBetGame == index ? nil : index
@@ -3809,10 +4197,11 @@ private struct FieldhousePicksPage: View {
                 Text("AT").font(.caption2.weight(.black)).foregroundStyle(.white.opacity(0.38))
                 sideButton(matchup.home, game: index, selected: selected)
             }
-            Text(matchup.spread).font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.52))
+            Text(state.cardKind.usesStraightUpScoring ? "PICK THE CHAMPION · STRAIGHT UP" : matchup.spread)
+                .font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.52))
             HStack(spacing: 7) {
                 Text("CONFIDENCE").font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.48))
-                ForEach(1...FieldhouseGameCatalog.weeklyCardSize, id: \.self) { value in
+                ForEach(1...state.cardKind.requiredGameCount, id: \.self) { value in
                     let chosen = state.confidenceSelections[index] == value
                     let available = state.confidenceAvailable(value, for: index)
                     Button {
