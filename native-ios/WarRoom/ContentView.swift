@@ -1221,7 +1221,10 @@ private struct MissingWeekCardView: View {
                                 .font(.caption.weight(.black)).tracking(0.7)
                                 .frame(maxWidth: .infinity).padding(.vertical, 8)
                         }
-                        .buttonStyle(.bordered).tint(isNFL ? .cyan : .yellow)
+                        .buttonStyle(.borderedProminent)
+                        .tint(LeagueSwitchSignal.accent)
+                        .foregroundStyle(.white)
+                        .shadow(color: LeagueSwitchSignal.glow, radius: 12)
                     }
                     VStack(spacing: 7) {
                         Text("COMMISH IS DRUNK AGAIN.")
@@ -2465,6 +2468,7 @@ struct HomeView: View {
                                     title: "SWITCH LEAGUE",
                                     icon: isNFL ? "football.fill" : "antenna.radiowaves.left.and.right",
                                     accent: isNFL ? .cyan : .green,
+                                    isLeagueSwitcher: true,
                                     playerBadgeCount: LeagueAttentionSummary(attention: leagueAttention).playerLeagueCount,
                                     commandBadgeCount: LeagueAttentionSummary(attention: leagueAttention).commissionerLeagueCount
                                 )
@@ -3065,10 +3069,27 @@ private struct InviteShareLabel: View {
     }
 }
 
+/// One global visual signal for changing rooms across every sport skin.
+/// This intentionally does not inherit a league accent: users should learn
+/// that electric violet always means "switch league."
+enum LeagueSwitchSignal {
+    static let accent = Color(red: 0.58, green: 0.16, blue: 0.98)
+    static let glow = Color(red: 0.72, green: 0.28, blue: 1.0).opacity(0.58)
+    static let gradient = LinearGradient(
+        colors: [
+            Color(red: 0.72, green: 0.20, blue: 1.0),
+            Color(red: 0.34, green: 0.08, blue: 0.82)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+}
+
 private struct CompactHomeUtilityButton: View {
     let title: String
     let icon: String
     let accent: Color
+    var isLeagueSwitcher = false
     var playerBadgeCount = 0
     var commandBadgeCount = 0
 
@@ -3082,11 +3103,15 @@ private struct CompactHomeUtilityButton: View {
                 .minimumScaleFactor(0.78)
             Spacer(minLength: 0)
         }
-        .foregroundStyle(accent)
+        .foregroundStyle(isLeagueSwitcher ? Color.white : accent)
         .padding(.horizontal, 13)
         .frame(maxWidth: .infinity, minHeight: 52)
-        .background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(accent.opacity(0.45)))
+        .background(
+            isLeagueSwitcher ? LeagueSwitchSignal.gradient : LinearGradient(colors: [.black.opacity(0.88)], startPoint: .leading, endPoint: .trailing),
+            in: RoundedRectangle(cornerRadius: 12)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(isLeagueSwitcher ? Color.white.opacity(0.72) : accent.opacity(0.45), lineWidth: isLeagueSwitcher ? 1.5 : 1))
+        .shadow(color: isLeagueSwitcher ? LeagueSwitchSignal.glow : .clear, radius: 12, y: 3)
         .overlay(alignment: .topTrailing) {
             LeagueAttentionBadges(playerCount: playerBadgeCount, commandCount: commandBadgeCount)
                 .offset(x: 7, y: -9)
@@ -3256,19 +3281,19 @@ private struct ActiveLeagueSwitchCard: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(isNFL ? "ACTIVE FRANCHISE · PRO FOOTBALL" : "ACTIVE FREQUENCY · \(membership.leagues.sportId.uppercased())")
-                    .font(.system(size: 8, weight: .black)).tracking(1.4).foregroundStyle(isNFL ? .cyan : .green)
+                    .font(.system(size: 8, weight: .black)).tracking(1.4).foregroundStyle(.white.opacity(0.78))
                 Text(membership.leagues.name).font(.headline.weight(.black)).foregroundStyle(.white)
                 Text(isNFL ? "CHANGE FRANCHISE OR ENTER THE LOBBY" : "SWITCH LEAGUE OR SPORT")
-                    .font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(isNFL ? .white.opacity(0.52) : .yellow)
+                    .font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(.white)
             }
             Spacer()
-            Image(systemName: isNFL ? "football.fill" : "antenna.radiowaves.left.and.right").font(.title2.weight(.black)).foregroundStyle(isNFL ? .white : .green)
-            Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(isNFL ? .red : .yellow)
+            Image(systemName: isNFL ? "football.fill" : "antenna.radiowaves.left.and.right").font(.title2.weight(.black)).foregroundStyle(.white)
+            Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(.white)
         }
         .padding(15)
-        .background(isNFL ? Color.black.opacity(0.9) : Color.black.opacity(0.78), in: RoundedRectangle(cornerRadius: isNFL ? 8 : 18))
-        .overlay(alignment: .leading) { if isNFL { Rectangle().fill(.blue).frame(width: 4).padding(.vertical, 8) } }
-        .overlay(RoundedRectangle(cornerRadius: isNFL ? 8 : 18).stroke(isNFL ? .blue.opacity(0.55) : .green.opacity(0.45)))
+        .background(LeagueSwitchSignal.gradient, in: RoundedRectangle(cornerRadius: isNFL ? 8 : 18))
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 8 : 18).stroke(.white.opacity(0.72), lineWidth: 1.5))
+        .shadow(color: LeagueSwitchSignal.glow, radius: 14, y: 4)
     }
 }
 

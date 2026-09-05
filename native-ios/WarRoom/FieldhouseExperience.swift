@@ -2864,6 +2864,7 @@ private struct FieldhouseHomePage: View {
                     FieldhouseHomeButton(
                         title: "SWITCH LEAGUE",
                         icon: "antenna.radiowaves.left.and.right",
+                        isLeagueSwitcher: true,
                         playerBadgeCount: switchAttention.playerLeagueCount,
                         commandBadgeCount: switchAttention.commissionerLeagueCount
                     )
@@ -3766,13 +3767,18 @@ private struct FieldhouseHomeButton: View {
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     let title: String
     let icon: String
+    var isLeagueSwitcher = false
     var playerBadgeCount = 0
     var commandBadgeCount = 0
     var body: some View {
         Label(title, systemImage: icon).font(.system(size: 10, weight: .black)).tracking(0.6)
-            .foregroundStyle(accent).frame(maxWidth: .infinity).padding(.vertical, 17)
-            .background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: 15))
-            .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.34)))
+            .foregroundStyle(isLeagueSwitcher ? Color.white : accent).frame(maxWidth: .infinity).padding(.vertical, 17)
+            .background(
+                isLeagueSwitcher ? LeagueSwitchSignal.gradient : LinearGradient(colors: [.black.opacity(0.80)], startPoint: .leading, endPoint: .trailing),
+                in: RoundedRectangle(cornerRadius: 15)
+            )
+            .overlay(RoundedRectangle(cornerRadius: 15).stroke(isLeagueSwitcher ? Color.white.opacity(0.72) : accent.opacity(0.34), lineWidth: isLeagueSwitcher ? 1.5 : 1))
+            .shadow(color: isLeagueSwitcher ? LeagueSwitchSignal.glow : .clear, radius: 12, y: 3)
             .overlay(alignment: .topTrailing) {
                 LeagueAttentionBadges(playerCount: playerBadgeCount, commandCount: commandBadgeCount)
                     .offset(x: 7, y: -9)

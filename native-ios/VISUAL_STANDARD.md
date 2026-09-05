@@ -11,3 +11,9 @@ If an interface element represents a physical object, it must look physically re
   - Rare: handmade equipment-room plaque or artifact.
   - Common: intentionally cheap physical evidence, such as a crooked sticky note written in crayon.
 - Humor should come from the object and its construction, not from abandoning realism.
+
+## Global navigation signals
+
+- `Switch League` is a global control, not a sport-skinned action. It always uses the electric-violet signal gradient, a white label, a bright border, and a restrained violet glow.
+- Do not recolor it green for CFB, blue for NFL, orange for NCAAM, or cyan for NCAAW. The consistent color is what teaches users where to change rooms.
+- Player and commissioner task-count badges remain red and cyan so the existing attention language survives on top of the violet control.
