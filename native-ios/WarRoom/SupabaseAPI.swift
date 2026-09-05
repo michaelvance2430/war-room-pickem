@@ -28,6 +28,50 @@ struct PlatformStatus: Decodable, Sendable {
     }
 }
 
+struct CompetitiveLeagueQualification: Decodable, Sendable, Equatable {
+    let userId: UUID
+    let eligibleCards: Int
+    let lockedCards: Int
+    let requiredLockedCards: Int
+    let qualifies: Bool
+}
+
+struct CompetitiveLeagueStatus: Decodable, Sendable, Equatable {
+    let leagueId: UUID?
+    let sportId: String
+    let status: String
+    let activeHumanCount: Int
+    let totalHumanCount: Int
+    let minimumActivePlayers: Int
+    let requiredParticipationPercent: Int
+    let minimumLockedCards: Int
+    let qualification: [CompetitiveLeagueQualification]
+
+    var maximumEligibleCards: Int {
+        qualification.map(\.eligibleCards).max() ?? 0
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case leagueId, sportId, status, activeHumanCount, totalHumanCount
+        case minimumActivePlayers, requiredParticipationPercent, minimumLockedCards
+        case qualification
+    }
+
+    static func foundryDemo(sportId: String) -> CompetitiveLeagueStatus {
+        CompetitiveLeagueStatus(
+            leagueId: nil,
+            sportId: sportId,
+            status: "demo",
+            activeHumanCount: 0,
+            totalHumanCount: 0,
+            minimumActivePlayers: CompetitiveLeaguePolicy.minimumActivePlayers,
+            requiredParticipationPercent: 75,
+            minimumLockedCards: CompetitiveLeaguePolicy.minimumLockedCards,
+            qualification: []
+        )
+    }
+}
+
 struct SignUpResponse: Decodable, Sendable {
     let accessToken: String?
     let refreshToken: String?
@@ -1685,6 +1729,19 @@ enum SupabaseAPI {
             URLQueryItem(name: "limit", value: "1"),
         ]
         return try await send(authorizedRequest(url: components.url!, token: token), as: [NflPostseasonFieldStatus].self).first
+    }
+
+    static func competitiveLeagueStatus(token: String, leagueId: UUID) async throws -> CompetitiveLeagueStatus {
+        var request = authorizedRequest(
+            url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/league_competitive_status"),
+            token: token
+        )
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "p_league_id": leagueId.uuidString.lowercased()
+        ])
+        return try await send(request, as: CompetitiveLeagueStatus.self)
     }
 
     static func saveCrystalBallPick(token: String, leagueId: UUID, userId: UUID, teamName: String) async throws {

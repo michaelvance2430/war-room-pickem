@@ -2849,6 +2849,7 @@ private struct FieldhouseHomePage: View {
     @State private var showingAnnouncements = false
     @State private var showingTournamentScorecard = false
     @State private var leagueAttention: [LeagueAttention] = []
+    @State private var competitiveStatus: CompetitiveLeagueStatus?
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHomeMasthead(state: state)
@@ -2869,6 +2870,14 @@ private struct FieldhouseHomePage: View {
                         commandBadgeCount: switchAttention.commissionerLeagueCount
                     )
                 }.buttonStyle(.plain)
+            }
+            if let displayedStatus = competitiveStatus ?? (state.isAuthenticatedSession ? nil : .foundryDemo(sportId: fieldhouseSportID)) {
+                CompetitiveLeagueStatusBanner(
+                    status: displayedStatus,
+                    sportId: fieldhouseSportID,
+                    seasonIsFrozen: state.phase == .postseason,
+                    forceDemo: !state.isAuthenticatedSession
+                )
             }
             if state.isCommissioner {
                 Button { showingCommissionerCommand = true } label: {
@@ -2948,7 +2957,12 @@ private struct FieldhouseHomePage: View {
         }
         .task(id: "\(state.league.rawValue)-\(state.window)-\(state.cardIsPublished)-\(state.picksLocked)") {
             await loadLeagueAttention()
+            await loadCompetitiveStatus()
         }
+    }
+
+    private var fieldhouseSportID: String {
+        state.league == .ncaaw ? "ncaaw" : "ncaam"
     }
 
     private var switchAttention: LeagueAttentionSummary {
@@ -2972,6 +2986,19 @@ private struct FieldhouseHomePage: View {
             leagueAttention = await LeagueAttentionService.load(memberships: memberships, token: token, user: user)
         } catch {
             // Preserve the last confirmed counts. A network error must never manufacture a task or clear one.
+        }
+    }
+
+    @MainActor private func loadCompetitiveStatus() async {
+        guard state.isAuthenticatedSession, let leagueID = auth.selectedLeagueId else {
+            competitiveStatus = nil
+            return
+        }
+        do {
+            let token = try await auth.validAccessToken()
+            competitiveStatus = try await SupabaseAPI.competitiveLeagueStatus(token: token, leagueId: leagueID)
+        } catch {
+            competitiveStatus = nil
         }
     }
 
@@ -4369,6 +4396,7 @@ private struct FieldhouseStandingsPage: View {
     @State private var showingPostseason = ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-bracket")
     @State private var postseasonStrikePresentation: StrikePresentation?
     @State private var profile: Profile?
+    @State private var competitiveStatus: CompetitiveLeagueStatus?
     @AppStorage("fieldhouse.preview.equippedTitleId") private var previewEquippedTitleId: String?
     private let previewFallbackUserID = UUID(uuidString: "09544d2b-6eca-4131-a321-c000586c9029")!
     private var profileUserID: UUID { auth.user?.id ?? previewFallbackUserID }
@@ -4434,6 +4462,14 @@ private struct FieldhouseStandingsPage: View {
                         : "Certified points, regional position, and both postseason cuts in the same format used across War Room."),
                 icon: usesPostseasonScores ? "chart.line.uptrend.xyaxis" : "list.number"
             )
+            if let displayedStatus = competitiveStatus ?? (state.isAuthenticatedSession ? nil : .foundryDemo(sportId: sportID)) {
+                CompetitiveLeagueStatusBanner(
+                    status: displayedStatus,
+                    sportId: sportID,
+                    seasonIsFrozen: state.phase == .postseason,
+                    forceDemo: !state.isAuthenticatedSession
+                )
+            }
             if usesPostseasonScores { postseasonRaceSummary } else { regionalCutSummary }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -4506,6 +4542,11 @@ private struct FieldhouseStandingsPage: View {
         .task(id: profileUserID) {
             guard let token = auth.token else { profile = nil; return }
             profile = try? await SupabaseAPI.profile(token: token, userId: profileUserID)
+            guard state.isAuthenticatedSession, let leagueID = auth.selectedLeagueId else {
+                competitiveStatus = nil
+                return
+            }
+            competitiveStatus = try? await SupabaseAPI.competitiveLeagueStatus(token: token, leagueId: leagueID)
         }
         .onAppear { routePostseasonCommandIfNeeded() }
         .onChange(of: openActivePostseasonRound) { _, _ in routePostseasonCommandIfNeeded() }

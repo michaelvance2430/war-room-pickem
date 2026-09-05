@@ -359,6 +359,40 @@ struct WarRoomTests {
         #expect(CompetitiveLeaguePolicy.isOfficial(activePlayers: 8))
     }
 
+    @Test func competitiveLeagueBannerNeverConfusesMembersWithActivePlayers() {
+        let status = CompetitiveLeagueStatus(
+            leagueId: UUID(), sportId: "cfb", status: "demo",
+            activeHumanCount: 5, totalHumanCount: 14,
+            minimumActivePlayers: 8, requiredParticipationPercent: 75,
+            minimumLockedCards: 4,
+            qualification: [
+                CompetitiveLeagueQualification(
+                    userId: UUID(), eligibleCards: 6, lockedCards: 5,
+                    requiredLockedCards: 5, qualifies: true
+                )
+            ]
+        )
+        let copy = CompetitiveLeagueBannerPolicy.copy(status: status, seasonIsFrozen: false)
+        #expect(copy.title == "DEMO TRACK · NEED 3 MORE ACTIVE PLAYERS")
+        #expect(copy.detail.contains("5 of 8 active players currently qualify"))
+        #expect(!copy.detail.contains("14 of 8"))
+        #expect(!copy.isHardwareEligible)
+    }
+
+    @Test func competitiveLeagueBannerOnlyPromisesHardwareAfterTheThreshold() {
+        let status = CompetitiveLeagueStatus(
+            leagueId: UUID(), sportId: "nfl", status: "official",
+            activeHumanCount: 8, totalHumanCount: 12,
+            minimumActivePlayers: 8, requiredParticipationPercent: 75,
+            minimumLockedCards: 4, qualification: []
+        )
+        let tracking = CompetitiveLeagueBannerPolicy.copy(status: status, seasonIsFrozen: false)
+        let frozen = CompetitiveLeagueBannerPolicy.copy(status: status, seasonIsFrozen: true)
+        #expect(tracking.title == "HARDWARE TRACK · 8 ACTIVE PLAYERS")
+        #expect(frozen.title == "OFFICIAL LEAGUE · PROFILE HARDWARE ENABLED")
+        #expect(frozen.isHardwareEligible)
+    }
+
     @Test func duplicateLeagueCheevosNeverMultiplyCareerRankPoints() {
         let firstLeague = UUID()
         let secondLeague = UUID()

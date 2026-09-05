@@ -1683,6 +1683,7 @@ struct StandingsView: View {
     @State private var liveProjectionActive = false
     @State private var liveProjectionStale = false
     @State private var activeMembership: LeagueMembership?
+    @State private var competitiveStatus: CompetitiveLeagueStatus?
     private var identity: SportIdentity { SportIdentity(sportId) }
 
     private var conferences: [String] {
@@ -1719,6 +1720,15 @@ struct StandingsView: View {
                                 .background(LinearGradient(colors: [.black.opacity(0.80), identity.accent.opacity(0.13)], startPoint: .leading, endPoint: .trailing), in: UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 25, bottomTrailingRadius: 4, topTrailingRadius: 25))
                                 .overlay(alignment: .leading) { Rectangle().fill(identity.accent).frame(width: 4).padding(.vertical, 14) }
                                 .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 25, bottomTrailingRadius: 4, topTrailingRadius: 25).stroke(identity.accent.opacity(0.48)))
+
+                                if let competitiveStatus, let activeMembership {
+                                    CompetitiveLeagueStatusBanner(
+                                        status: competitiveStatus,
+                                        sportId: sportId,
+                                        seasonIsFrozen: activeMembership.leagues.currentWeek > activeMembership.leagues.regularSeasonWeeks,
+                                        forceDemo: activeMembership.leagues.mode == "foundry"
+                                    )
+                                }
 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 8) {
@@ -1871,10 +1881,12 @@ struct StandingsView: View {
             try? await SupabaseAPI.touchLastSeen(token: token, userId: user.id)
             async let loadedStandings = SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
             async let loadedTrophies = SupabaseAPI.leagueTrophies(token: token, leagueId: membership.leagueId)
+            async let loadedCompetitiveStatus = SupabaseAPI.competitiveLeagueStatus(token: token, leagueId: membership.leagueId)
             async let loadedPostseasonScores: [CfbPostseasonScore] = membership.leagues.sportId.lowercased() == "cfb" && membership.leagues.currentWeek >= membership.leagues.regularSeasonWeeks + 2
                 ? SupabaseAPI.cfbPostseasonScoreboard(token: token, leagueId: membership.leagueId, seasonKey: Calendar.current.component(.year, from: Date()))
                 : []
             standings = try await loadedStandings
+            competitiveStatus = try? await loadedCompetitiveStatus
             let trophies = (try? await loadedTrophies) ?? []
             let postseasonScores = (try? await loadedPostseasonScores) ?? []
             postseasonScoreByUser = Dictionary(uniqueKeysWithValues: postseasonScores.map { ($0.userId, $0) })
@@ -2374,6 +2386,7 @@ struct HomeView: View {
     @State private var showingRegularScorecard = false
     @State private var regularScorecardToShowID: String?
     @State private var showingNewDispatch = false
+    @State private var competitiveStatus: CompetitiveLeagueStatus?
     @State private var loading = true
     @State private var loadError: String?
     @State private var clock = Date()
@@ -2474,6 +2487,14 @@ struct HomeView: View {
                                 )
                             }
                             .buttonStyle(WarRoomCardButtonStyle())
+                        }
+                        if let competitiveStatus {
+                            CompetitiveLeagueStatusBanner(
+                                status: competitiveStatus,
+                                sportId: membership.leagues.sportId,
+                                seasonIsFrozen: membership.leagues.currentWeek > membership.leagues.regularSeasonWeeks,
+                                forceDemo: membership.leagues.mode == "foundry"
+                            )
                         }
                         if isCommissioner {
                             NavigationLink { CommissionerCommandCenterView(membership: membership, standings: standings, submittedUserIds: visibleSubmittedUserIds) } label: {
@@ -2887,6 +2908,7 @@ struct HomeView: View {
             async let loadedSubmissions = SupabaseAPI.weekSubmittedUserIds(token: token, leagueId: active.leagueId, weekNumber: active.leagues.currentWeek)
             async let loadedSportPool = SupabaseAPI.sportPoolPoll(token: token, leagueId: active.leagueId)
             async let loadedDispatches = SupabaseAPI.gazetteEditions(token: token, leagueId: active.leagueId)
+            async let loadedCompetitiveStatus = SupabaseAPI.competitiveLeagueStatus(token: token, leagueId: active.leagueId)
             card = try await loadedCard
             homeScores = [:]
             homeScoreStatus = nil
@@ -2898,6 +2920,7 @@ struct HomeView: View {
             lockerMessages = try await loadedLocker
             submittedUserIds = try await loadedSubmissions
             sportPoolPoll = try? await loadedSportPool
+            competitiveStatus = try? await loadedCompetitiveStatus
             let dispatches = (try? await loadedDispatches) ?? []
             regularScorecards = (try? await SupabaseAPI.regularSeasonScorecards(token: token, leagueId: active.leagueId, userId: user.id)) ?? []
             if active.leagues.sportId.lowercased() == "cfb" {
@@ -3021,6 +3044,54 @@ struct HomeView: View {
         if let requests = try? await SupabaseAPI.privateRoomJoinRequests(token: token, leagueId: membership.leagueId) {
             pendingJoinRequests = requests
         }
+    }
+}
+
+struct CompetitiveLeagueStatusBanner: View {
+    let status: CompetitiveLeagueStatus
+    let sportId: String
+    let seasonIsFrozen: Bool
+    var forceDemo = false
+
+    private var copy: CompetitiveLeagueBannerCopy {
+        CompetitiveLeagueBannerPolicy.copy(
+            status: status,
+            seasonIsFrozen: seasonIsFrozen,
+            forceDemo: forceDemo
+        )
+    }
+
+    private var accent: Color {
+        copy.isHardwareEligible ? SportIdentity(sportId).accent : .orange
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: copy.isHardwareEligible ? "trophy.fill" : "exclamationmark.shield.fill")
+                .font(.title2.weight(.black))
+                .foregroundStyle(accent)
+                .frame(width: 34, height: 34)
+                .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9))
+            VStack(alignment: .leading, spacing: 5) {
+                Text(copy.title)
+                    .font(.system(size: 11, weight: .black))
+                    .tracking(1.05)
+                    .foregroundStyle(accent)
+                Text(copy.detail)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: SportIdentity(sportId).isNFL ? 7 : 15))
+        .overlay(
+            RoundedRectangle(cornerRadius: SportIdentity(sportId).isNFL ? 7 : 15)
+                .stroke(accent.opacity(0.62), lineWidth: copy.isHardwareEligible ? 1 : 1.5)
+        )
+        .accessibilityElement(children: .combine)
     }
 }
 
