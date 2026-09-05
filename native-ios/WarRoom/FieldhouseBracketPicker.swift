@@ -181,7 +181,6 @@ enum FieldhouseBracketEngine {
     }
 
     static func liveRoundKey(field: FieldhouseOfficialField, now: Date = Date()) -> String? {
-        let formatter = ISO8601DateFormatter()
         for key in orderedRoundKeys {
             let games = field.games.filter { $0.roundKey == key }
             guard !games.isEmpty, games.contains(where: { $0.winnerTeamID == nil }) else { continue }
@@ -190,7 +189,7 @@ enum FieldhouseBracketEngine {
                 resolveParticipant(game.secondTeamID, source: game.secondSourceGameID, field: field) != nil
             }
             guard participantsReady else { continue }
-            let tips = games.compactMap { $0.startsAt.flatMap(formatter.date(from:)) }
+            let tips = games.compactMap { footballKickoffDate($0.startsAt) }
             if tips.isEmpty || now < (tips.min() ?? now) { return key }
             return key
         }

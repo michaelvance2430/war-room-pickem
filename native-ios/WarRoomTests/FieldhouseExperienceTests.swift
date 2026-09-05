@@ -330,6 +330,45 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertFalse(state.postseasonRoundScheduleIsReady("r64"))
     }
 
+    func testPostseasonAcceptsSupabaseFractionalSecondTimestamps() {
+        let base = FieldhouseOfficialField.previewRound(for: .ncaaw)
+        let games = base.games.map { game in
+            FieldhouseOfficialGame(
+                gameID: game.gameID,
+                roundKey: game.roundKey,
+                roundOrder: game.roundOrder,
+                ordinal: game.ordinal,
+                region: game.region,
+                firstTeamID: game.firstTeamID,
+                secondTeamID: game.secondTeamID,
+                firstSourceGameID: game.firstSourceGameID,
+                secondSourceGameID: game.secondSourceGameID,
+                startsAt: "2027-03-18T16:00:00.123Z",
+                winnerTeamID: game.winnerTeamID
+            )
+        }
+        var state = FieldhouseSeasonState()
+        state.officialPostseasonField = FieldhouseOfficialField(
+            tournamentID: base.tournamentID,
+            sportID: base.sportID,
+            seasonKey: base.seasonKey,
+            status: base.status,
+            firstTipAt: "2027-03-18T16:00:00.123Z",
+            teams: base.teams,
+            games: games
+        )
+        state.postseasonScoreUpdatedAt = "2027-03-18T18:30:45.456+00:00"
+        let beforeTip = ISO8601DateFormatter().date(from: "2027-03-18T15:59:59Z")!
+        let afterTip = ISO8601DateFormatter().date(from: "2027-03-18T16:00:01Z")!
+
+        XCTAssertTrue(state.postseasonRoundScheduleIsReady("r64"))
+        XCTAssertFalse(state.postseasonBracketIsLocked(at: beforeTip))
+        XCTAssertTrue(state.postseasonBracketIsLocked(at: afterTip))
+        XCTAssertTrue(state.postseasonRoundIsLocked("r64", at: afterTip))
+        XCTAssertEqual(state.activePostseasonRound(at: afterTip), "r64")
+        XCTAssertFalse(state.postseasonScoreFreshnessLabel.contains("WAITING"))
+    }
+
     func testCardWritePlanTranslatesTeamFavoriteToSharedHomeAwayContract() throws {
         var state = FieldhouseSeasonState()
         state.isCommissioner = true

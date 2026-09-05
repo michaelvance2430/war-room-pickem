@@ -1355,7 +1355,7 @@ struct FieldhouseSeasonState: Codable, Equatable {
     }
     var postseasonScoreFreshnessLabel: String {
         guard let value = postseasonScoreUpdatedAt,
-              let date = ISO8601DateFormatter().date(from: value) else {
+              let date = footballKickoffDate(value) else {
             return "WAITING FOR FIRST OFFICIAL RESULT"
         }
         return "SERVER UPDATED \(date.formatted(date: .abbreviated, time: .shortened).uppercased())"
@@ -1422,34 +1422,31 @@ struct FieldhouseSeasonState: Codable, Equatable {
     func postseasonBracketIsLocked(at now: Date = Date()) -> Bool {
         if bracketLocked { return true }
         guard let firstTipAt = officialPostseasonField?.firstTipAt,
-              let firstTip = ISO8601DateFormatter().date(from: firstTipAt) else { return false }
+              let firstTip = footballKickoffDate(firstTipAt) else { return false }
         return now >= firstTip
     }
     func postseasonRoundScheduleIsReady(_ roundKey: String) -> Bool {
         guard let field = officialPostseasonField else { return false }
-        let formatter = ISO8601DateFormatter()
         let games = field.games.filter { $0.roundKey == roundKey }
         return !games.isEmpty && games.allSatisfy { game in
-            game.startsAt.flatMap(formatter.date(from:)) != nil
+            footballKickoffDate(game.startsAt) != nil
         }
     }
     func postseasonRoundIsLocked(_ roundKey: String, at now: Date = Date()) -> Bool {
         if postseasonRoundLocked.contains(roundKey) { return true }
         guard let field = officialPostseasonField else { return false }
-        let formatter = ISO8601DateFormatter()
         let firstTip = field.games
             .filter { $0.roundKey == roundKey }
-            .compactMap { $0.startsAt.flatMap(formatter.date(from:)) }
+            .compactMap { footballKickoffDate($0.startsAt) }
             .min()
         return firstTip.map { now >= $0 } ?? false
     }
     func postseasonLockLabel(at now: Date) -> String {
         guard let field = officialPostseasonField,
               let round = activePostseasonRound else { return "TOURNAMENT COMPLETE" }
-        let formatter = ISO8601DateFormatter()
         let firstTip = field.games
             .filter { $0.roundKey == round }
-            .compactMap { $0.startsAt.flatMap(formatter.date(from:)) }
+            .compactMap { footballKickoffDate($0.startsAt) }
             .min()
         guard let firstTip else { return "\(FieldhouseBracketEngine.roundTitle(round)) · TIP PENDING" }
         guard now < firstTip else { return "\(FieldhouseBracketEngine.roundTitle(round)) PICKS LOCKED" }
@@ -3002,7 +2999,7 @@ private struct FieldhouseTournamentRoundReceiptView: View {
     }
 
     private func tipLabel(_ value: String?) -> String {
-        guard let value, let date = ISO8601DateFormatter().date(from: value) else { return "TIP PENDING" }
+        guard let date = footballKickoffDate(value) else { return "TIP PENDING" }
         let formatter = DateFormatter()
         formatter.timeZone = TimeZone(identifier: "America/New_York")
         formatter.dateFormat = "EEE MMM d · h:mm a"
