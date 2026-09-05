@@ -64,6 +64,8 @@ assert.match(sql, /insert into public\.fieldhouse_postseason_totals/);
 assert.match(sql, /row_number\(\) over\(partition by league_id,fieldhouse_region order by total_points desc,regular_points desc,user_id\)/);
 assert.match(sql, /insert into public\.league_trophies\(/);
 assert.match(sql, /create or replace function public\.freeze_fieldhouse_postseason_qualifiers/);
+assert.match(sql, /Every published Fieldhouse card must be certified before Selection Sunday/);
+assert.match(sql, /from public\.week_cards card[\s\S]*from public\.week_results result/);
 assert.match(sql, /when regular_rank<=brass_size then 'championship'/);
 assert.match(sql, /when regular_rank>region_count-brass_size then 'toilet_bowl'/);
 assert.match(sql, /else 'no_brass'/);

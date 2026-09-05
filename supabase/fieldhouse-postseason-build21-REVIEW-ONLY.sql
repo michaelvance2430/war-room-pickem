@@ -315,6 +315,15 @@ begin
       select 1 from public.memberships
       where league_id=league_row.id and coalesce(is_bot,false)=false and fieldhouse_region is null
     ) then raise exception 'Every Fieldhouse player needs a region before Selection Sunday'; end if;
+    if exists(
+      select 1
+      from public.week_cards card
+      where card.league_id=league_row.id
+        and not exists(
+          select 1 from public.week_results result
+          where result.league_id=card.league_id and result.week_number=card.week_number
+        )
+    ) then raise exception 'Every published Fieldhouse card must be certified before Selection Sunday'; end if;
 
     with regional_order as (
       select m.user_id,m.fieldhouse_region,m.total_points,

@@ -18,7 +18,7 @@ This workflow builds the platform-owned NCAAM or NCAAW tournament field. It does
 
    `node scripts/generate-fieldhouse-official-field.mjs /tmp/ncaam-2027-input.json /tmp/ncaam-2027-ready.json --publish-ready`
 
-6. In the owner-only Fieldhouse control, import the generated file as a draft. Inspect all regions, seeds, opening feeders, game times, and Final Four paths. Publish only after that review. Publishing is a deliberate separate action and opens the same field for every league in that sport.
+6. In the owner-only Fieldhouse control, import the generated file as a draft. Inspect all regions, seeds, opening feeders, game times, and Final Four paths. Publish only after that review and after every posted weekly card in every league for that sport has a certified result. Publishing is a deliberate separate action, freezes the Selection Sunday eligibility snapshot, and opens the same field for every league in that sport.
 
 7. When later-round broadcast times or Odds API event IDs become official, regenerate the same file and use **Sync Times + Event IDs**. That operation cannot replace the bracket graph or any player receipt, and it refuses to move a game time after that game has started.
 
