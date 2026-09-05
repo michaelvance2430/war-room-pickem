@@ -1124,6 +1124,9 @@ declare
   v_region_awards integer := 0;
   v_league_awards integer := 0;
   v_toilet_awards integer := 0;
+  v_champion record;
+  v_source_key text;
+  v_existing_user uuid;
 begin
   select status,season_key,sport_id into v_status,v_season_key,v_sport_id
   from public.fieldhouse_tournaments where id=p_tournament_id;
@@ -1201,6 +1204,34 @@ begin
   select p_tournament_id,league_id,user_id,'toilet_champion',null,'toilet_bowl',total_points
   from ranked where place=1;
   get diagnostics v_toilet_awards=row_count;
+
+  -- Fieldhouse co-champions use their own award table, but career title count
+  -- is global. Feed every legitimate league champion into the same immutable
+  -- receipt ledger used by CFB and NFL hardware.
+  for v_champion in
+    select award.id,award.league_id,award.user_id,award.awarded_at
+    from public.fieldhouse_postseason_awards award
+    join public.leagues league on league.id=award.league_id
+    where award.tournament_id=p_tournament_id
+      and award.award_key='league_champion'
+      and coalesce(league.mode::text,'production')='production'
+  loop
+    v_source_key:='fieldhouse:'||p_tournament_id::text||':'||v_champion.league_id::text||':league_champion:'||v_champion.user_id::text;
+    insert into public.career_championship_receipts(
+      source_key,user_id,league_id,season_key,sport_id,earned_at
+    ) values (
+      v_source_key,v_champion.user_id,v_champion.league_id,v_season_key,v_sport_id,v_champion.awarded_at
+    ) on conflict(source_key) do nothing;
+    select receipt.user_id into v_existing_user
+    from public.career_championship_receipts receipt
+    where receipt.source_key=v_source_key;
+    if v_existing_user is distinct from v_champion.user_id then
+      raise exception 'Permanent Fieldhouse championship receipt cannot be reassigned';
+    end if;
+    perform private.refresh_repeat_champion_milestones(
+      v_champion.user_id,v_source_key,v_champion.league_id
+    );
+  end loop;
 
   return jsonb_build_object(
     'ok',true,

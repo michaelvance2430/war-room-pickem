@@ -18,7 +18,9 @@ for (const fragment of [
 }
 assert.match(sql, /revoke all on function public\.record_cfb_season_closeout[\s\S]*from public,anon/i);
 assert.match(client, /league_season_closeouts/);
-assert.match(client, /record_cfb_season_closeout/);
+assert.match(client, /record_season_closeout/);
+assert.match(client, /p_sport_id: "cfb"/);
+assert.match(client, /p_league_champion_ids: readiness\.leagueChampionIds/);
 assert.match(client, /listBracketScoredWeekNumbers/);
 assert.doesNotMatch(client, /const existing = readClosed/);
 assert.match(client, /if \(!championshipAward\.ok\)/);

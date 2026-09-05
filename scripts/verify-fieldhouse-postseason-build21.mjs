@@ -5,6 +5,7 @@ const sql = readFileSync(new URL("../supabase/fieldhouse-postseason-build21-REVI
 const schema = readFileSync(new URL("../supabase/fieldhouse-build21-schema-REVIEW-ONLY.sql", import.meta.url), "utf8");
 const liveStandings = readFileSync(new URL("../supabase/fieldhouse-live-standings-build21-REVIEW-ONLY.sql", import.meta.url), "utf8");
 const competitive = readFileSync(new URL("../supabase/competitive-league-qualification-build21-REVIEW-ONLY.sql", import.meta.url), "utf8");
+const closeout = readFileSync(new URL("../supabase/multi-sport-season-closeout-build21-REVIEW-ONLY.sql", import.meta.url), "utf8");
 const worker = readFileSync(new URL("../supabase/functions/fieldhouse-tournament-results/index.ts", import.meta.url), "utf8");
 const weeklyWorker = readFileSync(new URL("../supabase/functions/autonomous-football-results/index.ts", import.meta.url), "utf8");
 const fieldhouseOdds = readFileSync(new URL("../supabase/functions/fieldhouse-odds/index.ts", import.meta.url), "utf8");
@@ -118,6 +119,13 @@ assert.match(competitive, /grant select on public\.league_competitive_seasons to
 assert.match(competitive, /create table if not exists public\.career_champion_milestones/);
 assert.match(competitive, /threshold integer not null check \(threshold in \(3,5,10\)\)/);
 assert.match(competitive, /create trigger league_trophies_award_repeat_champion_milestones/);
+assert.match(competitive, /career_championship_receipts/);
+assert.match(competitive, /refresh_repeat_champion_milestones/);
+assert.match(competitive, /Missing evidence is never guessed/);
+assert.match(sql, /Permanent Fieldhouse championship receipt cannot be reassigned/);
+assert.match(closeout, /create or replace function public\.record_season_closeout/);
+assert.match(closeout, /Official competitive-season receipt is missing/);
+assert.match(closeout, /fieldhouse_postseason_awards/);
 assert.match(competitive, /competitive\.status = 'official'/);
 assert.match(competitive, /coalesce\(league\.mode::text,'production'\) = 'production'/);
 assert.match(competitive, /case v_threshold when 3 then 'three_ring_circus' when 5 then 'five_star_dynasty' else 'ten_room_terror' end/);

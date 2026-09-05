@@ -570,14 +570,16 @@ export async function closeCfbSeason(opts?: {
     // 11) Commit the immutable server receipt only after required hardware exists.
     const { createClient } = await import("./supabase/client");
     const { data: closeout, error: closeoutError } = await createClient().rpc(
-      "record_cfb_season_closeout",
+      "record_season_closeout",
       {
         p_league_id: session.leagueId,
         p_season_key: year,
+        p_sport_id: "cfb",
+        p_competition_type: "league",
         p_readiness_version: readiness.version,
         p_national_champion: champTeam,
-        p_league_champion_id: readiness.leagueChampionIds[0],
-        p_toilet_bowl_champion_id: readiness.toiletBowlIds[0],
+        p_league_champion_ids: readiness.leagueChampionIds,
+        p_toilet_bowl_champion_ids: readiness.toiletBowlIds,
         p_award_manifest: {
           championship: readiness.leagueChampionIds,
           toilet_bowl: readiness.toiletBowlIds,

@@ -8,6 +8,9 @@
 
 ## Done
 
+- [x] ~~Add the Build 21 multi-sport season-closeout authority~~ (2026-09-05)
+  - Replaced the CFB-only receipt contract with a review-only sport-aware closeout RPC for CFB, NFL, NCAAM, and NCAAW. It preserves the legacy CFB entry point, supports honest co-champion arrays, requires an Official-season receipt, validates each sport's trophy catalog, and checks final evidence against the correct football or Fieldhouse authority. The existing CFB consumer now uses the generic RPC. Multi-sport, CFB regression, Fieldhouse authority, and targeted lint checks pass; production was inspected read-only and not changed. Attaching the NFL ceremony remains separate because the current code has no authoritative rule mapping Final Thirteen results to league and Toilet Bowl winners.
+
 - [x] ~~Protect career championships from demo-room farming~~ (2026-09-05)
   - Every permanent hardware write now creates a durable Official-season qualification receipt first. Only championship trophies from production rooms with that receipt count toward the new three-, five-, and ten-title career milestones. The native profile merges those milestone awards without duplicating the base championship achievement. Focused native tests and the Build 21 authority verifier pass; the SQL remains review-only and has not been executed against production.
 
