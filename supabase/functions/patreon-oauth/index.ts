@@ -216,7 +216,14 @@ async function persistConnection(
   return { ...identity, verifiedAt: row.verified_at };
 }
 
-function publicConnection(connection: ConnectionRecord) {
+async function publicConnectionWithRecognition(service: SupabaseClient, connection: ConnectionRecord) {
+  const { data: founder, error } = await service
+    .schema("private")
+    .from("patreon_founding_supporters")
+    .select("supporter_number")
+    .eq("patreon_user_id", connection.patreon_user_id)
+    .maybeSingle<{ supporter_number: number }>();
+  if (error) throw error;
   return {
     connected: true,
     patreon_user_id: connection.patreon_user_id,
@@ -226,6 +233,7 @@ function publicConnection(connection: ConnectionRecord) {
     currently_entitled_amount_cents: connection.currently_entitled_amount_cents,
     connected_at: connection.connected_at,
     verified_at: connection.verified_at,
+    founding_supporter_number: founder?.supporter_number ?? null,
   };
 }
 
@@ -312,11 +320,11 @@ Deno.serve(async (request: Request) => {
       const tokens = await refreshTokens(environment, refreshToken);
       await persistConnection(service, environment, user.id, tokens);
       const { data: refreshed } = await service.schema("private").from("patreon_connections").select("*").eq("user_id", user.id).single<ConnectionRecord>();
-      if (refreshed) return json(publicConnection(refreshed));
+      if (refreshed) return json(await publicConnectionWithRecognition(service, refreshed));
     } catch (refreshError) {
       console.error("Patreon refresh failed", refreshError instanceof Error ? refreshError.message : "unknown");
-      return json({ ...publicConnection(data), needs_reauthorization: true });
+      return json({ ...await publicConnectionWithRecognition(service, data), needs_reauthorization: true });
     }
   }
-  return json(publicConnection(data));
+  return json(await publicConnectionWithRecognition(service, data));
 });

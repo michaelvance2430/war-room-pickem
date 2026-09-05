@@ -8,7 +8,9 @@ enum PatreonConnectionFeature {
     // round trip have been verified. The preview flag keeps local UI review open.
     static let isEnabled = false
     static var shouldShow: Bool {
-        isEnabled || ProcessInfo.processInfo.arguments.contains("--patreon-preview")
+        isEnabled
+            || ProcessInfo.processInfo.arguments.contains("--patreon-preview")
+            || ProcessInfo.processInfo.arguments.contains("--patreon-founder-preview")
     }
 }
 
@@ -22,6 +24,23 @@ struct PatreonConnectionView: View {
     @State private var showingDisconnectConfirmation = false
 
     private var accent: Color { .green }
+
+    init() {
+        guard ProcessInfo.processInfo.arguments.contains("--patreon-founder-preview") else { return }
+        _status = State(initialValue: PatreonConnectionStatus(
+            connected: true,
+            patreonUserId: "preview-founder-02",
+            displayName: "Tbone Soulstache",
+            avatarURL: nil,
+            membershipStatus: "active_patron",
+            currentlyEntitledAmountCents: 500,
+            connectedAt: nil,
+            verifiedAt: nil,
+            needsReauthorization: false,
+            foundingSupporterNumber: 2
+        ))
+        _loading = State(initialValue: false)
+    }
 
     var body: some View {
         ZStack {
@@ -109,6 +128,11 @@ struct PatreonConnectionView: View {
                     .overlay(Circle().stroke(accent.opacity(0.7), lineWidth: 2))
                     VStack(alignment: .leading, spacing: 4) {
                         Text(status.displayName ?? "Patreon member").font(.headline.weight(.black))
+                        if let recognitionTitle = status.recognitionTitle {
+                            Text(recognitionTitle)
+                                .font(.caption.weight(.black)).tracking(1)
+                                .foregroundStyle(.yellow)
+                        }
                         Text(status.badge).font(.caption.weight(.black)).tracking(1).foregroundStyle(badgeColor(status))
                     }
                     Spacer()
@@ -188,7 +212,7 @@ struct PatreonConnectionView: View {
         do {
             let token = try await auth.validAccessToken()
             try await SupabaseAPI.disconnectPatreon(token: token)
-            status = PatreonConnectionStatus(connected: false, patreonUserId: nil, displayName: nil, avatarURL: nil, membershipStatus: nil, currentlyEntitledAmountCents: nil, connectedAt: nil, verifiedAt: nil, needsReauthorization: nil)
+            status = PatreonConnectionStatus(connected: false, patreonUserId: nil, displayName: nil, avatarURL: nil, membershipStatus: nil, currentlyEntitledAmountCents: nil, connectedAt: nil, verifiedAt: nil, needsReauthorization: nil, foundingSupporterNumber: nil)
             message = "Patreon disconnected. Your Patreon membership was not changed."
         } catch {
             message = error.localizedDescription

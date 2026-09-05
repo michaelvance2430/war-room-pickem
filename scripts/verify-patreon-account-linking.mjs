@@ -15,6 +15,10 @@ const assertions = [
   [edge.includes("anon.auth.getUser(token)"), "app actions must authenticate the War Room user"],
   [schema.includes("private.patreon_connections"), "connections must live outside the exposed public schema"],
   [schema.includes("patreon_user_id text not null unique"), "one Patreon identity must not link to multiple War Room accounts"],
+  [schema.includes("private.patreon_founding_supporters"), "Founding Ten must use a private permanent registry"],
+  [schema.includes("check (supporter_number between 1 and 10)"), "founder numbers must be limited to the first ten"],
+  [schema.includes("values (2, 'Tbone Soulstache')"), "Tbone Soulstache must remain reserved as Founding Ten number 2"],
+  [edge.includes("founding_supporter_number"), "server status must return verified Founding Ten recognition"],
   [schema.includes("references auth.users(id) on delete cascade"), "account deletion must remove Patreon connection data"],
   [!schema.includes("revoke all on all tables in schema private"), "the migration must not alter unrelated private tables"],
 ];

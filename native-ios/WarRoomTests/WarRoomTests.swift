@@ -13,13 +13,15 @@ struct WarRoomTests {
 
     @Test func patreonStatusNeverTurnsSupportIntoGameplayAuthority() throws {
         let active = try JSONDecoder().decode(PatreonConnectionStatus.self, from: Data("""
-        {"connected":true,"membership_status":"active_patron","currently_entitled_amount_cents":500}
+        {"connected":true,"membership_status":"active_patron","currently_entitled_amount_cents":500,"founding_supporter_number":2}
         """.utf8))
         let unlinked = try JSONDecoder().decode(PatreonConnectionStatus.self, from: Data("""
         {"connected":false}
         """.utf8))
         #expect(active.badge == "ACTIVE SUPPORTER")
+        #expect(active.recognitionTitle == "FOUNDING TEN · #02")
         #expect(unlinked.badge == "NOT CONNECTED")
+        #expect(unlinked.recognitionTitle == nil)
     }
 
     @Test func leagueInviteRouterAcceptsOnlyWarRoomJoinLinks() throws {

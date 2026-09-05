@@ -122,6 +122,7 @@ struct PatreonConnectionStatus: Decodable, Sendable, Equatable {
     let connectedAt: String?
     let verifiedAt: String?
     let needsReauthorization: Bool?
+    let foundingSupporterNumber: Int?
 
     enum CodingKeys: String, CodingKey {
         case connected
@@ -133,6 +134,7 @@ struct PatreonConnectionStatus: Decodable, Sendable, Equatable {
         case connectedAt = "connected_at"
         case verifiedAt = "verified_at"
         case needsReauthorization = "needs_reauthorization"
+        case foundingSupporterNumber = "founding_supporter_number"
     }
 
     var badge: String {
@@ -145,6 +147,11 @@ struct PatreonConnectionStatus: Decodable, Sendable, Equatable {
         case "former_patron": return "FORMER SUPPORTER"
         default: return "ACCOUNT CONNECTED"
         }
+    }
+
+    var recognitionTitle: String? {
+        guard let foundingSupporterNumber, (1...10).contains(foundingSupporterNumber) else { return nil }
+        return "FOUNDING TEN · #\(String(format: "%02d", foundingSupporterNumber))"
     }
 }
 
