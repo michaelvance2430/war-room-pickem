@@ -2839,6 +2839,7 @@ private struct FieldhouseHomePage: View {
     @EnvironmentObject private var auth: AuthStore
     @Environment(\.fieldhousePersist) private var persist
     @Environment(\.fieldhouseLeague) private var themedLeague
+    @Environment(\.openURL) private var openURL
     private var accent: Color { FieldhouseTheme.accent(for: themedLeague) }
     @Binding var state: FieldhouseSeasonState
     @Binding var desk: FieldhouseDesk
@@ -2847,6 +2848,9 @@ private struct FieldhouseHomePage: View {
     @State private var showingCardBuilder = false
     @State private var showingCommissionerCommand = false
     @State private var showingTournamentScorecard = false
+    @State private var showingMoreFromWarRoom = false
+    @State private var showingDispatch = false
+    @State private var showingFeedbackFallback = false
     @State private var leagueAttention: [LeagueAttention] = []
     @State private var competitiveStatus: CompetitiveLeagueStatus?
     var body: some View {
@@ -2906,6 +2910,8 @@ private struct FieldhouseHomePage: View {
             if let certifiedWindow = state.lastCertifiedWindow, let certifiedPoints = state.lastCertifiedPoints {
                 FieldhouseAction(kicker: "LAST CERTIFIED SCORECARD", title: "Week \(certifiedWindow) · \(certifiedPoints) points", detail: "Permanent weekly receipt.", icon: "clipboard.fill")
             }
+            moreFromWarRoom
+            fieldReports
         }
         .sheet(isPresented: $showingLeagueSwitcher) {
             FieldhouseLeagueSwitcher(league: Binding(get: { state.league }, set: { state.selectLeague($0) }), dismiss: { showingLeagueSwitcher = false })
@@ -2936,6 +2942,9 @@ private struct FieldhouseHomePage: View {
         .fullScreenCover(isPresented: $showingTournamentScorecard) {
             FieldhouseTournamentScorecardView(state: state)
         }
+        .sheet(isPresented: $showingDispatch) {
+            FieldhouseDispatchPage(state: state)
+        }
         .onAppear {
             if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-trophies") {
                 showingCommissionerCommand = true
@@ -2944,6 +2953,11 @@ private struct FieldhouseHomePage: View {
         .task(id: "\(state.league.rawValue)-\(state.window)-\(state.cardIsPublished)-\(state.picksLocked)") {
             await loadLeagueAttention()
             await loadCompetitiveStatus()
+        }
+        .alert("SUPPORT EMAIL COPIED", isPresented: $showingFeedbackFallback) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("No email app was available, so \(AppLinks.supportEmail) was copied. Paste it into any email app to send your field report.")
         }
     }
 
@@ -3003,6 +3017,101 @@ private struct FieldhouseHomePage: View {
                 lockAt: lockAt,
                 cardKind: state.cardKind
             )
+        }
+    }
+
+    private var moreFromWarRoom: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showingMoreFromWarRoom.toggle() }
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "ellipsis.circle.fill")
+                        .font(.title3.weight(.black))
+                        .foregroundStyle(accent)
+                    Text("MORE FROM WAR ROOM")
+                        .font(.system(size: 12, weight: .black))
+                        .tracking(1.1)
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Image(systemName: showingMoreFromWarRoom ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.black))
+                        .foregroundStyle(accent)
+                }
+                .padding(.horizontal, 15)
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if showingMoreFromWarRoom {
+                Divider().overlay(accent.opacity(0.25))
+                Link(destination: AppLinks.patreon) {
+                    FieldhouseAction(
+                        kicker: "KEEP THE LIGHTS ON",
+                        title: "Support War Room on Patreon",
+                        detail: "Optional support for operating costs · no gameplay advantage.",
+                        icon: "heart.fill"
+                    )
+                    .padding(10)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.38), lineWidth: 1))
+    }
+
+    private var fieldReports: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("FIELD REPORTS")
+                    .font(.system(size: 13, weight: .black))
+                    .tracking(1.5)
+                    .foregroundStyle(accent)
+                Text("BOX SCORES, LOCKER WIRE, OCCASIONAL FACTS")
+                    .font(.system(size: 8, weight: .black))
+                    .tracking(1.0)
+                    .foregroundStyle(.white.opacity(0.40))
+            }
+            .padding(.horizontal, 4)
+
+            Button { showingDispatch = true } label: {
+                FieldhouseAction(
+                    kicker: "THE FIELDHOUSE PAPER · ARCHIVE",
+                    title: "The Dispatch",
+                    detail: "Regional movement, busted chalk, buzzer beaters, and permanent receipts.",
+                    icon: "newspaper.fill",
+                    signalColor: .yellow
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button { desk = .locker } label: {
+                FieldhouseAction(
+                    kicker: "LATEST FROM THE LOCKER",
+                    title: "Open the Locker Wire",
+                    detail: "Read the newest room transmission and join the conversation.",
+                    icon: "quote.bubble.fill"
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                openURL(AppLinks.issueReport(sportId: fieldhouseSportID, leagueName: state.league.displayName)) { accepted in
+                    guard !accepted else { return }
+                    UIPasteboard.general.string = AppLinks.supportEmail
+                    showingFeedbackFallback = true
+                }
+            } label: {
+                FieldhouseAction(
+                    kicker: "YOUR INPUT MATTERS",
+                    title: "Help Shape the War Room",
+                    detail: "Spot a bug, find something confusing, or have an idea? Send it directly to the team.",
+                    icon: "wrench.and.screwdriver.fill"
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -5119,7 +5228,67 @@ private struct FieldhouseNationalBracketMap: View {
     }
 }
 
-private struct FieldhouseDispatchPage: View { var body: some View { VStack(spacing: 13) { FieldhouseHero(kicker: "THE FIELDHOUSE DISPATCH", title: "FINAL SCORES.\nFULL RECEIPTS.", detail: "Regional movement, busted chalk, buzzer beaters, and the weekly floor report.", icon: "newspaper.fill"); FieldhouseAction(kicker: "FRONT PAGE", title: "THE PAINT BELONGED TO NOBODY", detail: "Three favorites fell. One Best Bet survived. The Midwest is already hostile.", icon: "doc.text.image.fill") } } }
+private struct FieldhouseDispatchPage: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.fieldhouseLeague) private var league
+    let state: FieldhouseSeasonState
+
+    private var accent: Color { FieldhouseTheme.accent(for: league) }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                FieldhouseBackdrop(leagueOverride: state.league).ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 13) {
+                        FieldhouseHero(
+                            kicker: "THE FIELDHOUSE DISPATCH · WEEK \(state.scoringWindow)",
+                            title: "FINAL SCORES.\nFULL RECEIPTS.",
+                            detail: "Regional movement, busted chalk, buzzer beaters, and the weekly floor report.",
+                            icon: "newspaper.fill"
+                        )
+                        FieldhouseAction(
+                            kicker: state.scoringIsComplete ? "FINAL HORN · CERTIFIED" : "LIVE FLOOR REPORT",
+                            title: state.scoringIsComplete ? "Week \(state.scoringWindow) is in the books" : "The board is still moving",
+                            detail: state.scoringIsComplete
+                                ? "\(state.scoringPoints) points recorded. Your permanent scorecard is ready."
+                                : "\(state.scoringFinalGames) final · \(state.scoringLiveGames) live · \(state.scoringPoints) points so far.",
+                            icon: state.scoringIsComplete ? "checkmark.seal.fill" : "waveform.path.ecg",
+                            signalColor: state.scoringIsComplete ? .green : accent
+                        )
+                        if let certifiedWindow = state.lastCertifiedWindow, let certifiedPoints = state.lastCertifiedPoints {
+                            FieldhouseAction(
+                                kicker: "PERMANENT RECEIPT",
+                                title: "Week \(certifiedWindow) · \(certifiedPoints) points",
+                                detail: "The last certified scorecard remains on the record.",
+                                icon: "clipboard.fill"
+                            )
+                        }
+                        Text("Completed Fieldhouse editions will remain here so players can revisit every weekly receipt and tournament report.")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(15)
+                            .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15))
+                            .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.25)))
+                    }
+                    .padding(14)
+                    .padding(.bottom, 28)
+                }
+            }
+            .navigationTitle("The Dispatch")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: { Label("BACK", systemImage: "chevron.left") }
+                        .font(.caption.weight(.black))
+                        .foregroundStyle(accent)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
 
 private struct FieldhouseLockerMessage: Identifiable {
     let id: String
