@@ -930,6 +930,34 @@ enum BoardRefreshPresentation: Equatable {
     case content
 }
 
+enum BoardGameStage: Int, Comparable {
+    case final
+    case live
+    case waiting
+
+    static func < (lhs: BoardGameStage, rhs: BoardGameStage) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+}
+
+func boardGameStage(score: SyncedFootballScore?) -> BoardGameStage {
+    if score?.completed == true { return .final }
+    if score != nil { return .live }
+    return .waiting
+}
+
+func footballCoverWinnerSide(game: CardGame, score: SyncedFootballScore?) -> String? {
+    guard let score, score.completed else { return nil }
+    let favorite = game.favorite.lowercased() == "away" ? "away" : "home"
+    let margin = favorite == "away"
+        ? Double(score.awayScore - score.homeScore)
+        : Double(score.homeScore - score.awayScore)
+    let line = abs(game.spread)
+    guard abs(margin - line) >= 0.000_1 else { return nil }
+    if margin > line { return favorite }
+    return favorite == "home" ? "away" : "home"
+}
+
 func boardRefreshPresentation(lockedCardCount: Int, loading: Bool, errorMessage: String?) -> BoardRefreshPresentation {
     // Once cards are on screen, a live refresh must never replace the board.
     // Collapsing the ScrollView content destroys the reader's scroll position.
@@ -952,14 +980,31 @@ struct WeekBoardView: View {
     private var identity: SportIdentity { SportIdentity(sportId) }
 
     private var scored: Bool { picks.contains { $0.totalPoints != nil } }
-    private var visibleGames: [CardGame] {
-        card.cardGames.filter { boardGameIsDeclassified(startTime: $0.startTime, at: clock, weekScored: scored) }
+    private var orderedGames: [CardGame] {
+        card.cardGames.sorted { lhs, rhs in
+            let lhsStage = boardGameStage(score: scores[lhs.id])
+            let rhsStage = boardGameStage(score: scores[rhs.id])
+            if lhsStage != rhsStage { return lhsStage < rhsStage }
+            let lhsStart = footballKickoffDate(lhs.startTime) ?? .distantFuture
+            let rhsStart = footballKickoffDate(rhs.startTime) ?? .distantFuture
+            if lhsStart != rhsStart { return lhsStart < rhsStart }
+            return lhs.sortOrder < rhs.sortOrder
+        }
+    }
+    private var finalGames: [CardGame] {
+        orderedGames.filter { boardGameStage(score: scores[$0.id]) == .final }
+    }
+    private var liveGames: [CardGame] {
+        orderedGames.filter { boardGameStage(score: scores[$0.id]) == .live }
+    }
+    private var waitingGames: [CardGame] {
+        orderedGames.filter { boardGameStage(score: scores[$0.id]) == .waiting }
     }
     private var nextKickoff: Date? {
         card.cardGames.compactMap { footballKickoffDate($0.startTime) }.filter { $0 > clock }.min()
     }
     private var refreshPresentation: BoardRefreshPresentation {
-        boardRefreshPresentation(lockedCardCount: picks.count, loading: loading, errorMessage: errorMessage)
+        boardRefreshPresentation(lockedCardCount: max(picks.count, card.cardGames.count), loading: loading, errorMessage: errorMessage)
     }
 
     var body: some View {
@@ -972,7 +1017,7 @@ struct WeekBoardView: View {
                             .font(.caption2.weight(.black)).tracking(2.1).foregroundStyle(identity.secondaryAccent)
                         Text(identity.boardTitle)
                             .font(.system(size: 43, weight: .black)).fontWidth(.compressed)
-                        Text(identity.boardDetail)
+                        Text("Games only. Finals, live action, and every scheduled kickoff in one clean board.")
                             .font(.caption.weight(.black)).tracking(1.1).foregroundStyle(identity.isNFL ? .red : .orange)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1002,31 +1047,41 @@ struct WeekBoardView: View {
                                 .foregroundStyle(.orange)
                         }
                         HStack {
-                            BoardMetric(value: "\(picks.count)", label: "CARDS EXPOSED", color: identity.isNFL ? .cyan : .green)
-                            BoardMetric(value: "\(visibleGames.count)/\(card.cardGames.count)", label: "DECLASSIFIED", color: identity.isNFL ? .red : .orange)
-                            BoardMetric(value: "\(picks.filter { $0.totalPoints != nil }.count)", label: "SCORED", color: identity.isNFL ? .blue : .yellow)
+                            BoardMetric(value: "\(finalGames.count)", label: "FINAL", color: .green)
+                            BoardMetric(value: "\(liveGames.count)", label: "LIVE", color: identity.isNFL ? .cyan : .orange)
+                            BoardMetric(value: "\(waitingGames.count)", label: "WAITING", color: .white)
                         }
 
-                        if identity.isNFL { NflBroadcastSectionLabel(title: "CONSENSUS BOARD", detail: "WHO TOOK WHAT · CONFIDENCE ATTACHED") }
-                        else { HomeSectionLabel(title: "CONSENSUS MAP", detail: "WHO TOOK WHAT · CONFIDENCE ATTACHED") }
+                        if identity.isNFL { NflBroadcastSectionLabel(title: "GAME BOARD", detail: "FINAL · LIVE · WAITING") }
+                        else { HomeSectionLabel(title: "GAME BOARD", detail: "FINAL · LIVE · WAITING") }
                         Label(scoreStatus ?? "SYNCING LIVE SCORES", systemImage: "dot.radiowaves.left.and.right")
                             .font(.system(size: 9, weight: .black)).tracking(1.1)
                             .foregroundStyle(identity.isNFL ? .cyan : .green)
-                        ForEach(visibleGames) { game in
-                            BoardGamePanel(game: game, picks: picks, score: scores[game.id], sportId: sportId)
+                        if !finalGames.isEmpty {
+                            boardSectionLabel("FINAL", count: finalGames.count, color: .green)
+                            ForEach(finalGames) { game in
+                                BoardGamePanel(game: game, score: scores[game.id], sportId: sportId)
+                            }
+                        }
+                        if !liveGames.isEmpty {
+                            boardSectionLabel("LIVE NOW", count: liveGames.count, color: identity.isNFL ? .cyan : .orange)
+                            ForEach(liveGames) { game in
+                                BoardGamePanel(game: game, score: scores[game.id], sportId: sportId)
+                            }
+                        }
+                        if !waitingGames.isEmpty {
+                            boardSectionLabel("WAITING TO PLAY", count: waitingGames.count, color: .white.opacity(0.72))
+                            ForEach(waitingGames) { game in
+                                BoardGamePanel(game: game, score: nil, sportId: sportId)
+                            }
                         }
                         if let nextKickoff, !scored {
-                            Label("NEXT PICKS DECLASSIFY AT \(nextKickoff.formatted(date: .omitted, time: .shortened))", systemImage: "lock.fill")
+                            Label("NEXT KICKOFF · \(nextKickoff.formatted(date: .omitted, time: .shortened))", systemImage: "clock.fill")
                                 .font(.caption.weight(.black)).tracking(0.7).foregroundStyle(identity.isNFL ? .red : .orange)
                                 .frame(maxWidth: .infinity).padding(14)
                                 .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 12))
                         }
 
-                        if identity.isNFL { NflBroadcastSectionLabel(title: "PLAYER TAPE", detail: "EVERY LOCKED CARD · NO HIDING") }
-                        else { HomeSectionLabel(title: "PERSONNEL FILES", detail: "EVERY LOCKED CARD · NO HIDING") }
-                        ForEach(Array(picks.enumerated()), id: \.element.id) { index, player in
-                            BoardPlayerDossier(index: index + 1, player: player, card: card, sportId: sportId)
-                        }
                     }
                 }
                 .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 38)
@@ -1039,6 +1094,17 @@ struct WeekBoardView: View {
                 clock = Date()
             }
         }
+    }
+
+    private func boardSectionLabel(_ title: String, count: Int, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Circle().fill(color).frame(width: 7, height: 7).shadow(color: color.opacity(0.75), radius: 5)
+            Text(title).font(.caption.weight(.black)).tracking(1.4).foregroundStyle(color)
+            Spacer()
+            Text("\(count) GAME\(count == 1 ? "" : "S")")
+                .font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(.white.opacity(0.42))
+        }
+        .padding(.top, 4)
     }
 }
 
@@ -1056,134 +1122,85 @@ private struct BoardMetric: View {
 
 private struct BoardGamePanel: View {
     let game: CardGame
-    let picks: [BoardPick]
     let score: SyncedFootballScore?
     let sportId: String
     private var identity: SportIdentity { SportIdentity(sportId) }
-    private func selections(for team: String, sideKey: String) -> [(String, PickedGame, Bool)] {
-        picks.compactMap { player in
-            guard let choice = player.pickGames.first(where: { $0.cardGameId == game.id }),
-                  choice.side.caseInsensitiveCompare(team) == .orderedSame || choice.side.lowercased() == sideKey else { return nil }
-            return (player.displayName, choice, isFavorite(team, for: player))
-        }
-    }
-    private func isFavorite(_ team: String, for player: BoardPick) -> Bool {
-        guard let favorite = FootballTeamCatalog.team(forTeamId: player.favoriteTeamId, sportId: sportId) else { return false }
-        return FootballTeamCatalog.matches(team, favorite: favorite)
-    }
+    private var stage: BoardGameStage { boardGameStage(score: score) }
+    private var coverWinner: String? { footballCoverWinnerSide(game: game, score: score) }
+    private var accent: Color { identity.isNFL ? .cyan : .green }
+    private var favoriteTeam: String { game.favorite.lowercased() == "away" ? game.awayTeam : game.homeTeam }
+    private var lineLabel: String { favoriteSpreadLabel(favorite: favoriteTeam, spread: game.spread) }
     var body: some View {
-        let away = selections(for: game.awayTeam, sideKey: "away")
-        let home = selections(for: game.homeTeam, sideKey: "home")
-        VStack(spacing: 0) {
+        VStack(spacing: 10) {
             HStack {
                 Text("GAME \(game.sortOrder + 1)").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(identity.isNFL ? .cyan : .green)
                 Spacer()
-                Text(score?.completed == true ? "FINAL" : (score == nil ? "WAITING" : "LIVE"))
-                    .font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(score?.completed == true ? (identity.isNFL ? .cyan : .green) : .yellow)
-            }.padding(12).background(.white.opacity(0.055))
-            HStack(spacing: 1) {
-                boardScoreTeam(game.awayTeam, value: score?.awayScore, leading: true)
-                Rectangle().fill((identity.isNFL ? Color.cyan : Color.green).opacity(0.28)).frame(width: 1)
-                boardScoreTeam(game.homeTeam, value: score?.homeScore, leading: false)
-            }.background(.white.opacity(0.025))
-            HStack(alignment: .top, spacing: 1) {
-                BoardTeamColumn(team: game.awayTeam, selections: away, leading: true, accent: identity.isNFL ? .cyan : .green, bestBetAccent: identity.isNFL ? .red : .yellow)
-                Rectangle().fill((identity.isNFL ? Color.cyan : Color.green).opacity(0.28)).frame(width: 1)
-                BoardTeamColumn(team: game.homeTeam, selections: home, leading: false, accent: identity.isNFL ? .cyan : .green, bestBetAccent: identity.isNFL ? .red : .yellow)
+                Label(statusLabel, systemImage: statusIcon)
+                    .font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(statusColor)
             }
+            HStack(spacing: 8) {
+                teamSide(game.awayTeam, score: score?.awayScore, side: "away")
+                Text("AT").font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.28))
+                teamSide(game.homeTeam, score: score?.homeScore, side: "home")
+            }
+            HStack(spacing: 6) {
+                Label(footballKickoffLabel(game.startTime) ?? "KICKOFF TO BE ANNOUNCED", systemImage: "clock.fill")
+                Spacer(minLength: 6)
+                Text(lineLabel.uppercased())
+            }
+            .font(.system(size: 8, weight: .black)).tracking(0.45)
+            .foregroundStyle(.white.opacity(0.52))
         }
+        .padding(12)
         .background(.black.opacity(0.83), in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14))
-        .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14).stroke((identity.isNFL ? Color.cyan : Color.green).opacity(0.42)))
-        .clipShape(RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14))
+        .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14).stroke(stage == .live ? statusColor.opacity(0.85) : accent.opacity(0.34), lineWidth: stage == .live ? 2 : 1))
+        .shadow(color: stage == .live ? statusColor.opacity(0.30) : .clear, radius: 10)
     }
 
-    private func boardScoreTeam(_ team: String, value: Int?, leading: Bool) -> some View {
-        HStack {
-            if !leading { Text(value.map(String.init) ?? "—").font(.title2.weight(.black)).monospacedDigit() }
-            Text(team.uppercased()).font(.system(size: 9, weight: .black)).lineLimit(1).minimumScaleFactor(0.6)
-            if leading { Text(value.map(String.init) ?? "—").font(.title2.weight(.black)).monospacedDigit() }
-        }
-        .frame(maxWidth: .infinity, alignment: leading ? .leading : .trailing)
-        .padding(.horizontal, 12).padding(.vertical, 9)
-    }
-}
-
-private struct BoardTeamColumn: View {
-    let team: String
-    let selections: [(String, PickedGame, Bool)]
-    let leading: Bool
-    let accent: Color
-    let bestBetAccent: Color
-    var body: some View {
-        VStack(alignment: leading ? .leading : .trailing, spacing: 8) {
-            Text(team.uppercased()).font(.caption.weight(.black)).foregroundStyle(.white).fixedSize(horizontal: false, vertical: true)
-            ForEach(Array(selections.enumerated()), id: \.offset) { _, item in
-                HStack(spacing: 5) {
-                    if !leading { Spacer(minLength: 0) }
-                    if item.1.isBestBet { Text("BB").font(.system(size: 7, weight: .black)).foregroundStyle(.white).padding(.horizontal, 4).padding(.vertical, 2).background(bestBetAccent, in: Capsule()) }
-                    if item.2 { Image(systemName: "heart.fill").font(.system(size: 8, weight: .black)).foregroundStyle(.red).accessibilityLabel("Favorite team") }
-                    Text(item.0).font(.system(size: 10, weight: .bold)).lineLimit(1)
-                    Text("\(item.1.confidence)").font(.system(size: 10, weight: .black)).foregroundStyle(accent)
-                    if leading { Spacer(minLength: 0) }
-                }
-            }
-            if selections.isEmpty { Text("NO TAKERS").font(.system(size: 9, weight: .black)).foregroundStyle(.white.opacity(0.28)) }
-        }.frame(maxWidth: .infinity, alignment: leading ? .leading : .trailing).padding(12)
-    }
-}
-
-private struct BoardPlayerDossier: View {
-    let index: Int
-    let player: BoardPick
-    let card: WeekCard
-    let sportId: String
-    private var identity: SportIdentity { SportIdentity(sportId) }
-    private var favoriteTeam: FootballTeam? { FootballTeamCatalog.team(forTeamId: player.favoriteTeamId, sportId: sportId) }
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Text(String(format: "%02d", index)).font(.title3.weight(.black)).foregroundStyle((identity.isNFL ? Color.cyan : Color.green).opacity(0.6))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(player.displayName.uppercased()).font(.headline.weight(.black))
-                    if let favoriteTeam {
-                        Label("LOYALTY · \(favoriteTeam.name.uppercased())", systemImage: "heart.fill")
-                            .font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(.red)
-                    }
-                    Text(player.totalPoints.map { "\($0) POINTS · OFFICIAL" } ?? "RESULTS PENDING")
-                        .font(.caption2.weight(.black)).tracking(1).foregroundStyle(player.totalPoints == nil ? (identity.isNFL ? .red : .orange) : (identity.isNFL ? .cyan : .yellow))
-                }
-                Spacer()
-                if let prop = player.propChoice { Text("PROP\n\(prop)").font(.system(size: 8, weight: .black)).multilineTextAlignment(.trailing).foregroundStyle(.white.opacity(0.55)) }
-            }
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 7) {
-                ForEach(player.pickGames, id: \.cardGameId) { choice in
-                    let game = card.cardGames.first { $0.id == choice.cardGameId }
-                    let team = choice.side.lowercased() == "away" ? game?.awayTeam : choice.side.lowercased() == "home" ? game?.homeTeam : choice.side
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text((team ?? choice.side).uppercased()).font(.system(size: 9, weight: .black)).lineLimit(1)
-                        HStack {
-                            Text("CONF \(choice.confidence)").font(.system(size: 8, weight: .bold)).foregroundStyle(identity.isNFL ? .cyan : .green)
-                            Spacer()
-                            if choice.isBestBet { Text("BEST BET").font(.system(size: 7, weight: .black)).foregroundStyle(identity.isNFL ? .red : .yellow) }
-                        }
-                        if let favoriteTeam, let team {
-                            if FootballTeamCatalog.matches(team, favorite: favoriteTeam) {
-                                Text("HOMER PICK").font(.system(size: 7, weight: .black)).foregroundStyle(.red)
-                            } else if gameInvolvesFavorite(choice, favoriteTeam: favoriteTeam) {
-                                Text("BETRAYAL").font(.system(size: 7, weight: .black)).foregroundStyle(identity.isNFL ? .cyan : .orange)
-                            }
-                        }
-                    }.padding(9).background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
-                }
+    private func teamSide(_ team: String, score: Int?, side: String) -> some View {
+        let won = coverWinner == side
+        return VStack(spacing: 5) {
+            Text(team.uppercased())
+                .font(.system(size: 11, weight: .black)).lineLimit(2).minimumScaleFactor(0.68)
+                .multilineTextAlignment(.center)
+            Text(score.map(String.init) ?? "—")
+                .font(.system(size: 30, weight: .black)).monospacedDigit()
+            if won {
+                Label("COVERED", systemImage: "checkmark.seal.fill")
+                    .font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.green)
+            } else if stage == .final {
+                Text("FINAL").font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.white.opacity(0.32))
             }
         }
-        .padding(15).background(.black.opacity(0.86), in: UnevenRoundedRectangle(topLeadingRadius: 3, bottomLeadingRadius: 18, bottomTrailingRadius: 3, topTrailingRadius: 18))
-        .overlay(UnevenRoundedRectangle(topLeadingRadius: 3, bottomLeadingRadius: 18, bottomTrailingRadius: 3, topTrailingRadius: 18).stroke((identity.isNFL ? Color.blue : Color.orange).opacity(0.35)))
+        .frame(maxWidth: .infinity, minHeight: 86)
+        .padding(.horizontal, 8).padding(.vertical, 10)
+        .background(won ? Color.green.opacity(0.16) : Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 11))
+        .overlay(RoundedRectangle(cornerRadius: 11).stroke(won ? Color.green.opacity(0.95) : Color.white.opacity(0.08), lineWidth: won ? 2 : 1))
+        .shadow(color: won ? Color.green.opacity(0.65) : .clear, radius: won ? 12 : 0)
     }
 
-    private func gameInvolvesFavorite(_ choice: PickedGame, favoriteTeam: FootballTeam) -> Bool {
-        guard let game = card.cardGames.first(where: { $0.id == choice.cardGameId }) else { return false }
-        return [game.awayTeam, game.homeTeam].contains { FootballTeamCatalog.matches($0, favorite: favoriteTeam) }
+    private var statusLabel: String {
+        switch stage {
+        case .final: return "FINAL"
+        case .live: return "LIVE"
+        case .waiting: return "WAITING"
+        }
+    }
+
+    private var statusIcon: String {
+        switch stage {
+        case .final: return "checkmark.circle.fill"
+        case .live: return "dot.radiowaves.left.and.right"
+        case .waiting: return "clock.fill"
+        }
+    }
+
+    private var statusColor: Color {
+        switch stage {
+        case .final: return .green
+        case .live: return identity.isNFL ? .cyan : .orange
+        case .waiting: return .white.opacity(0.58)
+        }
     }
 }
 

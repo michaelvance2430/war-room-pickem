@@ -8,6 +8,9 @@
 
 ## Done
 
+- [x] ~~Replace the Build 21 football personnel board with a game-first scoreboard~~ (2026-09-05)
+  - Removed the league-wide player dossiers and per-team player-name columns from the shared CFB/NFL Board. Every matchup now remains visible and is grouped Final, Live Now, or Waiting to Play with its kickoff and locked spread. A completed game illuminates the actual ATS winner—not merely the straight-up winner—with a green outline and glow. The native simulator build and full WarRoomTests suite pass; no upload or production change was made.
+
 - [x] ~~Harden Build 21 privileged database functions~~ (2026-09-05)
   - Pinned every review-only Fieldhouse `SECURITY DEFINER` function—including the live-board reader—to an empty search path and hardened the existing NFL publish, bracket-save, reset, and result-scoring functions before they can bypass direct-write restrictions. Added regression checks that fail if a mutable public search path returns. All three Build 21 authority/scoring verifiers, the full native iOS test suite, the 21-part CFB regression gate, and the diff integrity check pass; nothing was executed against production.
 

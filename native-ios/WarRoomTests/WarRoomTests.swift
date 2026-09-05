@@ -460,6 +460,32 @@ struct WarRoomTests {
         #expect(boardRefreshPresentation(lockedCardCount: 0, loading: false, errorMessage: nil) == .empty)
     }
 
+    @Test func gameBoardSeparatesWaitingLiveAndFinalGames() {
+        #expect(boardGameStage(score: nil) == .waiting)
+        #expect(boardGameStage(score: SyncedFootballScore(homeScore: 14, awayScore: 10, completed: false)) == .live)
+        #expect(boardGameStage(score: SyncedFootballScore(homeScore: 24, awayScore: 17, completed: true)) == .final)
+    }
+
+    @Test func finalGameHighlightsTheTeamThatCoveredNotTheStraightUpWinner() {
+        let game = CardGame(
+            id: UUID(),
+            sortOrder: 0,
+            awayTeam: "Alabama Crimson Tide",
+            homeTeam: "Georgia Bulldogs",
+            spread: 7.5,
+            favorite: "home",
+            startTime: "2026-09-05T16:00:00Z",
+            awayRank: 3,
+            homeRank: 1,
+            isRivalry: false
+        )
+        let score = SyncedFootballScore(homeScore: 3, awayScore: 0, completed: true)
+
+        #expect(footballCoverWinnerSide(game: game, score: score) == "away")
+        #expect(footballCoverWinnerSide(game: game, score: SyncedFootballScore(homeScore: 10, awayScore: 0, completed: true)) == "home")
+        #expect(footballCoverWinnerSide(game: game, score: SyncedFootballScore(homeScore: 10, awayScore: 0, completed: false)) == nil)
+    }
+
     @Test func postgresKickoffTimestampDrivesLockedHomeState() {
         let value = "2026-08-16 16:43:41.278784+00"
         #expect(footballKickoffDate(value) != nil)
