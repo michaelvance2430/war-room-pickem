@@ -2495,6 +2495,8 @@ struct HomeView: View {
     @State private var homeScores: [UUID: SyncedFootballScore] = [:]
     @State private var homeScoreStatus: String?
     @State private var regularScorecards: [RegularSeasonScorecard] = []
+    @State private var seasonCloseout: LeagueSeasonCloseout?
+    @State private var leagueTrophies: [ProfileTrophy] = []
     @State private var showingRegularScorecard = false
     @State private var regularScorecardToShowID: String?
     @State private var showingNewDispatch = false
@@ -2606,6 +2608,9 @@ struct HomeView: View {
                                 seasonIsFrozen: membership.leagues.currentWeek > membership.leagues.regularSeasonWeeks,
                                 forceDemo: membership.leagues.mode == "foundry"
                             )
+                        }
+                        if let reigningChampion {
+                            ReigningChampionHomeCard(presentation: reigningChampion)
                         }
                         if isCommissioner {
                             NavigationLink { CommissionerCommandCenterView(membership: membership, standings: standings, submittedUserIds: visibleSubmittedUserIds) } label: {
@@ -2977,6 +2982,12 @@ struct HomeView: View {
             async let loadedSportPool = SupabaseAPI.sportPoolPoll(token: token, leagueId: active.leagueId)
             async let loadedDispatches = SupabaseAPI.gazetteEditions(token: token, leagueId: active.leagueId)
             async let loadedCompetitiveStatus = SupabaseAPI.competitiveLeagueStatus(token: token, leagueId: active.leagueId)
+            async let loadedCloseout = try? SupabaseAPI.latestLeagueSeasonCloseout(
+                token: token,
+                leagueId: active.leagueId,
+                sportId: active.leagues.sportId
+            )
+            async let loadedLeagueTrophies = try? SupabaseAPI.leagueTrophies(token: token, leagueId: active.leagueId)
             card = try await loadedCard
             homeScores = [:]
             homeScoreStatus = nil
@@ -2988,6 +2999,8 @@ struct HomeView: View {
             submittedUserIds = try await loadedSubmissions
             sportPoolPoll = try? await loadedSportPool
             competitiveStatus = try? await loadedCompetitiveStatus
+            seasonCloseout = await loadedCloseout
+            leagueTrophies = (await loadedLeagueTrophies) ?? []
             let dispatches = (try? await loadedDispatches) ?? []
             regularScorecards = (try? await SupabaseAPI.regularSeasonScorecards(token: token, leagueId: active.leagueId, userId: user.id)) ?? []
             if active.leagues.sportId.lowercased() == "cfb" {
@@ -3042,6 +3055,10 @@ struct HomeView: View {
 
     private var unreadRegularScorecard: RegularSeasonScorecard? {
         regularScorecards.first(where: isUnread)
+    }
+
+    private var reigningChampion: ReigningChampionPresentation? {
+        ReigningChampionPolicy.presentation(closeout: seasonCloseout, trophies: leagueTrophies)
     }
 
     private func scorecardReadKey(_ scorecard: RegularSeasonScorecard) -> String {
@@ -7450,11 +7467,11 @@ private struct CheevoBriefingView: View {
     }
 }
 
-private func trophyArtifactName(for trophy: ProfileTrophy) -> String? {
+func trophyArtifactName(for trophy: ProfileTrophy) -> String? {
     trophyArtifactName(trophyDesignId: trophy.trophyDesignId, trophyType: trophy.trophyType)
 }
 
-private func trophyArtifactName(trophyDesignId: String?, trophyType: String) -> String? {
+func trophyArtifactName(trophyDesignId: String?, trophyType: String) -> String? {
     switch trophyDesignId ?? trophyType {
     case "command_cup", "championship": return "ChampionshipArtifact"
     case "nfc_championship": return "NfcChampionshipArtifact"

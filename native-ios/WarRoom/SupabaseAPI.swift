@@ -1140,6 +1140,34 @@ struct ProfileTrophy: Decodable, Identifiable, Sendable {
     }
 }
 
+struct LeagueSeasonCloseout: Decodable, Identifiable, Sendable {
+    let id: UUID
+    let leagueId: UUID
+    let seasonKey: Int
+    let sportId: String
+    let competitionType: String
+    let nationalChampion: String
+    let leagueChampionId: UUID
+    let leagueChampionIds: [UUID]
+    let closedAt: String
+
+    nonisolated var authoritativeChampionIds: [UUID] {
+        leagueChampionIds.isEmpty ? [leagueChampionId] : leagueChampionIds
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case leagueId = "league_id"
+        case seasonKey = "season_key"
+        case sportId = "sport_id"
+        case competitionType = "competition_type"
+        case nationalChampion = "national_champion"
+        case leagueChampionId = "league_champion_id"
+        case leagueChampionIds = "league_champion_ids"
+        case closedAt = "closed_at"
+    }
+}
+
 struct FavoriteTeam: Decodable, Sendable {
     let sportId: String
     let teamId: String
@@ -2359,6 +2387,19 @@ enum SupabaseAPI {
         async let fieldhouse = projectedTrophies(token: token, resource: "fieldhouse_profile_trophies", filter: "league_id", value: leagueId.uuidString.lowercased())
         async let nfl = projectedTrophies(token: token, resource: "nfl_profile_trophies", filter: "league_id", value: leagueId.uuidString.lowercased())
         return (live + (await fieldhouse) + (await nfl)).sorted { $0.seasonYear > $1.seasonYear }
+    }
+
+    static func latestLeagueSeasonCloseout(token: String, leagueId: UUID, sportId: String) async throws -> LeagueSeasonCloseout? {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/league_season_closeouts"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,league_id,season_key,sport_id,competition_type,national_champion,league_champion_id,league_champion_ids,closed_at"),
+            URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
+            URLQueryItem(name: "sport_id", value: "eq.\(SportIdentity(sportId).sportId)"),
+            URLQueryItem(name: "competition_type", value: "eq.league"),
+            URLQueryItem(name: "order", value: "season_key.desc,closed_at.desc"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [LeagueSeasonCloseout].self).first
     }
 
     /// Fieldhouse permits honest co-champions, while the legacy football shelf

@@ -2869,6 +2869,8 @@ private struct FieldhouseHomePage: View {
     @State private var showingFeedbackFallback = false
     @State private var leagueAttention: [LeagueAttention] = []
     @State private var competitiveStatus: CompetitiveLeagueStatus?
+    @State private var seasonCloseout: LeagueSeasonCloseout?
+    @State private var leagueTrophies: [ProfileTrophy] = []
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHomeMasthead(state: state)
@@ -2897,6 +2899,9 @@ private struct FieldhouseHomePage: View {
                     seasonIsFrozen: state.phase == .postseason,
                     forceDemo: !state.isAuthenticatedSession
                 )
+            }
+            if let reigningChampion {
+                ReigningChampionHomeCard(presentation: reigningChampion)
             }
             if state.isCommissioner {
                 Button { showingCommissionerCommand = true } label: {
@@ -2969,6 +2974,7 @@ private struct FieldhouseHomePage: View {
         .task(id: "\(state.league.rawValue)-\(state.window)-\(state.cardIsPublished)-\(state.picksLocked)") {
             await loadLeagueAttention()
             await loadCompetitiveStatus()
+            await loadReigningChampion()
         }
         .alert("SUPPORT EMAIL COPIED", isPresented: $showingFeedbackFallback) {
             Button("OK", role: .cancel) { }
@@ -2994,6 +3000,10 @@ private struct FieldhouseHomePage: View {
         )
     }
 
+    private var reigningChampion: ReigningChampionPresentation? {
+        ReigningChampionPolicy.presentation(closeout: seasonCloseout, trophies: leagueTrophies)
+    }
+
     @MainActor private func loadLeagueAttention() async {
         guard let user = auth.user else { return }
         do {
@@ -3015,6 +3025,28 @@ private struct FieldhouseHomePage: View {
             competitiveStatus = try await SupabaseAPI.competitiveLeagueStatus(token: token, leagueId: leagueID)
         } catch {
             competitiveStatus = nil
+        }
+    }
+
+    @MainActor private func loadReigningChampion() async {
+        guard state.isAuthenticatedSession, let leagueID = auth.selectedLeagueId else {
+            seasonCloseout = nil
+            leagueTrophies = []
+            return
+        }
+        do {
+            let token = try await auth.validAccessToken()
+            async let closeout = SupabaseAPI.latestLeagueSeasonCloseout(
+                token: token,
+                leagueId: leagueID,
+                sportId: fieldhouseSportID
+            )
+            async let trophies = SupabaseAPI.leagueTrophies(token: token, leagueId: leagueID)
+            seasonCloseout = try await closeout
+            leagueTrophies = try await trophies
+        } catch {
+            // Keep the previous verified display. A partial or failed read must
+            // never invent a champion or replace permanent hardware.
         }
     }
 
