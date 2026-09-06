@@ -11,6 +11,7 @@ const defaultKey = (jsonName: string, legacyName: string) => {
   } catch { /* legacy fallback */ }
   return Deno.env.get(legacyName) || "";
 };
+const FIELDHOUSE_BUILD_UNLOCK_AT = "2026-10-26T04:00:00.000Z";
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return reply({ error: "POST required" }, 405);
@@ -28,7 +29,6 @@ Deno.serve(async (req: Request) => {
       to.getTime() <= from.getTime() || to.getTime() - from.getTime() > 8 * 86_400_000) {
     return reply({ error: "Valid Fieldhouse league, sport, week, and seven-day window required" }, 400);
   }
-
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const publishable = defaultKey("SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY");
   const secret = defaultKey("SUPABASE_SECRET_KEYS", "SUPABASE_SERVICE_ROLE_KEY");
@@ -46,6 +46,12 @@ Deno.serve(async (req: Request) => {
   const league = Array.isArray(membership?.leagues) ? membership.leagues[0] : membership?.leagues;
   const canBuild = membership?.role === "commissioner" || membership?.is_deputy === true || league?.commissioner_id === user?.id;
   if (!canBuild || league?.sport_id !== sport) return reply({ error: "Commissioner or deputy access to this Fieldhouse league is required" }, 403);
+  if (Date.now() < Date.parse(FIELDHOUSE_BUILD_UNLOCK_AT)) {
+    return reply({
+      error: `Card building unlocks ${FIELDHOUSE_BUILD_UNLOCK_AT} — one week before the season starts.`,
+      unlockAt: FIELDHOUSE_BUILD_UNLOCK_AT,
+    }, 423);
+  }
 
   const apiKey = (Deno.env.get("ODDS_API_KEY") || "").trim();
   if (!apiKey) return reply({ error: "Odds API secret is not configured in Supabase" }, 503);

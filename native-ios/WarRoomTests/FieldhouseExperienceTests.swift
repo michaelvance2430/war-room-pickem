@@ -704,6 +704,20 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertFalse(state.canBuildCard)
     }
 
+    func testAuthenticatedFieldhouseCardBuilderStaysLockedUntilPreseasonWeek() throws {
+        var state = FieldhouseSeasonState()
+        state.isAuthenticatedSession = true
+        state.isCommissioner = true
+        state.cardIsPublished = false
+        let unlock = try XCTUnwrap(SeasonCardBuildGate.unlockDate(sportId: "ncaam"))
+
+        XCTAssertFalse(state.canBuildCard(at: unlock.addingTimeInterval(-1)))
+        XCTAssertTrue(state.canBuildCard(at: unlock))
+
+        state.isAuthenticatedSession = false
+        XCTAssertTrue(state.canBuildCard(at: .distantPast), "fixture previews do not spend provider credits")
+    }
+
     func testFieldhouseUsesMondaySundayWindowsAndNamesTheLockWeek() {
         let calendar = Calendar(identifier: .gregorian)
         XCTAssertEqual(calendar.component(.weekday, from: FieldhouseSeasonCalendar.openingTip), 2)

@@ -57,6 +57,11 @@ function dateWindow(sport: string, week: number) {
 
 function compactDate(value: string) { return value.replaceAll("-", ""); }
 
+const BUILD_UNLOCK_AT: Record<string, string> = {
+  cfb: "2026-08-20T04:00:00.000Z",
+  nfl: "2026-09-03T04:00:00.000Z",
+};
+
 // The live AP endpoint remains primary. This preseason snapshot guarantees
 // Week 1 labels if ESPN blocks or changes its edge response unexpectedly.
 const WEEK_ONE_AP_TOP_25: [number, string][] = [
@@ -130,21 +135,26 @@ Deno.serve(async (req: Request) => {
   const sport = requestedSport === "nfl" ? "nfl" : "cfb";
   const range = Number.isInteger(week) ? dateWindow(sport, week) : null;
   if (!leagueId || !range) return reply({ error: "Valid league and week required" }, 400);
-
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const legacyAnon = Deno.env.get("SUPABASE_ANON_KEY") || "";
   let publishable = legacyAnon;
   try { publishable = JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") || "{}").default || legacyAnon; } catch { /* legacy fallback */ }
   const common = { apikey: publishable, Authorization: authorization };
-  const membershipURL = `${supabaseUrl}/rest/v1/memberships?select=role,is_deputy,leagues!inner(commissioner_id)&league_id=eq.${encodeURIComponent(leagueId)}&limit=1`;
+  const membershipURL = `${supabaseUrl}/rest/v1/memberships?select=role,is_deputy,leagues!inner(commissioner_id,sport_id,mode)&league_id=eq.${encodeURIComponent(leagueId)}&limit=1`;
   const [membershipResponse, authResponse] = await Promise.all([
     fetch(membershipURL, { headers: common }), fetch(`${supabaseUrl}/auth/v1/user`, { headers: common }),
   ]);
   if (!membershipResponse.ok || !authResponse.ok) return reply({ error: "Could not verify commissioner access" }, 403);
   const membership = (await membershipResponse.json())?.[0];
   const user = await authResponse.json();
-  if (!(membership?.role === "commissioner" || membership?.is_deputy === true || membership?.leagues?.commissioner_id === user?.id)) {
+  const league = Array.isArray(membership?.leagues) ? membership.leagues[0] : membership?.leagues;
+  if (!(membership?.role === "commissioner" || membership?.is_deputy === true || league?.commissioner_id === user?.id)) {
     return reply({ error: "Commissioner or deputy required" }, 403);
+  }
+  if (league?.sport_id !== sport) return reply({ error: "Requested odds sport does not match this league" }, 403);
+  const unlockAt = BUILD_UNLOCK_AT[sport];
+  if (Date.now() < Date.parse(unlockAt)) {
+    return reply({ error: `Card building unlocks ${unlockAt} — one week before the season starts.`, unlockAt }, 423);
   }
 
   const apiKey = (Deno.env.get("ODDS_API_KEY") || "").trim();

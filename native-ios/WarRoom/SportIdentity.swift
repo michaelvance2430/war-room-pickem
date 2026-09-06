@@ -1,5 +1,52 @@
 import SwiftUI
 
+enum SeasonCardBuildGate {
+    static let eastern = TimeZone(identifier: "America/New_York")!
+
+    static func seasonStart(sportId: String) -> Date? {
+        let normalized = SportIdentity(sportId).sportId
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = eastern
+        components.hour = 0
+        switch normalized {
+        case "cfb":
+            components.year = 2026; components.month = 8; components.day = 27
+        case "nfl":
+            components.year = 2026; components.month = 9; components.day = 10
+        case "cbb", "ncaam", "ncaaw":
+            components.year = 2026; components.month = 11; components.day = 2
+        default:
+            return nil
+        }
+        return components.date
+    }
+
+    static func unlockDate(sportId: String) -> Date? {
+        guard let start = seasonStart(sportId: sportId) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = eastern
+        return calendar.date(byAdding: .day, value: -7, to: start)
+    }
+
+    static func allowsBuild(sportId: String, at date: Date = Date()) -> Bool {
+        guard let unlock = unlockDate(sportId: sportId) else { return false }
+        return date >= unlock
+    }
+
+    static func lockedMessage(sportId: String) -> String {
+        guard let unlock = unlockDate(sportId: sportId) else {
+            return "Card building is unavailable for this sport."
+        }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = eastern
+        formatter.dateFormat = "MMM d, yyyy"
+        return "Card building unlocks \(formatter.string(from: unlock)) — one week before the season starts."
+    }
+}
+
 enum CfbWeekTimeline {
     /// ESPN's 2026 regular-season week buckets roll Tuesday through Monday.
     /// Week 2 begins Tuesday, September 8; Week 14 contains conference titles.

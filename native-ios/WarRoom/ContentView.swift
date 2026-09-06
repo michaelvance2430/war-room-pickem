@@ -1219,6 +1219,37 @@ private struct BoardSituationRoomBackdrop: View {
     }
 }
 
+struct PreseasonBuildLockCard: View {
+    let sportId: String
+    var compact = false
+    private var identity: SportIdentity { SportIdentity(sportId) }
+    private var accent: Color { identity.isNFL ? .cyan : (identity.isFieldhouse ? identity.accent : .green) }
+
+    var body: some View {
+        HStack(spacing: 13) {
+            Image(systemName: "lock.fill")
+                .font(compact ? .title3.weight(.black) : .title2.weight(.black))
+                .foregroundStyle(.red)
+                .frame(width: compact ? 38 : 46, height: compact ? 38 : 46)
+                .background(.red.opacity(0.12), in: RoundedRectangle(cornerRadius: identity.isNFL ? 5 : 12))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("PRESEASON · ODDS DESK LOCKED")
+                    .font(.caption.weight(.black)).tracking(0.8).foregroundStyle(.red)
+                Text(SeasonCardBuildGate.lockedMessage(sportId: sportId))
+                    .font(compact ? .caption.weight(.bold) : .subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Text("LOCKED").font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(accent)
+        }
+        .padding(compact ? 13 : 16)
+        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 16))
+        .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 16).stroke(.red.opacity(0.48)))
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct MissingWeekCardView: View {
     let league: LeagueMembership?
     let memberships: [LeagueMembership]
@@ -1226,6 +1257,10 @@ private struct MissingWeekCardView: View {
     let retry: () -> Void
     private var isNFL: Bool { league?.leagues.sportId.lowercased() == "nfl" }
     private var accent: Color { isNFL ? .cyan : .yellow }
+    private var seasonBuildIsOpen: Bool {
+        guard let league else { return false }
+        return SeasonCardBuildGate.allowsBuild(sportId: league.leagues.sportId)
+    }
 
     var body: some View {
         ZStack {
@@ -1248,7 +1283,7 @@ private struct MissingWeekCardView: View {
                          : "Command has not published this week’s card yet. Your Picks tab will populate automatically when the slate goes live.")
                         .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.68))
                         .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
-                    if isCommissioner, let league {
+                    if isCommissioner, let league, seasonBuildIsOpen {
                         NavigationLink {
                             CommissionerCardBuilderView(membership: league)
                         } label: {
@@ -1257,6 +1292,8 @@ private struct MissingWeekCardView: View {
                                 .frame(maxWidth: .infinity).padding(.vertical, 8)
                         }
                         .buttonStyle(.borderedProminent).tint(isNFL ? .blue : .yellow).foregroundStyle(isNFL ? .white : .black)
+                    } else if isCommissioner, let league {
+                        PreseasonBuildLockCard(sportId: league.leagues.sportId, compact: true)
                     }
                     if memberships.count > 1 {
                         NavigationLink {
@@ -2608,6 +2645,8 @@ struct HomeView: View {
                             Button { openRegularScorecard(scorecard) } label: {
                                 UnreadWeekResultCard(scorecard: scorecard, sportId: membership.leagues.sportId)
                             }.buttonStyle(WarRoomCardButtonStyle())
+                        } else if isNFL && card == nil && isCommissioner && !SeasonCardBuildGate.allowsBuild(sportId: membership.leagues.sportId) {
+                            PreseasonBuildLockCard(sportId: membership.leagues.sportId)
                         } else if isNFL && card == nil && isCommissioner {
                             NavigationLink { CommissionerCardBuilderView(membership: membership) } label: {
                                 NflPrimaryActionCard(kicker: "COMMISSIONER CONTROL · WEEK \(membership.leagues.currentWeek)", title: "Set the Prime-Time Slate", detail: "Choose five games from the Thursday-to-Monday board, then set the prop.", icon: "rectangle.3.group.fill", urgent: true)
@@ -2639,6 +2678,8 @@ struct HomeView: View {
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if isNFL {
                             CompactHomeRow(kicker: "CARD FILED · WEEK \(membership.leagues.currentWeek)", title: "You’re set for kickoff", icon: "checkmark.seal.fill", accent: .cyan)
+                        } else if card == nil && isCommissioner && !SeasonCardBuildGate.allowsBuild(sportId: membership.leagues.sportId) {
+                            PreseasonBuildLockCard(sportId: membership.leagues.sportId)
                         } else if card == nil && isCommissioner {
                             NavigationLink { CommissionerCardBuilderView(membership: membership) } label: {
                                 StatusCard(kicker: isRivalryWeek ? "🚨 DO THIS NEXT · RIVALRY DESK" : "🚨 DO THIS NEXT · COMMISSIONER", title: isRivalryWeek ? "Build the Rivalry Card" : "Build This Week’s Card", detail: isRivalryWeek ? "Pick five grudge games. Family, geography, trophies, and good judgment are all suspended." : "Pick five games, add one prop, then give the room something to argue about.", icon: isRivalryWeek ? "bolt.horizontal.fill" : "hammer.fill", featured: true, accent: .red, emergency: true, actionLabel: "OPEN COMMAND")
@@ -3875,8 +3916,12 @@ private struct CommissionerCommandCenterView: View {
                     controlDoor(title: "WHO’S IN", detail: "\(submittedCount) OF \(standings.count) CARDS ON FILE", icon: "person.2.fill", color: allSubmitted ? .green : .yellow) {
                         SubmissionStatusView(membership: membership, standings: standings, submittedUserIds: submittedUserIds)
                     }
-                    controlDoor(title: "CARD & ODDS DESK", detail: "VIEW THE PUBLISHED SLATE OR PREPARE THE NEXT ONE", icon: "rectangle.and.pencil.and.ellipsis", color: .green) {
-                        CommissionerCardBuilderView(membership: membership)
+                    if SeasonCardBuildGate.allowsBuild(sportId: membership.leagues.sportId) {
+                        controlDoor(title: "CARD & ODDS DESK", detail: "VIEW THE PUBLISHED SLATE OR PREPARE THE NEXT ONE", icon: "rectangle.and.pencil.and.ellipsis", color: .green) {
+                            CommissionerCardBuilderView(membership: membership)
+                        }
+                    } else {
+                        PreseasonBuildLockCard(sportId: membership.leagues.sportId, compact: true)
                     }
                     controlDoor(title: "OFFICIAL TRANSMISSION", detail: "ANNOUNCE DEADLINES, THREATS, AND OTHER LEADERSHIP", icon: "megaphone.fill", color: .orange) {
                         AnnouncementsView(initialTitle: "Week \(week) orders", initialBody: "Week \(week) is live. Make your picks before first kickoff—future you has enough problems.")
@@ -5157,6 +5202,11 @@ struct CommissionerCardBuilderView: View {
     @State private var errorMessage: String?
     private var identity: SportIdentity { SportIdentity(membership.leagues.sportId) }
     private var deskAccent: Color { identity.isNFL ? .cyan : .green }
+    private var seasonBuildIsOpen: Bool {
+        SeasonCardBuildGate.allowsBuild(
+            sportId: membership.leagues.sportId
+        )
+    }
 
     private var isRivalryWeek: Bool {
         membership.leagues.sportId.lowercased() == "cfb" && membership.leagues.currentWeek == 13
@@ -5184,7 +5234,16 @@ struct CommissionerCardBuilderView: View {
                     }
                 }
             }
-            if step == 1 { Section("Odds desk") {
+            if !seasonBuildIsOpen {
+                Section {
+                    Label("PRESEASON LOCK", systemImage: "lock.fill")
+                        .font(.headline.weight(.black)).foregroundStyle(.red)
+                    Text(SeasonCardBuildGate.lockedMessage(sportId: membership.leagues.sportId))
+                        .font(.subheadline.weight(.semibold))
+                    Text("The paid odds feed is disabled until then. Nobody can burn provider credits by opening this desk early.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            } else if step == 1 { Section("Odds desk") {
                 HStack {
                     Label("THE ODDS API", systemImage: "network")
                     Spacer()
@@ -5401,6 +5460,10 @@ struct CommissionerCardBuilderView: View {
 
     private func pullOdds() async {
         guard let token = auth.token else { return }
+        guard seasonBuildIsOpen else {
+            errorMessage = SeasonCardBuildGate.lockedMessage(sportId: membership.leagues.sportId)
+            return
+        }
         pullingOdds = true
         errorMessage = nil
         do {

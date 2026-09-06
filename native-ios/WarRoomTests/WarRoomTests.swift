@@ -11,6 +11,29 @@ import Foundation
 
 struct WarRoomTests {
 
+    @Test func cardBuildingUnlocksExactlyOneWeekBeforeEachSeason() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = SeasonCardBuildGate.eastern
+
+        let expected: [(String, DateComponents)] = [
+            ("cfb", DateComponents(year: 2026, month: 8, day: 20)),
+            ("nfl", DateComponents(year: 2026, month: 9, day: 3)),
+            ("ncaam", DateComponents(year: 2026, month: 10, day: 26)),
+            ("ncaaw", DateComponents(year: 2026, month: 10, day: 26)),
+        ]
+
+        for (sport, components) in expected {
+            let unlock = try #require(SeasonCardBuildGate.unlockDate(sportId: sport))
+            let actual = calendar.dateComponents([.year, .month, .day], from: unlock)
+            #expect(actual.year == components.year)
+            #expect(actual.month == components.month)
+            #expect(actual.day == components.day)
+            #expect(!SeasonCardBuildGate.allowsBuild(sportId: sport, at: unlock.addingTimeInterval(-1)))
+            #expect(SeasonCardBuildGate.allowsBuild(sportId: sport, at: unlock))
+        }
+        #expect(!SeasonCardBuildGate.allowsBuild(sportId: "unsupported", at: .distantFuture))
+    }
+
     @Test func patreonStatusNeverTurnsSupportIntoGameplayAuthority() throws {
         let active = try JSONDecoder().decode(PatreonConnectionStatus.self, from: Data("""
         {"connected":true,"membership_status":"active_patron","currently_entitled_amount_cents":500,"founding_supporter_number":2}

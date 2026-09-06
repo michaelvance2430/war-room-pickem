@@ -1643,14 +1643,23 @@ struct FieldhouseSeasonState: Codable, Equatable {
     }
     var canRebalanceRegions: Bool { !seasonHasStarted }
     var canSelectChampionshipTrophy: Bool { !seasonHasStarted }
-    var canBuildCard: Bool {
+    func canBuildCard(at date: Date) -> Bool {
         guard isCommissioner, !cardIsPublished, phase != .postseason else { return false }
+        guard !isAuthenticatedSession || SeasonCardBuildGate.allowsBuild(
+            sportId: league.favoriteSportID,
+            at: date
+        ) else { return false }
         if phase == .conferenceChampionships,
            scoringCardKind == .conferenceChampionship {
             return false
         }
         return true
     }
+    var canBuildCard: Bool { canBuildCard(at: Date()) }
+    var buildCardLockedForPreseason: Bool {
+        isAuthenticatedSession && !SeasonCardBuildGate.allowsBuild(sportId: league.favoriteSportID)
+    }
+    var buildCardLockMessage: String { SeasonCardBuildGate.lockedMessage(sportId: league.favoriteSportID) }
     var playerPicksAreComplete: Bool { cardIsPublished && picksLocked }
     func outstandingPickTaskCount(at date: Date) -> Int {
         if postseasonIsActive {
@@ -3424,9 +3433,11 @@ private struct FieldhouseCommissionerCommand: View {
                                 state.phase == .conferenceChampionships ? "CHAMPIONSHIP WEEK" : "WEEK \(state.window) · ON DECK",
                                 detail: state.cardIsPublished
                                     ? (state.cardKind == .conferenceChampionship ? "Four conference title games published" : "Ten games and prop published")
-                                    : (state.phase == .conferenceChampionships ? "Post ACC, Big 12, Big Ten, and SEC title games" : "Choose ten games and an automatic floor prop"),
+                                    : (state.buildCardLockedForPreseason
+                                        ? state.buildCardLockMessage
+                                        : (state.phase == .conferenceChampionships ? "Post ACC, Big 12, Big Ten, and SEC title games" : "Choose ten games and an automatic floor prop")),
                                 icon: "list.bullet.clipboard.fill",
-                                status: state.cardIsPublished ? "PICKS OPEN" : (state.canBuildCard ? "BUILD CARD" : "LOCKED"),
+                                status: state.cardIsPublished ? "PICKS OPEN" : (state.canBuildCard ? "BUILD CARD" : (state.buildCardLockedForPreseason ? "PRESEASON" : "LOCKED")),
                                 color: state.cardIsPublished ? .green : (state.canBuildCard ? .yellow : .red)
                             )
                         }
