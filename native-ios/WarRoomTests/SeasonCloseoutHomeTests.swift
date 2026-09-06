@@ -98,6 +98,8 @@ struct SeasonCloseoutHomeTests {
             sportId: "nfl",
             seasonKey: 2027,
             weekNumber: 3,
+            windowStartsAt: "2027-09-23T00:00:00Z",
+            windowEndsAt: "2027-09-28T00:00:00Z",
             firstGameAt: "2027-09-23T00:00:00Z",
             timingStatus: "estimated",
             displayLabel: "Week 3"

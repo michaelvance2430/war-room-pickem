@@ -128,6 +128,28 @@ Apply the review package as one guarded release window in this order:
 
 The tournament cron is deliberately excluded. Schedule `supabase/fieldhouse-tournament-results-cron-REVIEW-ONLY.sql` only after the Fieldhouse Edge Functions are deployed, secrets are verified, and a manual tournament-result cycle succeeds.
 
+## Pending sport-schedule authority extension
+
+Status: committed package only; **not applied to production**. This extension
+replaces guessed weekly opening dates with the earliest eligible provider event
+inside each reviewed War Room week. Apply it only in a separately approved
+release window, in this order:
+
+1. `supabase/sport-season-windows-build21-REVIEW-ONLY.sql`
+2. `supabase/sport-season-window-seeds-build21-REVIEW-ONLY.sql`
+3. `supabase/sport-schedule-usage-action-build21-REVIEW-ONLY.sql`
+4. `supabase/sport-schedule-worker-auth-build21-REVIEW-ONLY.sql`
+5. Deploy `supabase/functions/sport-schedule-sync/index.ts`, then invoke it once manually and inspect its response and usage receipt.
+6. Deploy the updated `football-odds` and `fieldhouse-odds` functions so paid pulls use the same server-owned boundaries.
+7. Only after that readback passes, apply `supabase/sport-schedule-sync-cron-build21-REVIEW-ONLY.sql`.
+8. Run `supabase/sport-schedule-sync-postverify-build21-SELECT-ONLY.sql` and require every `passed` value to be true.
+
+The worker makes one provider `/events` request per active sport, not per
+league. That endpoint is currently zero-credit schedule metadata; the usage
+ledger still records every scan and fails closed if the audit receipt cannot be
+written. CFB schedule ingestion and paid odds pulls share the same FBS filter.
+Neither worker accepts product-week boundaries from the iOS client.
+
 ## Required post-verification
 
 1. A league member can call `league_competitive_status`; a nonmember and anonymous user cannot.

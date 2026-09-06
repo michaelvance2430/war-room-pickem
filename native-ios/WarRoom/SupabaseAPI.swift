@@ -466,6 +466,8 @@ struct OddsFeed: Decodable, Sendable {
     let used: String?
     let weekLabel: String?
     let rankLabel: String?
+    let windowStartsAt: String?
+    let windowEndsAt: String?
 }
 
 struct OddsGame: Decodable, Identifiable, Sendable {
@@ -1192,6 +1194,8 @@ struct SportCardWindow: Codable, Sendable, Equatable {
     let sportId: String
     let seasonKey: Int
     let weekNumber: Int
+    let windowStartsAt: String?
+    let windowEndsAt: String?
     let firstGameAt: String
     let timingStatus: String
     let displayLabel: String?
@@ -1202,6 +1206,8 @@ struct SportCardWindow: Codable, Sendable, Equatable {
         case sportId = "sport_id"
         case seasonKey = "season_key"
         case weekNumber = "week_number"
+        case windowStartsAt = "window_starts_at"
+        case windowEndsAt = "window_ends_at"
         case firstGameAt = "first_game_at"
         case timingStatus = "timing_status"
         case displayLabel = "display_label"
@@ -2033,9 +2039,6 @@ enum SupabaseAPI {
     }
 
     static func fieldhouseOdds(token: String, leagueId: UUID, sportId: String, window: Int) async throws -> OddsFeed {
-        let start = FieldhouseSeasonCalendar.start(of: window)
-        let end = Calendar(identifier: .gregorian).date(byAdding: .day, value: 7, to: start)!
-        let formatter = ISO8601DateFormatter()
         var request = URLRequest(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/fieldhouse-odds"))
         request.httpMethod = "POST"
         request.setValue(SupabaseConfiguration.publishableKey, forHTTPHeaderField: "apikey")
@@ -2045,8 +2048,6 @@ enum SupabaseAPI {
             "leagueId": leagueId.uuidString.lowercased(),
             "sport": sportId.lowercased(),
             "window": window,
-            "commenceTimeFrom": formatter.string(from: start),
-            "commenceTimeTo": formatter.string(from: end),
         ])
         return try await send(request, as: OddsFeed.self)
     }
@@ -2469,7 +2470,7 @@ enum SupabaseAPI {
     static func sportCardWindow(token: String, sportId: String, seasonKey: Int, week: Int) async throws -> SportCardWindow? {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/sport_card_windows"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "sport_id,season_key,week_number,first_game_at,timing_status,display_label"),
+            URLQueryItem(name: "select", value: "sport_id,season_key,week_number,window_starts_at,window_ends_at,first_game_at,timing_status,display_label"),
             URLQueryItem(name: "sport_id", value: "eq.\(SportIdentity(sportId).sportId)"),
             URLQueryItem(name: "season_key", value: "eq.\(seasonKey)"),
             URLQueryItem(name: "week_number", value: "eq.\(week)"),

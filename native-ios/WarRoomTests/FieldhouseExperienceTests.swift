@@ -469,6 +469,36 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(FieldhouseGame(cardGame: decoded, window: 1).bookmaker, "DraftKings")
     }
 
+    func testProviderWindowNotHardcodedSeasonControlsFieldhouseOddsConversion() throws {
+        let odds = OddsGame(
+            id: "future-game",
+            awayTeam: "UConn Huskies",
+            homeTeam: "Duke Blue Devils",
+            spread: -3.5,
+            favorite: "home",
+            commenceTime: "2027-11-04T00:30:00Z",
+            bookmaker: "DraftKings",
+            awayRank: nil,
+            homeRank: nil
+        )
+
+        let game = try XCTUnwrap(FieldhouseGame(
+            oddsGame: odds,
+            window: 1,
+            windowStartsAt: "2027-11-01T04:00:00Z",
+            windowEndsAt: "2027-11-08T05:00:00Z"
+        ))
+
+        XCTAssertEqual(game.startTime, "2027-11-04T00:30:00Z")
+        XCTAssertEqual(Calendar(identifier: .gregorian).component(.year, from: game.tipDate(in: 1)), 2027)
+        XCTAssertNil(FieldhouseGame(
+            oddsGame: odds,
+            window: 1,
+            windowStartsAt: "2027-11-04T00:30:01Z",
+            windowEndsAt: "2027-11-11T00:30:01Z"
+        ))
+    }
+
     func testAuthenticatedSnapshotHydratesChampionshipWeekAsFourStraightUpGames() {
         let userID = UUID()
         let membership = LeagueMembership(

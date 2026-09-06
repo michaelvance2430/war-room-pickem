@@ -1,59 +1,16 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { isFbsTeam, normalizeTeam } from "../_shared/sport-schedule.ts";
 
 const headers = { "Content-Type": "application/json", "Cache-Control": "no-store" };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
+type CardWindow = {
+  window_starts_at: string;
+  window_ends_at: string;
+  first_game_at: string;
+  display_label: string | null;
+};
 
-// War Room CFB cards use Division I FBS programs only. The provider's NCAAF
-// feed also contains FCS and lower-division games, so filter both teams here.
-const FBS_SCHOOLS = `Alabama|Arkansas|Auburn|Florida|Georgia|Kentucky|LSU|Mississippi State|Missouri|Oklahoma|Ole Miss|South Carolina|Tennessee|Texas|Texas A&M|Vanderbilt|Illinois|Indiana|Iowa|Maryland|Michigan|Michigan State|Minnesota|Nebraska|Northwestern|Ohio State|Oregon|Penn State|Purdue|Rutgers|UCLA|USC|Washington|Wisconsin|Boston College|California|Clemson|Duke|Florida State|Georgia Tech|Louisville|Miami|NC State|North Carolina|Pittsburgh|SMU|Stanford|Syracuse|Virginia|Virginia Tech|Wake Forest|Arizona|Arizona State|Baylor|BYU|Cincinnati|Colorado|Houston|Iowa State|Kansas|Kansas State|Oklahoma State|TCU|Texas Tech|UCF|Utah|West Virginia|Notre Dame|UConn|UMass|Army|East Carolina|Florida Atlantic|Memphis|Navy|North Texas|Rice|South Florida|Temple|Tulane|Tulsa|UTSA|Charlotte|Air Force|Boise State|Colorado State|Fresno State|Hawaii|Nevada|New Mexico|San Diego State|San Jose State|UNLV|Utah State|Wyoming|Akron|Ball State|Bowling Green|Buffalo|Central Michigan|Eastern Michigan|Kent State|Miami (OH)|Northern Illinois|Ohio|Toledo|Western Michigan|Appalachian State|Arkansas State|Coastal Carolina|Georgia Southern|Georgia State|James Madison|Louisiana|Marshall|Old Dominion|South Alabama|Southern Miss|Texas State|Troy|UL Monroe|FIU|Jacksonville State|Kennesaw State|Liberty|Louisiana Tech|Middle Tennessee|New Mexico State|Sam Houston|UTEP|Western Kentucky`
-  .split("|")
-  .sort((a, b) => b.length - a.length);
-
-const normalizeTeam = (value: string) => value.toLowerCase()
-  .replace(/&/g, "and").replace(/\(oh\)/g, "ohio")
-  .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-// Words that indicate the provider name is a different institution, not the
-// ranked/FBS school followed by its mascot (Houston Baptist is not Houston).
 const SCHOOL_MODIFIERS = new Set(["state", "tech", "central", "eastern", "western", "northern", "southern", "international", "christian", "baptist", "pine", "bluff", "ohio"]);
-function isFbsTeam(value: string) {
-  const team = normalizeTeam(value);
-  return FBS_SCHOOLS.some((school) => {
-    const key = normalizeTeam(school);
-    if (team !== key && !team.startsWith(`${key} `)) return false;
-    const schoolWords = key.split(" ");
-    const next = team.split(" ")[schoolWords.length];
-    return !next || SCHOOL_MODIFIERS.has(schoolWords.at(-1) || "") || !SCHOOL_MODIFIERS.has(next);
-  });
-}
-
-function dateWindow(sport: string, week: number) {
-  const fixed: Record<string, [string, string]> = sport === "nfl" ? {
-    19: ["2027-01-16", "2027-01-18"], 20: ["2027-01-23", "2027-01-24"],
-    21: ["2027-01-31", "2027-02-01"], 22: ["2027-02-14", "2027-02-14"],
-  } : {
-    0: ["2026-08-27", "2026-09-02"],
-    15: ["2026-12-18", "2026-12-21"], 16: ["2026-12-31", "2027-01-02"],
-    17: ["2027-01-08", "2027-01-11"], 18: ["2027-01-18", "2027-01-20"],
-  };
-  if (fixed[week]) return { start: fixed[week][0], end: fixed[week][1] };
-  if ((sport === "nfl" && (week < 1 || week > 18)) || (sport !== "nfl" && (week < 1 || week > 14))) return null;
-  let start: Date;
-  let end: Date;
-  if (sport === "nfl") {
-    start = new Date("2026-09-10T12:00:00Z");
-    start.setUTCDate(start.getUTCDate() + (week - 1) * 7);
-    end = new Date(start); end.setUTCDate(end.getUTCDate() + 4);
-  } else if (week === 1) {
-    start = new Date("2026-09-03T12:00:00Z");
-    end = new Date(start); end.setUTCDate(end.getUTCDate() + 4);
-  } else {
-    // ESPN's CFB buckets roll Tuesday through Monday from Week 2 forward.
-    start = new Date("2026-09-08T12:00:00Z");
-    start.setUTCDate(start.getUTCDate() + (week - 2) * 7);
-    end = new Date(start); end.setUTCDate(end.getUTCDate() + 6);
-  }
-  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
-}
 
 function compactDate(value: string) { return value.replaceAll("-", ""); }
 
@@ -69,6 +26,20 @@ function easternDateKey(date = new Date()) {
   }).formatToParts(date);
   const field = (type: string) => parts.find((part) => part.type === type)?.value || "";
   return `${field("year")}-${field("month")}-${field("day")}`;
+}
+
+async function loadCardWindow(supabaseUrl: string, common: Record<string, string>, sport: string, week: number): Promise<CardWindow | null> {
+  const query = new URLSearchParams({
+    select: "window_starts_at,window_ends_at,first_game_at,display_label",
+    sport_id: `eq.${sport}`,
+    week_number: `eq.${week}`,
+    window_ends_at: `gte.${new Date().toISOString()}`,
+    order: "window_starts_at.asc",
+    limit: "1",
+  });
+  const response = await fetch(`${supabaseUrl}/rest/v1/sport_card_windows?${query}`, { headers: common });
+  if (!response.ok) throw new Error(`Card calendar returned ${response.status}`);
+  return (await response.json())?.[0] || null;
 }
 
 // The live AP endpoint remains primary. This preseason snapshot guarantees
@@ -142,8 +113,7 @@ Deno.serve(async (req: Request) => {
   if (!authorization.startsWith("Bearer ")) return reply({ error: "Authentication required" }, 401);
   const { leagueId, sport: requestedSport, week } = await req.json().catch(() => ({}));
   const sport = requestedSport === "nfl" ? "nfl" : "cfb";
-  const range = Number.isInteger(week) ? dateWindow(sport, week) : null;
-  if (!leagueId || !range) return reply({ error: "Valid league and week required" }, 400);
+  if (!leagueId || !Number.isInteger(week)) return reply({ error: "Valid league and week required" }, 400);
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const legacyAnon = Deno.env.get("SUPABASE_ANON_KEY") || "";
   let publishable = legacyAnon;
@@ -161,8 +131,17 @@ Deno.serve(async (req: Request) => {
     return reply({ error: "Commissioner or deputy required" }, 403);
   }
   if (league?.sport_id !== sport) return reply({ error: "Requested odds sport does not match this league" }, 403);
-  const opensOn = addCalendarDays(range.start, -7);
-  if (easternDateKey() < opensOn) {
+  let range: CardWindow | null;
+  try {
+    range = await loadCardWindow(supabaseUrl, common, sport, week);
+  } catch (error) {
+    console.error(error);
+    return reply({ error: "WEEK CALENDAR UNAVAILABLE — odds desk stays locked" }, 503);
+  }
+  if (!range) return reply({ error: "SEASON DATE PENDING — odds desk stays locked" }, 423);
+  const opensAt = new Date(Date.parse(range.first_game_at) - 7 * 86_400_000);
+  const opensOn = easternDateKey(opensAt);
+  if (Date.now() < opensAt.getTime()) {
     return reply({
       error: `PAGE OPENS ${opensOn} — seven days before Week ${week}'s first scheduled game day.`,
       opensOn,
@@ -175,9 +154,14 @@ Deno.serve(async (req: Request) => {
   const url = new URL(`https://api.the-odds-api.com/v4/sports/${sportKey}/odds`);
   url.searchParams.set("apiKey", apiKey); url.searchParams.set("regions", "us");
   url.searchParams.set("markets", "spreads"); url.searchParams.set("oddsFormat", "american");
+  url.searchParams.set("commenceTimeFrom", new Date(range.window_starts_at).toISOString());
+  url.searchParams.set("commenceTimeTo", new Date(range.window_ends_at).toISOString());
   const [provider, cfbRanks] = await Promise.all([
     fetch(url),
-    sport === "cfb" ? loadCfbRanks(range.start, range.end) : Promise.resolve(new Map<string, number>()),
+    sport === "cfb" ? loadCfbRanks(
+      range.window_starts_at.slice(0, 10),
+      addCalendarDays(range.window_ends_at.slice(0, 10), -1),
+    ) : Promise.resolve(new Map<string, number>()),
   ]);
   const remaining = provider.headers.get("x-requests-remaining");
   const used = provider.headers.get("x-requests-used");
@@ -185,8 +169,8 @@ Deno.serve(async (req: Request) => {
 
   const raw = await provider.json();
   const games = (Array.isArray(raw) ? raw : []).flatMap((game: any) => {
-    const day = String(game.commence_time || "").slice(0, 10);
-    if (day < range.start || day > range.end) return [];
+    const tip = Date.parse(String(game.commence_time || ""));
+    if (!Number.isFinite(tip) || tip < Date.parse(range.window_starts_at) || tip >= Date.parse(range.window_ends_at)) return [];
     if (sport === "cfb" && (!isFbsTeam(game.away_team) || !isFbsTeam(game.home_team))) return [];
     for (const book of game.bookmakers || []) {
       const market = book.markets?.find((item: any) => item.key === "spreads");
@@ -201,7 +185,8 @@ Deno.serve(async (req: Request) => {
     }
     return [];
   });
-  return reply({ games, remaining, used, weekLabel: `${range.start} – ${range.end}`,
+  return reply({ games, remaining, used, weekLabel: range.display_label || `Week ${week}`,
     rankLabel: sport === "nfl" ? "NFL" : "ESPN TOP 25",
-    rankedTeams: sport === "cfb" ? cfbRanks.size : 0 });
+    rankedTeams: sport === "cfb" ? cfbRanks.size : 0,
+    windowStartsAt: range.window_starts_at, windowEndsAt: range.window_ends_at });
 });

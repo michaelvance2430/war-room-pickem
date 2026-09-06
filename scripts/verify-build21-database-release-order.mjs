@@ -14,6 +14,12 @@ const ordered = [
   "multi-sport-season-closeout-build21-REVIEW-ONLY.sql",
   "nfl-postseason-closeout-build21-REVIEW-ONLY.sql",
   "fieldhouse-live-standings-build21-REVIEW-ONLY.sql",
+  "sport-season-windows-build21-REVIEW-ONLY.sql",
+  "sport-season-window-seeds-build21-REVIEW-ONLY.sql",
+  "sport-schedule-usage-action-build21-REVIEW-ONLY.sql",
+  "sport-schedule-worker-auth-build21-REVIEW-ONLY.sql",
+  "sport-schedule-sync-cron-build21-REVIEW-ONLY.sql",
+  "sport-schedule-sync-postverify-build21-SELECT-ONLY.sql",
 ];
 
 let cursor = -1;
@@ -24,6 +30,10 @@ for (const file of ordered) {
 }
 
 assert.match(guide, /tournament cron is deliberately excluded/i);
+assert.match(guide, /sport-schedule authority extension/i);
+assert.match(guide, /not applied to production/i);
+assert.match(guide, /one provider[\s\S]*`\/events` request per active sport, not per[\s\S]*league/i);
+assert.match(guide, /invoke it once manually/i);
 assert.match(guide, /nonmember and anonymous user cannot/i);
 assert.match(guide, /seven qualifying humans remains Demo; a room with eight becomes Official/i);
 assert.match(guide, /Bots never count/);

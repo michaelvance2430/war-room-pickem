@@ -968,8 +968,9 @@ struct FieldhouseGame: Identifiable, Equatable, Codable {
     let tipMinute: Int
     let bookmaker: String?
     let championshipConference: FieldhouseChampionshipConference?
+    let startTime: String?
 
-    init(id: String, away: String, home: String, spread: String, tip: String, dayOffset: Int = 3, tipHour: Int = 19, tipMinute: Int = 0, bookmaker: String? = nil, championshipConference: FieldhouseChampionshipConference? = nil) {
+    init(id: String, away: String, home: String, spread: String, tip: String, dayOffset: Int = 3, tipHour: Int = 19, tipMinute: Int = 0, bookmaker: String? = nil, championshipConference: FieldhouseChampionshipConference? = nil, startTime: String? = nil) {
         self.id = id
         self.away = away
         self.home = home
@@ -980,9 +981,11 @@ struct FieldhouseGame: Identifiable, Equatable, Codable {
         self.tipMinute = tipMinute
         self.bookmaker = bookmaker
         self.championshipConference = championshipConference
+        self.startTime = startTime
     }
 
     func tipDate(in window: Int) -> Date {
+        if let startTime, let exact = footballKickoffDate(startTime) { return exact }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = FieldhouseSeasonCalendar.eastern
         let day = calendar.date(byAdding: .day, value: dayOffset, to: FieldhouseSeasonCalendar.start(of: window))!
@@ -1028,18 +1031,22 @@ extension FieldhouseGame {
         FieldhouseGame(
             id: id, away: away, home: home, spread: spread, tip: tip,
             dayOffset: dayOffset, tipHour: tipHour, tipMinute: tipMinute,
-            bookmaker: bookmaker, championshipConference: conference
+            bookmaker: bookmaker, championshipConference: conference,
+            startTime: startTime
         )
     }
 
-    init?(oddsGame: OddsGame, window: Int) {
+    init?(oddsGame: OddsGame, window: Int, windowStartsAt: String? = nil, windowEndsAt: String? = nil) {
         guard let rawTip = oddsGame.commenceTime,
               let tipDate = footballKickoffDate(rawTip),
               ["home", "away"].contains(oddsGame.favorite.lowercased()),
               FieldhouseSpreadRule.isHalfPoint(oddsGame.spread) else { return nil }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = FieldhouseSeasonCalendar.eastern
-        let windowStart = FieldhouseSeasonCalendar.start(of: window)
+        let exactStart = windowStartsAt.flatMap(footballKickoffDate)
+        let exactEnd = windowEndsAt.flatMap(footballKickoffDate)
+        if let exactStart, let exactEnd, !(tipDate >= exactStart && tipDate < exactEnd) { return nil }
+        let windowStart = exactStart ?? FieldhouseSeasonCalendar.start(of: window)
         let dayOffset = calendar.dateComponents(
             [.day],
             from: calendar.startOfDay(for: windowStart),
@@ -1061,7 +1068,8 @@ extension FieldhouseGame {
             tipHour: calendar.component(.hour, from: tipDate),
             tipMinute: calendar.component(.minute, from: tipDate),
             bookmaker: oddsGame.bookmaker,
-            championshipConference: nil
+            championshipConference: nil,
+            startTime: rawTip
         )
     }
 
@@ -1105,7 +1113,8 @@ extension FieldhouseGame {
             tipHour: hour,
             tipMinute: minute,
             bookmaker: cardGame.bookmaker,
-            championshipConference: cardGame.fieldhouseConference.flatMap(FieldhouseChampionshipConference.init(rawValue:))
+            championshipConference: cardGame.fieldhouseConference.flatMap(FieldhouseChampionshipConference.init(rawValue:)),
+            startTime: cardGame.startTime
         )
     }
 }
@@ -3732,7 +3741,14 @@ private struct FieldhouseCardBuilder: View {
                 sportId: themedLeague.favoriteSportID,
                 window: window
             )
-            let games = feed.games.compactMap { FieldhouseGame(oddsGame: $0, window: window) }
+            let games = feed.games.compactMap {
+                FieldhouseGame(
+                    oddsGame: $0,
+                    window: window,
+                    windowStartsAt: feed.windowStartsAt,
+                    windowEndsAt: feed.windowEndsAt
+                )
+            }
             guard games.count >= cardSize else {
                 throw FieldhouseRepositoryError(message: "Only \(games.count) eligible spread games are posted for this week. Try again when sportsbooks publish more lines.")
             }
@@ -3884,7 +3900,14 @@ private struct FieldhouseChampionshipCardBuilder: View {
                 token: token, leagueId: leagueID,
                 sportId: themedLeague.favoriteSportID, window: window
             )
-            loadedGames = feed.games.compactMap { FieldhouseGame(oddsGame: $0, window: window) }
+            loadedGames = feed.games.compactMap {
+                FieldhouseGame(
+                    oddsGame: $0,
+                    window: window,
+                    windowStartsAt: feed.windowStartsAt,
+                    windowEndsAt: feed.windowEndsAt
+                )
+            }
             if loadedGames.count < 4 {
                 throw FieldhouseRepositoryError(message: "Only \(loadedGames.count) future Division I games are posted. Wait for all four conference title matchups.")
             }

@@ -103,6 +103,127 @@ set
   source_note = excluded.source_note,
   updated_at = now();
 
+-- Product-week scaffolds give the UI a visibly estimated opening date before
+-- the provider publishes events. The zero-credit schedule worker replaces the
+-- estimate with the actual earliest eligible game. Re-running this seed never
+-- overwrites a provider-verified first game.
+with explicit_windows(
+  sport_id, season_key, week_number, start_date, end_date,
+  first_game_override, timing_status, display_label, source_note
+) as (
+  values
+    ('cfb', 2026, 0, date '2026-08-27', date '2026-09-03', timestamptz '2026-08-29 16:00:00+00', 'official', 'Week 0', 'Official 2026 kickoff; weekly boundary reviewed for War Room.'),
+    ('cfb', 2026, 1, date '2026-09-03', date '2026-09-08', null::timestamptz, 'estimated', 'Week 1', 'War Room Week 1 boundary; earliest event pending provider verification.'),
+    ('cfb', 2026, 15, date '2026-12-18', date '2026-12-22', null::timestamptz, 'estimated', 'Postseason 1', 'War Room postseason boundary; earliest event pending provider verification.'),
+    ('cfb', 2026, 16, date '2026-12-31', date '2027-01-03', null::timestamptz, 'estimated', 'Postseason 2', 'War Room postseason boundary; earliest event pending provider verification.'),
+    ('cfb', 2026, 17, date '2027-01-08', date '2027-01-12', null::timestamptz, 'estimated', 'Postseason 3', 'War Room postseason boundary; earliest event pending provider verification.'),
+    ('cfb', 2026, 18, date '2027-01-18', date '2027-01-21', null::timestamptz, 'estimated', 'Championship', 'War Room championship boundary; earliest event pending provider verification.'),
+    ('nfl', 2026, 1, date '2026-09-09', date '2026-09-15', timestamptz '2026-09-10 00:20:00+00', 'official', 'Week 1', 'Official Wednesday NFL opener; weekly boundary reviewed for War Room.'),
+    ('nfl', 2026, 19, date '2027-01-16', date '2027-01-19', null::timestamptz, 'estimated', 'Wild Card', 'War Room playoff boundary; earliest event pending provider verification.'),
+    ('nfl', 2026, 20, date '2027-01-23', date '2027-01-25', null::timestamptz, 'estimated', 'Divisional', 'War Room playoff boundary; earliest event pending provider verification.'),
+    ('nfl', 2026, 21, date '2027-01-31', date '2027-02-02', null::timestamptz, 'estimated', 'Conference Championships', 'War Room playoff boundary; earliest event pending provider verification.'),
+    ('nfl', 2026, 22, date '2027-02-14', date '2027-02-15', null::timestamptz, 'estimated', 'Super Bowl', 'War Room championship boundary; earliest event pending provider verification.')
+),
+generated_windows as (
+  select 'cfb'::text sport_id, 2026 season_key, week_number,
+    date '2026-09-08' + ((week_number - 2) * 7) start_date,
+    date '2026-09-08' + ((week_number - 2) * 7) + 7 end_date,
+    null::timestamptz first_game_override, 'estimated'::text timing_status,
+    'Week ' || week_number display_label,
+    'War Room Tuesday-Monday CFB boundary; earliest event pending provider verification.'::text source_note
+  from generate_series(2, 14) as weeks(week_number)
+  union all
+  select 'nfl', 2026, week_number,
+    date '2026-09-17' + ((week_number - 2) * 7),
+    date '2026-09-17' + ((week_number - 2) * 7) + 5,
+    null::timestamptz, 'estimated', 'Week ' || week_number,
+    'War Room Thursday-Monday NFL boundary; earliest event pending provider verification.'
+  from generate_series(2, 18) as weeks(week_number)
+  union all
+  select sport_id, 2026, week_number,
+    date '2026-11-02' + ((week_number - 1) * 7),
+    date '2026-11-02' + ((week_number - 1) * 7) + 7,
+    null::timestamptz, 'estimated', 'Window ' || week_number,
+    'War Room Monday-Sunday Fieldhouse boundary; earliest event pending provider verification.'
+  from (values ('ncaam'::text), ('ncaaw'::text)) sports(sport_id)
+  cross join generate_series(1, 19) as weeks(week_number)
+  union all
+  select 'cfb', 2027, week_number,
+    case when week_number = 0 then date '2027-08-26'
+         when week_number = 1 then date '2027-09-02'
+         else date '2027-09-07' + ((week_number - 2) * 7) end,
+    case when week_number = 0 then date '2027-09-02'
+         when week_number = 1 then date '2027-09-07'
+         else date '2027-09-07' + ((week_number - 2) * 7) + 7 end,
+    case when week_number = 0 then timestamptz '2027-08-28 16:00:00+00' else null::timestamptz end,
+    'estimated', 'Week ' || week_number,
+    'Estimated 2027 CFB product boundary; replace from the published schedule.'
+  from generate_series(0, 14) as weeks(week_number)
+  union all
+  select 'nfl', 2027, week_number,
+    date '2027-09-09' + ((week_number - 1) * 7),
+    date '2027-09-09' + ((week_number - 1) * 7) + 5,
+    null::timestamptz, 'estimated', 'Week ' || week_number,
+    'Estimated 2027 NFL product boundary; replace from the published schedule.'
+  from generate_series(1, 18) as weeks(week_number)
+  union all
+  select sport_id, 2027, week_number,
+    date '2027-11-01' + ((week_number - 1) * 7),
+    date '2027-11-01' + ((week_number - 1) * 7) + 7,
+    null::timestamptz, 'estimated', 'Window ' || week_number,
+    'War Room Monday-Sunday Fieldhouse boundary; earliest event pending provider verification.'
+  from (values ('ncaam'::text), ('ncaaw'::text)) sports(sport_id)
+  cross join generate_series(1, 19) as weeks(week_number)
+),
+all_windows as (
+  select * from explicit_windows
+  union all
+  select * from generated_windows
+),
+prepared as (
+  select
+    sport_id, season_key, week_number,
+    start_date::timestamp at time zone 'America/New_York' as window_starts_at,
+    end_date::timestamp at time zone 'America/New_York' as window_ends_at,
+    coalesce(
+      first_game_override,
+      start_date::timestamp at time zone 'America/New_York'
+    ) as first_game_at,
+    timing_status, display_label, source_note
+  from all_windows
+)
+insert into public.sport_card_windows (
+  sport_id, season_key, week_number,
+  window_starts_at, window_ends_at, first_game_at,
+  timing_status, display_label, source_note
+)
+select
+  sport_id, season_key, week_number,
+  window_starts_at, window_ends_at, first_game_at,
+  timing_status, display_label, source_note
+from prepared
+on conflict (sport_id, season_key, week_number) do update
+set
+  window_starts_at = excluded.window_starts_at,
+  window_ends_at = excluded.window_ends_at,
+  first_game_at = case
+    when public.sport_card_windows.last_ingested_at is not null
+      then public.sport_card_windows.first_game_at
+    else excluded.first_game_at
+  end,
+  timing_status = case
+    when public.sport_card_windows.last_ingested_at is not null
+      then public.sport_card_windows.timing_status
+    else excluded.timing_status
+  end,
+  display_label = excluded.display_label,
+  source_note = case
+    when public.sport_card_windows.last_ingested_at is not null
+      then public.sport_card_windows.source_note
+    else excluded.source_note
+  end,
+  updated_at = now();
+
 commit;
 
 -- Weekly rows are deliberately separate. Do not invent them from these season

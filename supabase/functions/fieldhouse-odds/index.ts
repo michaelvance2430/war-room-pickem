@@ -11,18 +11,32 @@ const defaultKey = (jsonName: string, legacyName: string) => {
   } catch { /* legacy fallback */ }
   return Deno.env.get(legacyName) || "";
 };
-const FIELDHOUSE_OPENING_DATE = "2026-11-02";
-function addCalendarDays(dateKey: string, days: number) {
-  const value = new Date(`${dateKey}T12:00:00.000Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-  return value.toISOString().slice(0, 10);
-}
-function easternDateKey(date = new Date()) {
+type CardWindow = {
+  window_starts_at: string;
+  window_ends_at: string;
+  first_game_at: string;
+  display_label: string | null;
+};
+function easternDateKey(date: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
   }).formatToParts(date);
   const field = (type: string) => parts.find((part) => part.type === type)?.value || "";
   return `${field("year")}-${field("month")}-${field("day")}`;
+}
+
+async function loadCardWindow(supabaseUrl: string, common: Record<string, string>, sport: string, week: number): Promise<CardWindow | null> {
+  const query = new URLSearchParams({
+    select: "window_starts_at,window_ends_at,first_game_at,display_label",
+    sport_id: `eq.${sport}`,
+    week_number: `eq.${week}`,
+    window_ends_at: `gte.${new Date().toISOString()}`,
+    order: "window_starts_at.asc",
+    limit: "1",
+  });
+  const response = await fetch(`${supabaseUrl}/rest/v1/sport_card_windows?${query}`, { headers: common });
+  if (!response.ok) throw new Error(`Card calendar returned ${response.status}`);
+  return (await response.json())?.[0] || null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -34,12 +48,8 @@ Deno.serve(async (req: Request) => {
   const leagueId = String(body.leagueId || "");
   const sport = String(body.sport || "").toLowerCase();
   const window = Number(body.window);
-  const from = new Date(String(body.commenceTimeFrom || ""));
-  const to = new Date(String(body.commenceTimeTo || ""));
-  if (!leagueId || !["ncaam", "ncaaw"].includes(sport) || !Number.isInteger(window) || window < 1 ||
-      !Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) ||
-      to.getTime() <= from.getTime() || to.getTime() - from.getTime() > 8 * 86_400_000) {
-    return reply({ error: "Valid Fieldhouse league, sport, week, and seven-day window required" }, 400);
+  if (!leagueId || !["ncaam", "ncaaw"].includes(sport) || !Number.isInteger(window) || window < 1) {
+    return reply({ error: "Valid Fieldhouse league, sport, and week required" }, 400);
   }
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const publishable = defaultKey("SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY");
@@ -58,13 +68,19 @@ Deno.serve(async (req: Request) => {
   const league = Array.isArray(membership?.leagues) ? membership.leagues[0] : membership?.leagues;
   const canBuild = membership?.role === "commissioner" || membership?.is_deputy === true || league?.commissioner_id === user?.id;
   if (!canBuild || league?.sport_id !== sport) return reply({ error: "Commissioner or deputy access to this Fieldhouse league is required" }, 403);
-  const windowStart = addCalendarDays(FIELDHOUSE_OPENING_DATE, (window - 1) * 7);
-  const windowEnd = addCalendarDays(windowStart, 7);
-  if (from.toISOString().slice(0, 10) !== windowStart || to.toISOString().slice(0, 10) !== windowEnd) {
-    return reply({ error: "Requested odds dates do not match this Fieldhouse week's scheduled window" }, 400);
+  let cardWindow: CardWindow | null;
+  try {
+    cardWindow = await loadCardWindow(supabaseUrl, callerHeaders, sport, window);
+  } catch (error) {
+    console.error(error);
+    return reply({ error: "WEEK CALENDAR UNAVAILABLE — odds desk stays locked" }, 503);
   }
-  const opensOn = addCalendarDays(windowStart, -7);
-  if (easternDateKey() < opensOn) {
+  if (!cardWindow) return reply({ error: "SEASON DATE PENDING — odds desk stays locked" }, 423);
+  const from = new Date(cardWindow.window_starts_at);
+  const to = new Date(cardWindow.window_ends_at);
+  const opensAt = new Date(Date.parse(cardWindow.first_game_at) - 7 * 86_400_000);
+  const opensOn = easternDateKey(opensAt);
+  if (Date.now() < opensAt.getTime()) {
     return reply({
       error: `PAGE OPENS ${opensOn} — seven days before Week ${window}'s first scheduled game day.`,
       opensOn,
@@ -125,6 +141,7 @@ Deno.serve(async (req: Request) => {
 
   return reply({
     games, remaining: remaining?.toString() ?? null, used: used?.toString() ?? null,
-    weekLabel: `Week ${window}`, rankLabel: sport === "ncaaw" ? "WNCAAB" : "NCAAB",
+    weekLabel: cardWindow.display_label || `Week ${window}`, rankLabel: sport === "ncaaw" ? "WNCAAB" : "NCAAB",
+    windowStartsAt: cardWindow.window_starts_at, windowEndsAt: cardWindow.window_ends_at,
   });
 });
