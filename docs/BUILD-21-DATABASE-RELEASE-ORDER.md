@@ -1,6 +1,32 @@
 # Build 21 database release order
 
-Status: local review package only. Nothing in this document authorizes a production change.
+Status: production schema applied and read back on 2026-09-06 after Mike's explicit approval.
+
+## Production deployment record
+
+The guarded package was applied to Supabase project `dorhjepugsjpmnuzdzck` in
+the order below. Supabase recorded migrations `build21_01_fieldhouse_schema`
+through `build21_10_lock_trigger_only_league_advance`, including the three
+shared atomic-definition reapplications (`09a` through `09c`).
+
+Fresh production preflight passed before the release. Post-release readback
+confirmed:
+
+- all eight Fieldhouse postseason tables and all three competitive-hardware
+  tables exist;
+- the NFL postseason awards table exists;
+- the competitive-status, Fieldhouse live-board, Fieldhouse scoring, and
+  multi-sport closeout RPC signatures exist;
+- anonymous and authenticated execution were removed from the trigger-only
+  `advance_league_after_week_score()` function while `service_role` execution
+  remains available;
+- all new Fieldhouse tournament, bracket, round, award, competitive-season,
+  career-receipt, and NFL-award tables contained zero rows immediately after
+  deployment.
+
+This production schema release did **not** enable Fieldhouse routing, deploy
+Fieldhouse Edge Functions, schedule the tournament cron, upload TestFlight, or
+submit an App Store build.
 
 ## Stop conditions
 
