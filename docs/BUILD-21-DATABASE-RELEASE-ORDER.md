@@ -84,6 +84,14 @@ app icons, weekly-opening movie, and all four sport-specific weapon movies.
 The Cheevo artwork audit covered all 185 catalog entries with zero uncovered
 visuals or broken asset references.
 
+A signed archive also completed successfully, but the subsequent local App
+Store export correctly stopped: this Mac currently has only the Apple
+Development identity for Michael Vance and no usable iOS Distribution
+certificate. Xcode also reported a stale account credential record with a
+missing username. Build 21 is therefore source-, test-, and archive-clean, but
+it is not yet distribution-signing-clean. Do not upload until that Apple
+credential and certificate gap is repaired and a local App Store export passes.
+
 Because the authenticated Fieldhouse route remains disabled, the Create League
 sport picker is now governed by that same release gate. Build 21 cannot expose
 NCAAM/NCAAW room creation while routing those rooms into the football
