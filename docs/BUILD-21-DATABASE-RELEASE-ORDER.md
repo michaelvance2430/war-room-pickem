@@ -36,6 +36,28 @@ be verified against a published tournament.
 This production release did **not** enable Fieldhouse routing, schedule the
 tournament cron, upload TestFlight, or submit an App Store build.
 
+## Native release validation record
+
+After the production schema and Edge Function readback, the complete native
+iOS test target passed on an iPhone 17 Pro simulator. That run covered the
+shared CFB/NFL/Fieldhouse unit and UI suites, including the 75-decision
+Fieldhouse bracket, NCAAM/NCAAW parity, regular- and postseason weapon rules,
+active-board refresh behavior, strike presentations, bottom-navigation return
+behavior, Patreon connection, and NFL JDAM scoring.
+
+A fresh unsigned Release archive then completed successfully at
+`/private/tmp/WarRoom-Build21.xcarchive`. Packaged-app inspection confirmed:
+
+- marketing version `3.3` and build `21`;
+- `PrivacyInfo.xcprivacy` at the archived app root;
+- CFB nuclear, NFL JDAM, NCAAM Hellfire, and NCAAW Hellfire strike movies;
+- the War Room weekly-opening movie.
+
+This proves that the current source can produce a complete local Release
+archive. Because code signing was intentionally disabled, it is **not** proof
+of distribution signing, App Store validation, upload, TestFlight processing,
+review submission, or release.
+
 ## Stop conditions
 
 Do not continue if any preflight check fails. In particular, stop if a legacy NFL JDAM scorecard exists, because Build 21 requires an explicit recalculation rather than silently relabeling old points.
