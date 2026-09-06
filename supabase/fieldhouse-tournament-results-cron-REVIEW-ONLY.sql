@@ -19,7 +19,8 @@ select cron.schedule(
     url:='https://dorhjepugsjpmnuzdzck.supabase.co/functions/v1/fieldhouse-tournament-results',
     headers:=jsonb_build_object(
       'Content-Type','application/json',
-      'Authorization','Bearer '||(select decrypted_secret from vault.decrypted_secrets where name='war_room_push_anon_key')
+      'Authorization','Bearer '||(select decrypted_secret from vault.decrypted_secrets where name='war_room_push_anon_key'),
+      'x-war-room-cron-secret',(select decrypted_secret from vault.decrypted_secrets where name='war_room_fieldhouse_cron_secret')
     ),
     body:='{}'::jsonb,
     timeout_milliseconds:=30000

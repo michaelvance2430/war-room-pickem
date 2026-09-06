@@ -23,6 +23,14 @@ Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return Response.json({ ok: false, error: "POST required" }, { status: 405 });
   try {
     const db = createClient(required("SUPABASE_URL"), required("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false, autoRefreshToken: false } });
+    const cronSecret = request.headers.get("x-war-room-cron-secret")?.trim() || "";
+    const { data: authorized, error: authorizationError } = await db.rpc(
+      "authorize_fieldhouse_tournament_worker",
+      { p_secret: cronSecret },
+    );
+    if (authorizationError || authorized !== true) {
+      return Response.json({ ok: false, error: "Worker authorization required" }, { status: 403 });
+    }
     const { data, error } = await db.from("fieldhouse_tournaments").select(
       "id,sport_id,status,fieldhouse_tournament_teams(team_id,display_name),fieldhouse_tournament_games(game_id,round_key,odds_event_id,starts_at,first_team_id,second_team_id,first_source_game_id,second_source_game_id,winner_team_id)"
     ).in("status", ["published", "in_progress"]);

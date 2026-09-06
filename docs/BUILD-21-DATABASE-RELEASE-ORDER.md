@@ -6,7 +6,7 @@ Status: production schema applied and read back on 2026-09-06 after Mike's expli
 
 The guarded package was applied to Supabase project `dorhjepugsjpmnuzdzck` in
 the order below. Supabase recorded migrations `build21_01_fieldhouse_schema`
-through `build21_10_lock_trigger_only_league_advance`, including the three
+through `build21_11_fieldhouse_worker_authorization`, including the three
 shared atomic-definition reapplications (`09a` through `09c`).
 
 Fresh production preflight passed before the release. Post-release readback
@@ -24,9 +24,17 @@ confirmed:
   career-receipt, and NFL-award tables contained zero rows immediately after
   deployment.
 
-This production schema release did **not** enable Fieldhouse routing, deploy
-Fieldhouse Edge Functions, schedule the tournament cron, upload TestFlight, or
-submit an App Store build.
+The `fieldhouse-odds` and `fieldhouse-tournament-results` Edge Functions were
+then deployed with JWT verification enabled. The tournament worker was hardened
+with a random Supabase Vault credential and a service-role-only authorization
+RPC. A request without that private credential returned `403`; a Vault-backed
+request returned `200` with zero published tournaments. The paid odds endpoint
+also rejected an anonymous request with `403` before contacting the provider.
+The tournament cron remains unscheduled until a real manual scoring cycle can
+be verified against a published tournament.
+
+This production release did **not** enable Fieldhouse routing, schedule the
+tournament cron, upload TestFlight, or submit an App Store build.
 
 ## Stop conditions
 
@@ -65,7 +73,8 @@ Apply the review package as one guarded release window in this order:
 6. `supabase/multi-sport-season-closeout-build21-REVIEW-ONLY.sql`
 7. `supabase/nfl-postseason-closeout-build21-REVIEW-ONLY.sql`
 8. `supabase/fieldhouse-live-standings-build21-REVIEW-ONLY.sql`
-9. Reapply `supabase/atomic-card-publish.sql`, `supabase/atomic-pick-save.sql`, and `supabase/atomic-week-scoring.sql` so their latest shared-card definitions win.
+9. `supabase/fieldhouse-tournament-worker-auth-build21-REVIEW-ONLY.sql`
+10. Reapply `supabase/atomic-card-publish.sql`, `supabase/atomic-pick-save.sql`, and `supabase/atomic-week-scoring.sql` so their latest shared-card definitions win.
 
 The tournament cron is deliberately excluded. Schedule `supabase/fieldhouse-tournament-results-cron-REVIEW-ONLY.sql` only after the Fieldhouse Edge Functions are deployed, secrets are verified, and a manual tournament-result cycle succeeds.
 
