@@ -183,6 +183,8 @@ struct ContentView: View {
     @State private var showingPushAnnouncements = false
     @State private var notificationDispatchTarget: NotificationDispatchTarget?
     @State private var fieldhouseNotificationDestination: WarRoomNotificationRoute?
+    @State private var availableUpdate: AppStoreRelease?
+    @State private var dismissedUpdateVersion: String?
     @AppStorage("warroom.notifications.primer-seen") private var notificationPrimerSeen = false
     @AppStorage("warroom.activeSportId") private var activeSportId = "cfb"
 
@@ -196,15 +198,24 @@ struct ContentView: View {
     }
 
     var body: some View {
-        Group {
-            if FieldhouseReleaseGate.shouldRoute(sportID: activeSportId) {
-                FieldhouseAuthenticatedContainer(notificationDestination: $fieldhouseNotificationDestination)
-            } else {
-                standardFootballExperience
+        VStack(spacing: 0) {
+            if let availableUpdate {
+                AppStoreUpdateBanner(release: availableUpdate) {
+                    dismissedUpdateVersion = availableUpdate.version
+                    self.availableUpdate = nil
+                }
+            }
+            Group {
+                if FieldhouseReleaseGate.shouldRoute(sportID: activeSportId) {
+                    FieldhouseAuthenticatedContainer(notificationDestination: $fieldhouseNotificationDestination)
+                } else {
+                    standardFootballExperience
+                }
             }
         }
         .task(id: auth.selectedLeagueId) { await refreshActiveSport() }
         .task(id: auth.user?.id) { await prepareNotifications() }
+        .task(id: auth.user?.id) { await refreshAppStoreUpdate() }
         .task(id: auth.user?.id) {
             if let destination = pendingNotificationDestination ?? WarRoomNotificationCenter.takePendingRoute() {
                 pendingNotificationDestination = nil
@@ -219,6 +230,9 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .warRoomDeviceTokenChanged)) { _ in
             Task { await registerPushToken() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await refreshAppStoreUpdate() } }
         }
         .sheet(isPresented: $showingPushAnnouncements) { NavigationStack { AnnouncementsView() } }
         .sheet(item: $notificationDispatchTarget) { target in
@@ -337,6 +351,12 @@ struct ContentView: View {
               !deviceToken.isEmpty
         else { return }
         try? await SupabaseAPI.registerPushDevice(token: token, userId: user.id, deviceToken: deviceToken)
+    }
+
+    @MainActor private func refreshAppStoreUpdate() async {
+        let release = await AppStoreUpdateChecker.shared.availableRelease()
+        guard release?.version != dismissedUpdateVersion else { return }
+        availableUpdate = release
     }
 
     private func refreshActiveSport() async {
