@@ -61,7 +61,7 @@ Fieldhouse bracket, NCAAM/NCAAW parity, regular- and postseason weapon rules,
 active-board refresh behavior, strike presentations, bottom-navigation return
 behavior, Patreon connection, and NFL JDAM scoring.
 
-A fresh unsigned Release archive of commit `6e65ef0` then completed
+A fresh unsigned Release archive of native source through commit `9f7acdd` then completed
 successfully at `/private/tmp/WarRoom-Build21-Unsigned.xcarchive`.
 Packaged-app inspection confirmed:
 
@@ -74,6 +74,12 @@ The weekly-opening presentation key has a focused native test proving that it
 is scoped to the signed-in user, sport, and current week—not the selected
 league. Switching between leagues in the same sport therefore cannot replay the
 film, while a new week or a different sport can present its own opening.
+
+Because the authenticated Fieldhouse route remains disabled, the Create League
+sport picker is now governed by that same release gate. Build 21 cannot expose
+NCAAM/NCAAW room creation while routing those rooms into the football
+experience. Enabling the live route will enable those creation choices in the
+same release.
 
 This proves that the current source can produce a complete local Release
 archive. Because code signing was intentionally disabled, it is **not** proof
