@@ -25,7 +25,12 @@ confirmed:
   deployment.
 
 The `fieldhouse-odds` and `fieldhouse-tournament-results` Edge Functions were
-then deployed with JWT verification enabled. The tournament worker was hardened
+then deployed with JWT verification enabled. `football-scores` version 10 was
+deployed after release hardening exposed that production version 9 still forced
+basketball requests onto the CFB feed and used a 50-second provider gate. The
+version 10 readback confirms distinct NCAAM/NCAAW provider mappings, strict
+league/sport membership binding, JWT verification, and a five-minute shared
+live-score provider gate. The tournament worker was hardened
 with a random Supabase Vault credential and a service-role-only authorization
 RPC. A request without that private credential returned `403`; a Vault-backed
 request returned `200` with zero published tournaments. The paid odds endpoint

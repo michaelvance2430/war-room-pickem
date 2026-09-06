@@ -617,7 +617,9 @@ enum FieldhouseReleaseGate {
     static let isEnabled = false
 
     static func supports(sportID: String) -> Bool {
-        ["cbb", "ncaam", "ncaaw"].contains(sportID.lowercased())
+        // `cbb` is the legacy Foundry-only preview key. It must never enter
+        // the authenticated live route when this release gate is enabled.
+        ["ncaam", "ncaaw"].contains(sportID.lowercased())
     }
 
     static func shouldRoute(sportID: String) -> Bool {

@@ -72,14 +72,15 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertEqual(state.postseasonEligibilityLabel, "POINTS + CHEEVOS · NO BRASS")
     }
 
-    func testFieldhouseLiveRouteRecognizesBothBasketballLeaguesButRemainsDark() {
+    func testFieldhouseLiveRouteRecognizesOnlyProductionBasketballLeaguesAndRemainsDark() {
         XCTAssertTrue(FieldhouseReleaseGate.supports(sportID: "ncaam"))
         XCTAssertTrue(FieldhouseReleaseGate.supports(sportID: "NCAAW"))
-        XCTAssertTrue(FieldhouseReleaseGate.supports(sportID: "cbb"))
+        XCTAssertFalse(FieldhouseReleaseGate.supports(sportID: "cbb"))
         XCTAssertFalse(FieldhouseReleaseGate.supports(sportID: "cfb"))
         XCTAssertFalse(FieldhouseReleaseGate.supports(sportID: "nfl"))
         XCTAssertFalse(FieldhouseReleaseGate.shouldRoute(sportID: "ncaam"))
         XCTAssertFalse(FieldhouseReleaseGate.shouldRoute(sportID: "ncaaw"))
+        XCTAssertFalse(FieldhouseReleaseGate.shouldRoute(sportID: "cbb"))
     }
 
     func testAuthenticatedSnapshotHydratesTheCorrectLeagueCardAndPlayerChoices() throws {
