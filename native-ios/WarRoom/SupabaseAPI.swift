@@ -1188,6 +1188,26 @@ struct SportSeasonWindow: Codable, Sendable, Equatable {
     }
 }
 
+struct SportCardWindow: Codable, Sendable, Equatable {
+    let sportId: String
+    let seasonKey: Int
+    let weekNumber: Int
+    let firstGameAt: String
+    let timingStatus: String
+    let displayLabel: String?
+
+    nonisolated var isEstimated: Bool { timingStatus.lowercased() == "estimated" }
+
+    enum CodingKeys: String, CodingKey {
+        case sportId = "sport_id"
+        case seasonKey = "season_key"
+        case weekNumber = "week_number"
+        case firstGameAt = "first_game_at"
+        case timingStatus = "timing_status"
+        case displayLabel = "display_label"
+    }
+}
+
 struct FavoriteTeam: Decodable, Sendable {
     let sportId: String
     let teamId: String
@@ -2444,6 +2464,18 @@ enum SupabaseAPI {
             URLQueryItem(name: "limit", value: "1"),
         ]
         return try await send(authorizedRequest(url: components.url!, token: token), as: [SportSeasonWindow].self).first
+    }
+
+    static func sportCardWindow(token: String, sportId: String, seasonKey: Int, week: Int) async throws -> SportCardWindow? {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/sport_card_windows"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "sport_id,season_key,week_number,first_game_at,timing_status,display_label"),
+            URLQueryItem(name: "sport_id", value: "eq.\(SportIdentity(sportId).sportId)"),
+            URLQueryItem(name: "season_key", value: "eq.\(seasonKey)"),
+            URLQueryItem(name: "week_number", value: "eq.\(week)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [SportCardWindow].self).first
     }
 
     /// Fieldhouse permits honest co-champions, while the legacy football shelf

@@ -6,6 +6,8 @@ enum SeasonCardBuildGate {
     private struct AuthorityState: Sendable {
         var bySport: [String: SportSeasonWindow] = [:]
         var completedLookups: Set<String> = []
+        var cardByKey: [String: SportCardWindow] = [:]
+        var completedCardLookups: Set<String> = []
     }
     private static let authorityState = OSAllocatedUnfairLock(initialState: AuthorityState())
 
@@ -36,15 +38,30 @@ enum SeasonCardBuildGate {
         }
     }
 
+    static func recordServerCardAuthority(_ window: SportCardWindow?, sportId: String, week: Int) {
+        let key = cardKey(sportId: sportId, week: week)
+        authorityState.withLock { state in
+            state.completedCardLookups.insert(key)
+            state.cardByKey[key] = window
+        }
+    }
+
+    static func recordServerCardFailure(sportId: String, week: Int) {
+        let key = cardKey(sportId: sportId, week: week)
+        authorityState.withLock { state in
+            state.completedCardLookups.remove(key)
+            state.cardByKey.removeValue(forKey: key)
+        }
+    }
+
     static func firstScheduledDay(sportId: String, week: Int) -> Date? {
         let normalized = SportIdentity(sportId).sportId
+        let cardAuthority = serverCardAuthority(sportId: normalized, week: week)
+        if cardAuthority.lookupCompleted {
+            return footballKickoffDate(cardAuthority.window?.firstGameAt)
+        }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = eastern
-        if let authority = serverAuthority(for: normalized).window,
-           let seasonStart = footballKickoffDate(authority.firstEventAt),
-           let offset = dayOffset(sportId: normalized, week: week) {
-            return calendar.date(byAdding: .day, value: offset, to: seasonStart)
-        }
         switch normalized {
         case "cfb":
             let fixed: [Int: Date?] = [
@@ -80,7 +97,7 @@ enum SeasonCardBuildGate {
 
     static func allowsBuild(sportId: String, week: Int, at date: Date = Date()) -> Bool {
         let normalized = SportIdentity(sportId).sportId
-        let authority = serverAuthority(for: normalized)
+        let authority = serverCardAuthority(sportId: normalized, week: week)
         if authority.lookupCompleted, authority.window == nil {
             return false
         }
@@ -90,7 +107,7 @@ enum SeasonCardBuildGate {
 
     static func lockedMessage(sportId: String, week: Int) -> String {
         let normalized = SportIdentity(sportId).sportId
-        let authority = serverAuthority(for: normalized)
+        let authority = serverCardAuthority(sportId: normalized, week: week)
         if authority.lookupCompleted, authority.window == nil {
             return "SEASON DATE PENDING · ODDS DESK STAYS LOCKED"
         }
@@ -112,21 +129,15 @@ enum SeasonCardBuildGate {
         }
     }
 
-    private static func dayOffset(sportId: String, week: Int) -> Int? {
-        switch sportId {
-        case "cfb":
-            let fixed = [0: 0, 1: 7, 15: 113, 16: 126, 17: 134, 18: 144]
-            if let offset = fixed[week] { return offset }
-            return (2...14).contains(week) ? 12 + ((week - 2) * 7) : nil
-        case "nfl":
-            let fixed = [19: 128, 20: 135, 21: 143, 22: 157]
-            if let offset = fixed[week] { return offset }
-            return (1...18).contains(week) ? (week - 1) * 7 : nil
-        case "cbb", "ncaam", "ncaaw":
-            return week >= 1 ? (week - 1) * 7 : nil
-        default:
-            return nil
+    private static func serverCardAuthority(sportId: String, week: Int) -> (lookupCompleted: Bool, window: SportCardWindow?) {
+        let key = cardKey(sportId: sportId, week: week)
+        return authorityState.withLock { state in
+            (state.completedCardLookups.contains(key), state.cardByKey[key])
         }
+    }
+
+    private static func cardKey(sportId: String, week: Int) -> String {
+        "\(SportIdentity(sportId).sportId):\(week)"
     }
 }
 

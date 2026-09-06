@@ -141,10 +141,30 @@ private struct MembershipGateView: View {
                         sportId: active.leagues.sportId
                     )
                     SeasonCardBuildGate.recordServerAuthority(window, sportId: active.leagues.sportId)
+                    let cardWindow: SportCardWindow?
+                    if let window {
+                        cardWindow = try await SupabaseAPI.sportCardWindow(
+                            token: token,
+                            sportId: active.leagues.sportId,
+                            seasonKey: window.seasonKey,
+                            week: active.leagues.currentWeek
+                        )
+                    } else {
+                        cardWindow = nil
+                    }
+                    SeasonCardBuildGate.recordServerCardAuthority(
+                        cardWindow,
+                        sportId: active.leagues.sportId,
+                        week: active.leagues.currentWeek
+                    )
                 } catch {
                     // Build 21 ships before the review-only calendar table. Until
                     // that schema is approved, preserve the validated local gate.
                     SeasonCardBuildGate.recordServerFailure(sportId: active.leagues.sportId)
+                    SeasonCardBuildGate.recordServerCardFailure(
+                        sportId: active.leagues.sportId,
+                        week: active.leagues.currentWeek
+                    )
                 }
             }
             state = memberships.isEmpty ? .rookie : .member
@@ -383,8 +403,28 @@ struct ContentView: View {
                 sportId: active.leagues.sportId
             )
             SeasonCardBuildGate.recordServerAuthority(window, sportId: active.leagues.sportId)
+            let cardWindow: SportCardWindow?
+            if let window {
+                cardWindow = try await SupabaseAPI.sportCardWindow(
+                    token: token,
+                    sportId: active.leagues.sportId,
+                    seasonKey: window.seasonKey,
+                    week: active.leagues.currentWeek
+                )
+            } else {
+                cardWindow = nil
+            }
+            SeasonCardBuildGate.recordServerCardAuthority(
+                cardWindow,
+                sportId: active.leagues.sportId,
+                week: active.leagues.currentWeek
+            )
         } catch {
             SeasonCardBuildGate.recordServerFailure(sportId: active.leagues.sportId)
+            SeasonCardBuildGate.recordServerCardFailure(
+                sportId: active.leagues.sportId,
+                week: active.leagues.currentWeek
+            )
         }
         guard !suppressOpeningForLaunch else { return }
         let openingKey = SeasonOpeningPolicy.storageKey(

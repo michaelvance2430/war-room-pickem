@@ -94,30 +94,32 @@ struct SeasonCloseoutHomeTests {
     }
 
     @Test @MainActor func serverCalendarMovesWeeklyGateAndMarksEstimatedDates() throws {
-        let window = SportSeasonWindow(
+        let window = SportCardWindow(
             sportId: "nfl",
             seasonKey: 2027,
-            firstEventAt: "2027-09-09T00:00:00Z",
-            seasonEndsAt: "2028-02-14T05:00:00Z",
+            weekNumber: 3,
+            firstGameAt: "2027-09-23T00:00:00Z",
             timingStatus: "estimated",
-            displayLabel: "2027-28"
+            displayLabel: "Week 3"
         )
-        SeasonCardBuildGate.recordServerAuthority(window, sportId: "nfl")
-        defer { SeasonCardBuildGate.recordServerFailure(sportId: "nfl") }
+        SeasonCardBuildGate.recordServerCardAuthority(window, sportId: "nfl", week: 3)
+        defer { SeasonCardBuildGate.recordServerCardFailure(sportId: "nfl", week: 3) }
 
-        let beforeOpen = try #require(footballKickoffDate("2027-09-01T23:59:59Z"))
-        let afterOpen = try #require(footballKickoffDate("2027-09-02T00:00:01Z"))
+        let beforeOpen = try #require(footballKickoffDate("2027-09-15T23:59:59Z"))
+        let afterOpen = try #require(footballKickoffDate("2027-09-16T00:00:01Z"))
         let weekThree = try #require(footballKickoffDate("2027-09-23T00:00:00Z"))
 
-        #expect(!SeasonCardBuildGate.allowsBuild(sportId: "nfl", week: 1, at: beforeOpen))
-        #expect(SeasonCardBuildGate.allowsBuild(sportId: "nfl", week: 1, at: afterOpen))
+        #expect(!SeasonCardBuildGate.allowsBuild(sportId: "nfl", week: 3, at: beforeOpen))
+        #expect(SeasonCardBuildGate.allowsBuild(sportId: "nfl", week: 3, at: afterOpen))
         #expect(SeasonCardBuildGate.firstScheduledDay(sportId: "nfl", week: 3) == weekThree)
-        #expect(SeasonCardBuildGate.lockedMessage(sportId: "nfl", week: 1).contains("~ SEP 1, 2027"))
+        // Midnight UTC is still the prior calendar day in Eastern time. The
+        // player-facing label must use the app's Eastern operations clock.
+        #expect(SeasonCardBuildGate.lockedMessage(sportId: "nfl", week: 3).contains("~ SEP 15, 2027"))
     }
 
     @Test @MainActor func successfulEmptyCalendarFailsClosed() {
-        SeasonCardBuildGate.recordServerAuthority(nil, sportId: "ncaaw")
-        defer { SeasonCardBuildGate.recordServerFailure(sportId: "ncaaw") }
+        SeasonCardBuildGate.recordServerCardAuthority(nil, sportId: "ncaaw", week: 1)
+        defer { SeasonCardBuildGate.recordServerCardFailure(sportId: "ncaaw", week: 1) }
 
         #expect(!SeasonCardBuildGate.allowsBuild(sportId: "ncaaw", week: 1))
         #expect(SeasonCardBuildGate.lockedMessage(sportId: "ncaaw", week: 1).contains("DATE PENDING"))
