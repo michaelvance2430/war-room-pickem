@@ -7,7 +7,13 @@ source_path = File.expand_path("../native-ios/WarRoom/ContentView.swift", __dir_
 assets_path = File.expand_path("../native-ios/WarRoom/Assets.xcassets", __dir__)
 source = File.read(source_path)
 
-catalog_body = source.match(/private static let raw = """(.*?)"""/m)[1]
+def required_match(source, pattern, label)
+  match = source.match(pattern)
+  abort "Native Cheevo artwork audit could not find #{label}; update the audit for the current catalog layout" unless match
+  match[1]
+end
+
+catalog_body = required_match(source, /private static let raw = """(.*?)"""/m, "the native Cheevo catalog")
 catalog = catalog_body.lines.map do |line|
   code, name = line.strip.split("|", 2)
   [code, name] if code && name
@@ -15,18 +21,18 @@ end.compact.to_h
 
 rarity_ids = {}
 %w[legendary epic rare].each do |rarity|
-  body = source.match(/let #{rarity}: Set<String> = \[(.*?)\n\s*\]/m)[1]
+  body = required_match(source, /let #{rarity}: Set<String> = \[(.*?)\n\s*\]/m, "the #{rarity} rarity set")
   body.scan(/"([^"]+)"/).flatten.each { |code| rarity_ids[code] = rarity.upcase }
 end
 catalog.each_key { |code| rarity_ids[code] ||= "COMMON" }
 
-mapping_body = source.match(/private func achievementArtifactName\(for code: String\) -> String\? \{(.*?)\n\}/m)[1]
+mapping_body = required_match(source, /private func achievementArtifactName\(for code: String\) -> String\? \{(.*?)\n\}/m, "the dedicated artwork map")
 artwork = {}
 mapping_body.scan(/case\s+([^:]+):\s+return\s+"([^"]+)"/) do |cases, asset|
   cases.scan(/"([^"]+)"/).flatten.each { |code| artwork[code] = asset }
 end
 
-visual_body = source.match(/private func achievementVisual\(for code: String\) -> AchievementVisual \{(.*?)\n\}/m)[1]
+visual_body = required_match(source, /(?:private\s+)?func achievementVisual\(for code: String\) -> AchievementVisual \{(.*?)\n\}/m, "the generated visual map")
 explicit_visuals = visual_body.scan(/case\s+([^:]+):\s+return/).flatten.flat_map do |cases|
   cases.scan(/"([^"]+)"/).flatten
 end.to_set

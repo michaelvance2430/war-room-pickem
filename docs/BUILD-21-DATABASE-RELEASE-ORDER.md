@@ -65,7 +65,7 @@ A fresh unsigned Release archive of native source through commit `9f7acdd` then 
 successfully at `/private/tmp/WarRoom-Build21-Unsigned.xcarchive`.
 Packaged-app inspection confirmed:
 
-- marketing version `3.3` and build `21`;
+- marketing version `3.4` and build `21`;
 - `PrivacyInfo.xcprivacy` at the archived app root;
 - CFB nuclear, NFL JDAM, NCAAM Hellfire, and NCAAW Hellfire strike movies;
 - the War Room weekly-opening movie.
@@ -74,6 +74,15 @@ The weekly-opening presentation key has a focused native test proving that it
 is scoped to the signed-in user, sport, and current week—not the selected
 league. Switching between leagues in the same sport therefore cannot replay the
 film, while a new week or a different sport can present its own opening.
+
+The final release-gate rerun on 2026-09-06 passed all 170 native tests with no
+failures or skips, plus 38 targeted release verifiers. A fresh unsigned Release
+archive completed at `/private/tmp/WarRoom-Build21-ReleaseGate.xcarchive`.
+Direct packaged-app inspection reconfirmed native bundle
+`com.warroompicks.WarRoom`, version `3.4` build `21`, the privacy manifest,
+app icons, weekly-opening movie, and all four sport-specific weapon movies.
+The Cheevo artwork audit covered all 185 catalog entries with zero uncovered
+visuals or broken asset references.
 
 Because the authenticated Fieldhouse route remains disabled, the Create League
 sport picker is now governed by that same release gate. Build 21 cannot expose
