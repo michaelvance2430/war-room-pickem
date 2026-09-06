@@ -84,13 +84,15 @@ app icons, weekly-opening movie, and all four sport-specific weapon movies.
 The Cheevo artwork audit covered all 185 catalog entries with zero uncovered
 visuals or broken asset references.
 
-A signed archive also completed successfully, but the subsequent local App
-Store export correctly stopped: this Mac currently has only the Apple
-Development identity for Michael Vance and no usable iOS Distribution
-certificate. Xcode also reported a stale account credential record with a
-missing username. Build 21 is therefore source-, test-, and archive-clean, but
-it is not yet distribution-signing-clean. Do not upload until that Apple
-credential and certificate gap is repaired and a local App Store export passes.
+A signed archive also completed successfully. The initial local App Store
+export stopped because this Mac had no usable Apple Distribution identity and
+the Xcode account record had a missing username. On 2026-09-06, a new Apple
+Distribution identity (`DC7DD0151AAFA0BBA092C95A8BBAA275CD8B3DBD`) and the
+matching `War Room App Store 2026` provisioning profile were created and
+installed. A manual App Store Connect export then passed at
+`/private/tmp/WarRoom-Build21-AppStoreExport-ManualGate`, producing a signed
+Build 21 IPA with production push and associated-domain entitlements. Build 21
+is now distribution-signing-clean. This validation did not upload the build.
 
 Because the authenticated Fieldhouse route remains disabled, the Create League
 sport picker is now governed by that same release gate. Build 21 cannot expose
@@ -98,10 +100,10 @@ NCAAM/NCAAW room creation while routing those rooms into the football
 experience. Enabling the live route will enable those creation choices in the
 same release.
 
-This proves that the current source can produce a complete local Release
-archive. Because code signing was intentionally disabled, it is **not** proof
-of distribution signing, App Store validation, upload, TestFlight processing,
-review submission, or release.
+The unsigned archive proves that the current source can produce a complete
+local Release archive. The subsequent manual export proves local distribution
+signing and App Store packaging. Neither step is proof of upload, TestFlight
+processing, App Store Connect validation, review submission, or release.
 
 ## Stop conditions
 
