@@ -2497,6 +2497,7 @@ struct HomeView: View {
     @State private var regularScorecards: [RegularSeasonScorecard] = []
     @State private var seasonCloseout: LeagueSeasonCloseout?
     @State private var leagueTrophies: [ProfileTrophy] = []
+    @State private var nextSeasonWindow: SportSeasonWindow?
     @State private var showingRegularScorecard = false
     @State private var regularScorecardToShowID: String?
     @State private var showingNewDispatch = false
@@ -2610,7 +2611,7 @@ struct HomeView: View {
                             )
                         }
                         if let reigningChampion {
-                            ReigningChampionHomeCard(presentation: reigningChampion)
+                            ReigningChampionHomeCard(presentation: reigningChampion, nextSeasonWindow: nextSeasonWindow)
                         }
                         if isCommissioner {
                             NavigationLink { CommissionerCommandCenterView(membership: membership, standings: standings, submittedUserIds: visibleSubmittedUserIds) } label: {
@@ -2988,6 +2989,7 @@ struct HomeView: View {
                 sportId: active.leagues.sportId
             )
             async let loadedLeagueTrophies = try? SupabaseAPI.leagueTrophies(token: token, leagueId: active.leagueId)
+            async let loadedNextSeasonWindow = try? SupabaseAPI.nextSportSeasonWindow(token: token, sportId: active.leagues.sportId)
             card = try await loadedCard
             homeScores = [:]
             homeScoreStatus = nil
@@ -3001,6 +3003,7 @@ struct HomeView: View {
             competitiveStatus = try? await loadedCompetitiveStatus
             seasonCloseout = await loadedCloseout
             leagueTrophies = (await loadedLeagueTrophies) ?? []
+            nextSeasonWindow = await loadedNextSeasonWindow
             let dispatches = (try? await loadedDispatches) ?? []
             regularScorecards = (try? await SupabaseAPI.regularSeasonScorecards(token: token, leagueId: active.leagueId, userId: user.id)) ?? []
             if active.leagues.sportId.lowercased() == "cfb" {

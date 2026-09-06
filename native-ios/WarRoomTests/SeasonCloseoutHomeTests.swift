@@ -74,6 +74,23 @@ struct SeasonCloseoutHomeTests {
         #expect(presentation.champions.map(\.userId) == [champion])
     }
 
+    @Test func seasonWindowKeepsEstimatedAndOfficialDatesDistinct() throws {
+        let estimated = try JSONDecoder().decode(SportSeasonWindow.self, from: Data("""
+        {"sport_id":"ncaam","season_key":2027,"first_event_at":"2027-11-01T05:00:00Z","timing_status":"estimated","display_label":"2027-28"}
+        """.utf8))
+        let official = SportSeasonWindow(
+            sportId: "ncaam",
+            seasonKey: 2027,
+            firstEventAt: "2027-11-01T05:00:00Z",
+            timingStatus: "official",
+            displayLabel: "2027-28"
+        )
+
+        #expect(estimated.isEstimated)
+        #expect(!official.isEstimated)
+        #expect(estimated.firstEventAt == official.firstEventAt)
+    }
+
     private func closeout(
         league: UUID,
         champion: UUID,

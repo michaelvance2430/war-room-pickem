@@ -2871,6 +2871,7 @@ private struct FieldhouseHomePage: View {
     @State private var competitiveStatus: CompetitiveLeagueStatus?
     @State private var seasonCloseout: LeagueSeasonCloseout?
     @State private var leagueTrophies: [ProfileTrophy] = []
+    @State private var nextSeasonWindow: SportSeasonWindow?
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHomeMasthead(state: state)
@@ -2901,7 +2902,7 @@ private struct FieldhouseHomePage: View {
                 )
             }
             if let reigningChampion {
-                ReigningChampionHomeCard(presentation: reigningChampion)
+                ReigningChampionHomeCard(presentation: reigningChampion, nextSeasonWindow: nextSeasonWindow)
             }
             if state.isCommissioner {
                 Button { showingCommissionerCommand = true } label: {
@@ -3032,6 +3033,7 @@ private struct FieldhouseHomePage: View {
         guard state.isAuthenticatedSession, let leagueID = auth.selectedLeagueId else {
             seasonCloseout = nil
             leagueTrophies = []
+            nextSeasonWindow = nil
             return
         }
         do {
@@ -3042,8 +3044,10 @@ private struct FieldhouseHomePage: View {
                 sportId: fieldhouseSportID
             )
             async let trophies = SupabaseAPI.leagueTrophies(token: token, leagueId: leagueID)
+            async let seasonWindow = try? SupabaseAPI.nextSportSeasonWindow(token: token, sportId: fieldhouseSportID)
             seasonCloseout = try await closeout
             leagueTrophies = try await trophies
+            nextSeasonWindow = await seasonWindow
         } catch {
             // Keep the previous verified display. A partial or failed read must
             // never invent a champion or replace permanent hardware.

@@ -68,6 +68,7 @@ enum ReigningChampionPolicy {
 
 struct ReigningChampionHomeCard: View {
     let presentation: ReigningChampionPresentation
+    let nextSeasonWindow: SportSeasonWindow?
 
     private var accent: Color {
         switch presentation.sportId.lowercased() {
@@ -123,13 +124,9 @@ struct ReigningChampionHomeCard: View {
                 Spacer(minLength: 0)
             }
 
-            HStack(spacing: 9) {
-                Image(systemName: "clock.badge.questionmark.fill")
-                Text("NEXT SEASON CLOCK ARMS WHEN THE OFFICIAL SCHEDULE IS SET")
-                    .font(.system(size: 8, weight: .black))
-                    .tracking(1.0)
+            TimelineView(.periodic(from: .now, by: 60)) { timeline in
+                seasonClock(at: timeline.date)
             }
-            .foregroundStyle(.white.opacity(0.56))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
@@ -144,5 +141,48 @@ struct ReigningChampionHomeCard: View {
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.62), lineWidth: 1.4))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Defending champion for \(presentation.seasonKey): \(presentation.names).")
+    }
+
+    @ViewBuilder private func seasonClock(at now: Date) -> some View {
+        if let nextSeasonWindow,
+           let firstEvent = footballKickoffDate(nextSeasonWindow.firstEventAt) {
+            let remaining = max(0, Int(firstEvent.timeIntervalSince(now)))
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 9) {
+                    Image(systemName: nextSeasonWindow.isEstimated ? "clock.badge.questionmark.fill" : "clock.badge.checkmark.fill")
+                    Text("\(nextSeasonWindow.isEstimated ? "~ " : "")\(countdown(remaining)) TO NEXT SEASON")
+                        .font(.system(size: 10, weight: .black).monospacedDigit())
+                        .tracking(1.0)
+                }
+                Text(dateLabel(firstEvent, estimated: nextSeasonWindow.isEstimated))
+                    .font(.system(size: 8, weight: .black))
+                    .tracking(1.0)
+            }
+            .foregroundStyle(.white.opacity(0.62))
+        } else {
+            HStack(spacing: 9) {
+                Image(systemName: "clock.badge.questionmark.fill")
+                Text("NEXT SEASON DATE PENDING")
+                    .font(.system(size: 8, weight: .black))
+                    .tracking(1.0)
+            }
+            .foregroundStyle(.white.opacity(0.56))
+        }
+    }
+
+    private func countdown(_ total: Int) -> String {
+        let days = total / 86_400
+        let hours = (total % 86_400) / 3_600
+        return days > 0 ? "\(days)D \(hours)H" : "\(hours)H"
+    }
+
+    private func dateLabel(_ date: Date, estimated: Bool) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "America/New_York")
+        formatter.dateFormat = "MMM d, yyyy"
+        return estimated
+            ? "ESTIMATED · ~ \(formatter.string(from: date).uppercased())"
+            : "OFFICIAL · \(formatter.string(from: date).uppercased())"
     }
 }
