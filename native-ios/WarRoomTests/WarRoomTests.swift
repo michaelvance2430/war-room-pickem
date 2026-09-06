@@ -11,27 +11,33 @@ import Foundation
 
 struct WarRoomTests {
 
-    @Test func cardBuildingUnlocksExactlyOneWeekBeforeEachSeason() throws {
+    @Test func everyCardDeskUnlocksExactlyOneWeekBeforeItsScheduledWindow() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = SeasonCardBuildGate.eastern
 
-        let expected: [(String, DateComponents)] = [
-            ("cfb", DateComponents(year: 2026, month: 8, day: 20)),
-            ("nfl", DateComponents(year: 2026, month: 9, day: 3)),
-            ("ncaam", DateComponents(year: 2026, month: 10, day: 26)),
-            ("ncaaw", DateComponents(year: 2026, month: 10, day: 26)),
+        let expected: [(String, Int, DateComponents)] = [
+            ("cfb", 0, DateComponents(year: 2026, month: 8, day: 20)),
+            ("cfb", 1, DateComponents(year: 2026, month: 8, day: 27)),
+            ("cfb", 2, DateComponents(year: 2026, month: 9, day: 1)),
+            ("nfl", 1, DateComponents(year: 2026, month: 9, day: 3)),
+            ("nfl", 2, DateComponents(year: 2026, month: 9, day: 10)),
+            ("ncaam", 1, DateComponents(year: 2026, month: 10, day: 26)),
+            ("ncaam", 2, DateComponents(year: 2026, month: 11, day: 2)),
+            ("ncaaw", 2, DateComponents(year: 2026, month: 11, day: 2)),
         ]
 
-        for (sport, components) in expected {
-            let unlock = try #require(SeasonCardBuildGate.unlockDate(sportId: sport))
+        for (sport, week, components) in expected {
+            let unlock = try #require(SeasonCardBuildGate.unlockDate(sportId: sport, week: week))
             let actual = calendar.dateComponents([.year, .month, .day], from: unlock)
             #expect(actual.year == components.year)
             #expect(actual.month == components.month)
             #expect(actual.day == components.day)
-            #expect(!SeasonCardBuildGate.allowsBuild(sportId: sport, at: unlock.addingTimeInterval(-1)))
-            #expect(SeasonCardBuildGate.allowsBuild(sportId: sport, at: unlock))
+            #expect(!SeasonCardBuildGate.allowsBuild(sportId: sport, week: week, at: unlock.addingTimeInterval(-1)))
+            #expect(SeasonCardBuildGate.allowsBuild(sportId: sport, week: week, at: unlock))
+            #expect(SeasonCardBuildGate.lockedMessage(sportId: sport, week: week).contains("PAGE OPENS"))
         }
-        #expect(!SeasonCardBuildGate.allowsBuild(sportId: "unsupported", at: .distantFuture))
+        #expect(!SeasonCardBuildGate.allowsBuild(sportId: "unsupported", week: 1, at: .distantFuture))
+        #expect(!SeasonCardBuildGate.allowsBuild(sportId: "cfb", week: 99, at: .distantFuture))
     }
 
     @Test func patreonStatusNeverTurnsSupportIntoGameplayAuthority() throws {

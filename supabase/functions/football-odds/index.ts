@@ -57,10 +57,19 @@ function dateWindow(sport: string, week: number) {
 
 function compactDate(value: string) { return value.replaceAll("-", ""); }
 
-const BUILD_UNLOCK_AT: Record<string, string> = {
-  cfb: "2026-08-20T04:00:00.000Z",
-  nfl: "2026-09-03T04:00:00.000Z",
-};
+function addCalendarDays(dateKey: string, days: number) {
+  const value = new Date(`${dateKey}T12:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function easternDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date);
+  const field = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return `${field("year")}-${field("month")}-${field("day")}`;
+}
 
 // The live AP endpoint remains primary. This preseason snapshot guarantees
 // Week 1 labels if ESPN blocks or changes its edge response unexpectedly.
@@ -152,9 +161,12 @@ Deno.serve(async (req: Request) => {
     return reply({ error: "Commissioner or deputy required" }, 403);
   }
   if (league?.sport_id !== sport) return reply({ error: "Requested odds sport does not match this league" }, 403);
-  const unlockAt = BUILD_UNLOCK_AT[sport];
-  if (Date.now() < Date.parse(unlockAt)) {
-    return reply({ error: `Card building unlocks ${unlockAt} — one week before the season starts.`, unlockAt }, 423);
+  const opensOn = addCalendarDays(range.start, -7);
+  if (easternDateKey() < opensOn) {
+    return reply({
+      error: `PAGE OPENS ${opensOn} — seven days before Week ${week}'s first scheduled game day.`,
+      opensOn,
+    }, 423);
   }
 
   const apiKey = (Deno.env.get("ODDS_API_KEY") || "").trim();

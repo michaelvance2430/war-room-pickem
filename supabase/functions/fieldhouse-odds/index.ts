@@ -11,7 +11,19 @@ const defaultKey = (jsonName: string, legacyName: string) => {
   } catch { /* legacy fallback */ }
   return Deno.env.get(legacyName) || "";
 };
-const FIELDHOUSE_BUILD_UNLOCK_AT = "2026-10-26T04:00:00.000Z";
+const FIELDHOUSE_OPENING_DATE = "2026-11-02";
+function addCalendarDays(dateKey: string, days: number) {
+  const value = new Date(`${dateKey}T12:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+function easternDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date);
+  const field = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return `${field("year")}-${field("month")}-${field("day")}`;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return reply({ error: "POST required" }, 405);
@@ -46,10 +58,16 @@ Deno.serve(async (req: Request) => {
   const league = Array.isArray(membership?.leagues) ? membership.leagues[0] : membership?.leagues;
   const canBuild = membership?.role === "commissioner" || membership?.is_deputy === true || league?.commissioner_id === user?.id;
   if (!canBuild || league?.sport_id !== sport) return reply({ error: "Commissioner or deputy access to this Fieldhouse league is required" }, 403);
-  if (Date.now() < Date.parse(FIELDHOUSE_BUILD_UNLOCK_AT)) {
+  const windowStart = addCalendarDays(FIELDHOUSE_OPENING_DATE, (window - 1) * 7);
+  const windowEnd = addCalendarDays(windowStart, 7);
+  if (from.toISOString().slice(0, 10) !== windowStart || to.toISOString().slice(0, 10) !== windowEnd) {
+    return reply({ error: "Requested odds dates do not match this Fieldhouse week's scheduled window" }, 400);
+  }
+  const opensOn = addCalendarDays(windowStart, -7);
+  if (easternDateKey() < opensOn) {
     return reply({
-      error: `Card building unlocks ${FIELDHOUSE_BUILD_UNLOCK_AT} — one week before the season starts.`,
-      unlockAt: FIELDHOUSE_BUILD_UNLOCK_AT,
+      error: `PAGE OPENS ${opensOn} — seven days before Week ${window}'s first scheduled game day.`,
+      opensOn,
     }, 423);
   }
 

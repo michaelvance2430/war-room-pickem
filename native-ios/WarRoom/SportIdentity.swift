@@ -3,39 +3,61 @@ import SwiftUI
 enum SeasonCardBuildGate {
     static let eastern = TimeZone(identifier: "America/New_York")!
 
-    static func seasonStart(sportId: String) -> Date? {
-        let normalized = SportIdentity(sportId).sportId
+    private static func date(_ year: Int, _ month: Int, _ day: Int) -> Date? {
         var components = DateComponents()
         components.calendar = Calendar(identifier: .gregorian)
         components.timeZone = eastern
+        components.year = year
+        components.month = month
+        components.day = day
         components.hour = 0
-        switch normalized {
-        case "cfb":
-            components.year = 2026; components.month = 8; components.day = 27
-        case "nfl":
-            components.year = 2026; components.month = 9; components.day = 10
-        case "cbb", "ncaam", "ncaaw":
-            components.year = 2026; components.month = 11; components.day = 2
-        default:
-            return nil
-        }
         return components.date
     }
 
-    static func unlockDate(sportId: String) -> Date? {
-        guard let start = seasonStart(sportId: sportId) else { return nil }
+    static func firstScheduledDay(sportId: String, week: Int) -> Date? {
+        let normalized = SportIdentity(sportId).sportId
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = eastern
+        switch normalized {
+        case "cfb":
+            let fixed: [Int: Date?] = [
+                0: date(2026, 8, 27), 1: date(2026, 9, 3),
+                15: date(2026, 12, 18), 16: date(2026, 12, 31),
+                17: date(2027, 1, 8), 18: date(2027, 1, 18),
+            ]
+            if let value = fixed[week] { return value }
+            guard (2...14).contains(week), let weekTwo = date(2026, 9, 8) else { return nil }
+            return calendar.date(byAdding: .day, value: (week - 2) * 7, to: weekTwo)
+        case "nfl":
+            let fixed: [Int: Date?] = [
+                19: date(2027, 1, 16), 20: date(2027, 1, 23),
+                21: date(2027, 1, 31), 22: date(2027, 2, 14),
+            ]
+            if let value = fixed[week] { return value }
+            guard (1...18).contains(week), let weekOne = date(2026, 9, 10) else { return nil }
+            return calendar.date(byAdding: .day, value: (week - 1) * 7, to: weekOne)
+        case "cbb", "ncaam", "ncaaw":
+            guard week >= 1, let windowOne = date(2026, 11, 2) else { return nil }
+            return calendar.date(byAdding: .day, value: (week - 1) * 7, to: windowOne)
+        default:
+            return nil
+        }
+    }
+
+    static func unlockDate(sportId: String, week: Int) -> Date? {
+        guard let start = firstScheduledDay(sportId: sportId, week: week) else { return nil }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = eastern
         return calendar.date(byAdding: .day, value: -7, to: start)
     }
 
-    static func allowsBuild(sportId: String, at date: Date = Date()) -> Bool {
-        guard let unlock = unlockDate(sportId: sportId) else { return false }
+    static func allowsBuild(sportId: String, week: Int, at date: Date = Date()) -> Bool {
+        guard let unlock = unlockDate(sportId: sportId, week: week) else { return false }
         return date >= unlock
     }
 
-    static func lockedMessage(sportId: String) -> String {
-        guard let unlock = unlockDate(sportId: sportId) else {
+    static func lockedMessage(sportId: String, week: Int) -> String {
+        guard let unlock = unlockDate(sportId: sportId, week: week) else {
             return "Card building is unavailable for this sport."
         }
         let formatter = DateFormatter()
@@ -43,7 +65,7 @@ enum SeasonCardBuildGate {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = eastern
         formatter.dateFormat = "MMM d, yyyy"
-        return "Card building unlocks \(formatter.string(from: unlock)) — one week before the season starts."
+        return "PAGE OPENS \(formatter.string(from: unlock).uppercased()) · 7 DAYS BEFORE WEEK \(week)'S FIRST GAME"
     }
 }
 
