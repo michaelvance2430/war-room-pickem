@@ -1168,10 +1168,11 @@ struct LeagueSeasonCloseout: Decodable, Identifiable, Sendable {
     }
 }
 
-struct SportSeasonWindow: Decodable, Sendable, Equatable {
+struct SportSeasonWindow: Codable, Sendable, Equatable {
     let sportId: String
     let seasonKey: Int
     let firstEventAt: String
+    let seasonEndsAt: String
     let timingStatus: String
     let displayLabel: String?
 
@@ -1181,6 +1182,7 @@ struct SportSeasonWindow: Decodable, Sendable, Equatable {
         case sportId = "sport_id"
         case seasonKey = "season_key"
         case firstEventAt = "first_event_at"
+        case seasonEndsAt = "season_ends_at"
         case timingStatus = "timing_status"
         case displayLabel = "display_label"
     }
@@ -2423,9 +2425,21 @@ enum SupabaseAPI {
     static func nextSportSeasonWindow(token: String, sportId: String, after date: Date = Date()) async throws -> SportSeasonWindow? {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/sport_season_windows"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "sport_id,season_key,first_event_at,timing_status,display_label"),
+            URLQueryItem(name: "select", value: "sport_id,season_key,first_event_at,season_ends_at,timing_status,display_label"),
             URLQueryItem(name: "sport_id", value: "eq.\(SportIdentity(sportId).sportId)"),
             URLQueryItem(name: "first_event_at", value: "gt.\(ISO8601DateFormatter().string(from: date))"),
+            URLQueryItem(name: "order", value: "first_event_at.asc"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [SportSeasonWindow].self).first
+    }
+
+    static func relevantSportSeasonWindow(token: String, sportId: String, at date: Date = Date()) async throws -> SportSeasonWindow? {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/sport_season_windows"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "sport_id,season_key,first_event_at,season_ends_at,timing_status,display_label"),
+            URLQueryItem(name: "sport_id", value: "eq.\(SportIdentity(sportId).sportId)"),
+            URLQueryItem(name: "season_ends_at", value: "gte.\(ISO8601DateFormatter().string(from: date))"),
             URLQueryItem(name: "order", value: "first_event_at.asc"),
             URLQueryItem(name: "limit", value: "1"),
         ]

@@ -16,19 +16,23 @@ create table if not exists public.sport_season_windows (
   season_key integer not null
     check (season_key between 2020 and 2100),
   first_event_at timestamptz not null,
+  season_ends_at timestamptz not null,
   timing_status text not null default 'estimated'
     check (timing_status in ('estimated', 'official')),
   display_label text,
   source_note text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  primary key (sport_id, season_key)
+  primary key (sport_id, season_key),
+  check (season_ends_at > first_event_at)
 );
 
 comment on table public.sport_season_windows is
   'Server-owned first event per sport season. Estimated dates display with a tilde; official dates do not.';
 comment on column public.sport_season_windows.first_event_at is
   'Authoritative or explicitly estimated first event used by offseason countdowns and future season-opening gates.';
+comment on column public.sport_season_windows.season_ends_at is
+  'End of the sport season. This prevents a future season row from locking an active current season.';
 comment on column public.sport_season_windows.timing_status is
   'estimated renders visibly with ~; official renders without approximation language.';
 

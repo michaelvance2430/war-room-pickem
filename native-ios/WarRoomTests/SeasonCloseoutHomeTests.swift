@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import WarRoom
 
+@Suite(.serialized)
 struct SeasonCloseoutHomeTests {
     @Test func closeoutDecodesCurrentAndLegacyChampionAuthority() throws {
         let league = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
@@ -76,12 +77,13 @@ struct SeasonCloseoutHomeTests {
 
     @Test func seasonWindowKeepsEstimatedAndOfficialDatesDistinct() throws {
         let estimated = try JSONDecoder().decode(SportSeasonWindow.self, from: Data("""
-        {"sport_id":"ncaam","season_key":2027,"first_event_at":"2027-11-01T05:00:00Z","timing_status":"estimated","display_label":"2027-28"}
+        {"sport_id":"ncaam","season_key":2027,"first_event_at":"2027-11-01T05:00:00Z","season_ends_at":"2028-04-04T04:00:00Z","timing_status":"estimated","display_label":"2027-28"}
         """.utf8))
         let official = SportSeasonWindow(
             sportId: "ncaam",
             seasonKey: 2027,
             firstEventAt: "2027-11-01T05:00:00Z",
+            seasonEndsAt: "2028-04-04T04:00:00Z",
             timingStatus: "official",
             displayLabel: "2027-28"
         )
@@ -89,6 +91,36 @@ struct SeasonCloseoutHomeTests {
         #expect(estimated.isEstimated)
         #expect(!official.isEstimated)
         #expect(estimated.firstEventAt == official.firstEventAt)
+    }
+
+    @Test @MainActor func serverCalendarMovesWeeklyGateAndMarksEstimatedDates() throws {
+        let window = SportSeasonWindow(
+            sportId: "nfl",
+            seasonKey: 2027,
+            firstEventAt: "2027-09-09T00:00:00Z",
+            seasonEndsAt: "2028-02-14T05:00:00Z",
+            timingStatus: "estimated",
+            displayLabel: "2027-28"
+        )
+        SeasonCardBuildGate.recordServerAuthority(window, sportId: "nfl")
+        defer { SeasonCardBuildGate.recordServerFailure(sportId: "nfl") }
+
+        let beforeOpen = try #require(footballKickoffDate("2027-09-01T23:59:59Z"))
+        let afterOpen = try #require(footballKickoffDate("2027-09-02T00:00:01Z"))
+        let weekThree = try #require(footballKickoffDate("2027-09-23T00:00:00Z"))
+
+        #expect(!SeasonCardBuildGate.allowsBuild(sportId: "nfl", week: 1, at: beforeOpen))
+        #expect(SeasonCardBuildGate.allowsBuild(sportId: "nfl", week: 1, at: afterOpen))
+        #expect(SeasonCardBuildGate.firstScheduledDay(sportId: "nfl", week: 3) == weekThree)
+        #expect(SeasonCardBuildGate.lockedMessage(sportId: "nfl", week: 1).contains("~ SEP 1, 2027"))
+    }
+
+    @Test @MainActor func successfulEmptyCalendarFailsClosed() {
+        SeasonCardBuildGate.recordServerAuthority(nil, sportId: "ncaaw")
+        defer { SeasonCardBuildGate.recordServerFailure(sportId: "ncaaw") }
+
+        #expect(!SeasonCardBuildGate.allowsBuild(sportId: "ncaaw", week: 1))
+        #expect(SeasonCardBuildGate.lockedMessage(sportId: "ncaaw", week: 1).contains("DATE PENDING"))
     }
 
     private func closeout(

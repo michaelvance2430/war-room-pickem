@@ -1,7 +1,13 @@
 import SwiftUI
+import os
 
 enum SeasonCardBuildGate {
     static let eastern = TimeZone(identifier: "America/New_York")!
+    private struct AuthorityState: Sendable {
+        var bySport: [String: SportSeasonWindow] = [:]
+        var completedLookups: Set<String> = []
+    }
+    private static let authorityState = OSAllocatedUnfairLock(initialState: AuthorityState())
 
     private static func date(_ year: Int, _ month: Int, _ day: Int) -> Date? {
         var components = DateComponents()
@@ -14,10 +20,31 @@ enum SeasonCardBuildGate {
         return components.date
     }
 
+    static func recordServerAuthority(_ window: SportSeasonWindow?, sportId: String) {
+        let normalized = SportIdentity(sportId).sportId
+        authorityState.withLock { state in
+            state.completedLookups.insert(normalized)
+            state.bySport[normalized] = window
+        }
+    }
+
+    static func recordServerFailure(sportId: String) {
+        let normalized = SportIdentity(sportId).sportId
+        authorityState.withLock { state in
+            state.completedLookups.remove(normalized)
+            state.bySport.removeValue(forKey: normalized)
+        }
+    }
+
     static func firstScheduledDay(sportId: String, week: Int) -> Date? {
         let normalized = SportIdentity(sportId).sportId
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = eastern
+        if let authority = serverAuthority(for: normalized).window,
+           let seasonStart = footballKickoffDate(authority.firstEventAt),
+           let offset = dayOffset(sportId: normalized, week: week) {
+            return calendar.date(byAdding: .day, value: offset, to: seasonStart)
+        }
         switch normalized {
         case "cfb":
             let fixed: [Int: Date?] = [
@@ -52,11 +79,21 @@ enum SeasonCardBuildGate {
     }
 
     static func allowsBuild(sportId: String, week: Int, at date: Date = Date()) -> Bool {
+        let normalized = SportIdentity(sportId).sportId
+        let authority = serverAuthority(for: normalized)
+        if authority.lookupCompleted, authority.window == nil {
+            return false
+        }
         guard let unlock = unlockDate(sportId: sportId, week: week) else { return false }
         return date >= unlock
     }
 
     static func lockedMessage(sportId: String, week: Int) -> String {
+        let normalized = SportIdentity(sportId).sportId
+        let authority = serverAuthority(for: normalized)
+        if authority.lookupCompleted, authority.window == nil {
+            return "SEASON DATE PENDING · ODDS DESK STAYS LOCKED"
+        }
         guard let unlock = unlockDate(sportId: sportId, week: week) else {
             return "Card building is unavailable for this sport."
         }
@@ -65,7 +102,31 @@ enum SeasonCardBuildGate {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = eastern
         formatter.dateFormat = "MMM d, yyyy"
-        return "PAGE OPENS \(formatter.string(from: unlock).uppercased()) · 7 DAYS BEFORE WEEK \(week)'S FIRST GAME"
+        let estimateMarker = authority.window?.isEstimated == true ? "~ " : ""
+        return "PAGE OPENS \(estimateMarker)\(formatter.string(from: unlock).uppercased()) · 7 DAYS BEFORE WEEK \(week)'S FIRST GAME"
+    }
+
+    private static func serverAuthority(for sportId: String) -> (lookupCompleted: Bool, window: SportSeasonWindow?) {
+        authorityState.withLock { state in
+            (state.completedLookups.contains(sportId), state.bySport[sportId])
+        }
+    }
+
+    private static func dayOffset(sportId: String, week: Int) -> Int? {
+        switch sportId {
+        case "cfb":
+            let fixed = [0: 0, 1: 7, 15: 113, 16: 126, 17: 134, 18: 144]
+            if let offset = fixed[week] { return offset }
+            return (2...14).contains(week) ? 12 + ((week - 2) * 7) : nil
+        case "nfl":
+            let fixed = [19: 128, 20: 135, 21: 143, 22: 157]
+            if let offset = fixed[week] { return offset }
+            return (1...18).contains(week) ? (week - 1) * 7 : nil
+        case "cbb", "ncaam", "ncaaw":
+            return week >= 1 ? (week - 1) * 7 : nil
+        default:
+            return nil
+        }
     }
 }
 

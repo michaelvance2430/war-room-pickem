@@ -134,6 +134,19 @@ private struct MembershipGateView: View {
         do {
             let token = try await auth.validAccessToken()
             let memberships = try await SupabaseAPI.leagueMemberships(token: token, userId: user.id)
+            if let active = memberships.first(where: { $0.leagueId == auth.selectedLeagueId }) ?? memberships.first {
+                do {
+                    let window = try await SupabaseAPI.relevantSportSeasonWindow(
+                        token: token,
+                        sportId: active.leagues.sportId
+                    )
+                    SeasonCardBuildGate.recordServerAuthority(window, sportId: active.leagues.sportId)
+                } catch {
+                    // Build 21 ships before the review-only calendar table. Until
+                    // that schema is approved, preserve the validated local gate.
+                    SeasonCardBuildGate.recordServerFailure(sportId: active.leagues.sportId)
+                }
+            }
             state = memberships.isEmpty ? .rookie : .member
         } catch {
             state = .failed(error.localizedDescription)
@@ -364,6 +377,15 @@ struct ContentView: View {
               let active = try? await SupabaseAPI.activeLeague(token: token, userId: user.id, preferredLeagueId: auth.selectedLeagueId)
         else { return }
         activeSportId = active.leagues.sportId.lowercased()
+        do {
+            let window = try await SupabaseAPI.relevantSportSeasonWindow(
+                token: token,
+                sportId: active.leagues.sportId
+            )
+            SeasonCardBuildGate.recordServerAuthority(window, sportId: active.leagues.sportId)
+        } catch {
+            SeasonCardBuildGate.recordServerFailure(sportId: active.leagues.sportId)
+        }
         guard !suppressOpeningForLaunch else { return }
         let openingKey = SeasonOpeningPolicy.storageKey(
             userID: user.id,
