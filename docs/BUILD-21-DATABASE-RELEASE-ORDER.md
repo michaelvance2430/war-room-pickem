@@ -94,7 +94,10 @@ installed. A manual App Store Connect export then passed at
 Build 21 IPA with production push and associated-domain entitlements. Build 21
 is now distribution-signing-clean. A strict deep signature verification also
 passed and resolved the complete Apple Distribution, WWDR, and Apple Root CA
-trust chain. This validation did not upload the build.
+trust chain. After refreshing the Xcode Apple account, a second export using
+automatic App Store signing and provisioning also passed at
+`/private/tmp/WarRoom-Build21-AppStoreExport-AccountGate2`. This validation did
+not upload the build.
 
 Because the authenticated Fieldhouse route remains disabled, the Create League
 sport picker is now governed by that same release gate. Build 21 cannot expose
