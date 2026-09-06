@@ -2469,6 +2469,7 @@ struct FieldhouseNativePreviewView: View {
                     token: token,
                     leagueId: liveContext.membership.leagueId,
                     sportId: liveContext.membership.leagues.sportId,
+                    weekNumber: state.scoringWindow,
                     daysFrom: 3
                 )
             } catch {

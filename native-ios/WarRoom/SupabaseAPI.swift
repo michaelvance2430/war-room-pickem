@@ -2116,7 +2116,7 @@ enum SupabaseAPI {
         return try await send(request, as: FieldhouseScheduleSyncResponse.self)
     }
 
-    static func footballScores(token: String, leagueId: UUID, sportId: String, daysFrom: Int = 3) async throws -> FootballScoreFeed {
+    static func footballScores(token: String, leagueId: UUID, sportId: String, weekNumber: Int, daysFrom: Int = 3) async throws -> FootballScoreFeed {
         var request = URLRequest(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/football-scores"))
         request.httpMethod = "POST"
         request.setValue(SupabaseConfiguration.publishableKey, forHTTPHeaderField: "apikey")
@@ -2125,6 +2125,7 @@ enum SupabaseAPI {
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "leagueId": leagueId.uuidString.lowercased(),
             "sport": ["nfl", "ncaam", "ncaaw"].contains(sportId.lowercased()) ? sportId.lowercased() : "cfb",
+            "week": weekNumber,
             "daysFrom": min(3, max(1, daysFrom)),
         ])
         return try await send(request, as: FootballScoreFeed.self)

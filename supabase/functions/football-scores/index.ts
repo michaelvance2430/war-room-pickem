@@ -44,11 +44,14 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return reply({ error: "POST required" }, 405);
   const authorization = req.headers.get("Authorization") || "";
   if (!authorization.startsWith("Bearer ")) return reply({ error: "Authentication required" }, 401);
-  const { leagueId, sport: requestedSport, daysFrom: requestedDays } = await req.json().catch(() => ({}));
+  const { leagueId, sport: requestedSport, week: requestedWeek, daysFrom: requestedDays } = await req.json().catch(() => ({}));
   const normalizedSport = String(requestedSport || "").toLowerCase();
   const sport = ["cfb", "nfl", "ncaam", "ncaaw"].includes(normalizedSport) ? normalizedSport : "cfb";
+  const hasRequestedWeek = requestedWeek !== undefined && requestedWeek !== null && requestedWeek !== "";
+  const week = Number(requestedWeek);
   const daysFrom = Math.min(3, Math.max(1, Number(requestedDays) || 3));
   if (!leagueId) return reply({ error: "League required" }, 400);
+  if (hasRequestedWeek && (!Number.isInteger(week) || week < 0)) return reply({ error: "Valid scoring week required" }, 400);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const publishable = defaultKey("SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY");
@@ -69,9 +72,14 @@ Deno.serve(async (req: Request) => {
   const cacheUrl = `${supabaseUrl}/rest/v1/live_football_score_cache?sport=eq.${sport}&select=*`;
   const cacheResponse = await fetch(cacheUrl, { headers: serviceHeaders });
   const cached = cacheResponse.ok ? (await cacheResponse.json())?.[0] : null;
-  const cardUrl = `${supabaseUrl}/rest/v1/week_cards?select=week_number,card_games(start_time)&league_id=eq.${encodeURIComponent(leagueId)}&order=week_number.desc&limit=1`;
+  // Fieldhouse intentionally overlaps one live board with the next open card.
+  // Gate provider refreshes against the exact board being scored, never the
+  // newest/future card in the league.
+  const cardSelector = hasRequestedWeek ? `week_number=eq.${week}` : "order=week_number.desc";
+  const cardUrl = `${supabaseUrl}/rest/v1/week_cards?select=week_number,card_games(start_time)&league_id=eq.${encodeURIComponent(leagueId)}&${cardSelector}&limit=1`;
   const cardResponse = await fetch(cardUrl, { headers: serviceHeaders });
   const card = cardResponse.ok ? (await cardResponse.json())?.[0] : null;
+  if (!card) return reply({ error: "Scoring card not found" }, 404);
   const starts = (card?.card_games || []).map((game: any) => Date.parse(game?.start_time || "")).filter(Number.isFinite);
   const plan = scoreRefreshPlan(starts);
   if (!plan) return reply({ events: cached?.events || [], remaining: cached?.provider_remaining?.toString() ?? null, used: cached?.provider_used?.toString() ?? null, last: cached?.provider_last_cost?.toString() ?? null, cachedAt: cached?.fetched_at, cacheHit: true, gated: true, sport });

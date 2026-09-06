@@ -750,7 +750,7 @@ private struct PicksView: View {
         boardLoading = true
         do {
             async let loadedPicks = SupabaseAPI.weekBoard(token: token, leagueId: league.leagueId, weekNumber: card.weekNumber)
-            async let loadedScores = SupabaseAPI.footballScores(token: token, leagueId: league.leagueId, sportId: league.leagues.sportId)
+            async let loadedScores = SupabaseAPI.footballScores(token: token, leagueId: league.leagueId, sportId: league.leagues.sportId, weekNumber: card.weekNumber)
             boardPicks = try await loadedPicks
             let feed = try await loadedScores
             var matched = 0
@@ -2013,7 +2013,7 @@ struct StandingsView: View {
             guard let card = try await SupabaseAPI.weekCard(token: token, leagueId: membership.leagueId, weekNumber: membership.leagues.currentWeek),
                   card.cardGames.contains(where: { $0.startTime.flatMap { ISO8601DateFormatter().date(from: $0) }.map { $0 <= Date() } == true })
             else { liveProjectionActive = false; liveProjectionStale = false; return }
-            async let feed = SupabaseAPI.footballScores(token: token, leagueId: membership.leagueId, sportId: membership.leagues.sportId)
+            async let feed = SupabaseAPI.footballScores(token: token, leagueId: membership.leagueId, sportId: membership.leagues.sportId, weekNumber: card.weekNumber)
             async let board = SupabaseAPI.weekBoard(token: token, leagueId: membership.leagueId, weekNumber: membership.leagues.currentWeek)
             let (scores, picks) = try await (feed, board)
             let eventsByGame = Dictionary(uniqueKeysWithValues: card.cardGames.compactMap { game in
@@ -3042,7 +3042,8 @@ struct HomeView: View {
             let feed = try await SupabaseAPI.footballScores(
                 token: token,
                 leagueId: membership.leagueId,
-                sportId: membership.leagues.sportId
+                sportId: membership.leagues.sportId,
+                weekNumber: card.weekNumber
             )
             var matched = 0
             var finals = 0
@@ -4242,7 +4243,7 @@ struct CommissionerScoreWeekView: View {
         if !silent { scoreSyncing = true; error = nil }
         defer { if !silent { scoreSyncing = false } }
         do {
-            let feed = try await SupabaseAPI.footballScores(token: token, leagueId: membership.leagueId, sportId: membership.leagues.sportId)
+            let feed = try await SupabaseAPI.footballScores(token: token, leagueId: membership.leagueId, sportId: membership.leagues.sportId, weekNumber: card.weekNumber)
             var matched = 0
             var finals = 0
             for game in card.cardGames {
