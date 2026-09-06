@@ -73,7 +73,8 @@ assert.match(autonomous, /sport==="ncaam"\?"basketball_ncaab":sport==="ncaaw"\?"
 assert.match(autonomous, /winner:championship\?\(game\.homeScore>game\.awayScore\?"home":"away"\):game\.ats/);
 assert.match(autonomous, /p_prop_result:championship\?null:/);
 assert.doesNotMatch(autonomous, /\.gte\("published_at",cutoff\)/);
-assert.match(autonomous, /order\("published_at",\{ascending:false\}\)\.limit\(100\)/);
+assert.match(autonomous, /const MAX_CANDIDATE_CARDS=500/);
+assert.match(autonomous, /order\("published_at",\{ascending:false\}\)\.limit\(MAX_CANDIDATE_CARDS\)/);
 
 assert.match(cacheSchema, /enable row level security/);
 assert.match(cacheSchema, /revoke all on public\.live_football_score_cache from anon, authenticated/);

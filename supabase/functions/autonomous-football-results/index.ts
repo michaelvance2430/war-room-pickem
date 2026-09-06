@@ -10,6 +10,10 @@ type ScoredRow = { league_id:string; week_number:number };
 const DAY_MS=86_400_000;
 const SCORE_LOOKBACK_MS=10*DAY_MS;
 const SCORE_LOOKAHEAD_MS=45*DAY_MS;
+// One Fieldhouse league can legitimately have a live board and its next card
+// open at the same time. Keep enough candidates for 100 active leagues across
+// every supported sport without letting future cards crowd live cards out.
+const MAX_CANDIDATE_CARDS=500;
 
 const required=(name:string)=>{const value=Deno.env.get(name);if(!value)throw new Error(`Missing ${name}`);return value;};
 const norm=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
@@ -111,7 +115,7 @@ Deno.serve(async(request:Request)=>{
   if(request.method!=="POST")return new Response("Method not allowed",{status:405});
   try{
     const db=createClient(required("SUPABASE_URL"),required("SUPABASE_SERVICE_ROLE_KEY"),{auth:{persistSession:false,autoRefreshToken:false}});
-    const {data:cards,error}=await db.from("week_cards").select("id,league_id,week_number,card_kind,prop_question,prop_option_a,prop_option_b,published_at,leagues!inner(sport_id),card_games(id,away_team,home_team,spread,favorite,start_time,is_rivalry,fieldhouse_conference)").order("published_at",{ascending:false}).limit(100);
+    const {data:cards,error}=await db.from("week_cards").select("id,league_id,week_number,card_kind,prop_question,prop_option_a,prop_option_b,published_at,leagues!inner(sport_id),card_games(id,away_team,home_team,spread,favorite,start_time,is_rivalry,fieldhouse_conference)").order("published_at",{ascending:false}).limit(MAX_CANDIDATE_CARDS);
     if(error)throw error;
     const cardRows=((cards||[]) as CardRow[]).filter((card)=>isScheduleEligible(card));
     const leagueIds=[...new Set(cardRows.map((card:CardRow)=>card.league_id))];
