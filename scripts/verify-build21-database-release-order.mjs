@@ -31,7 +31,8 @@ for (const file of ordered) {
 
 assert.match(guide, /tournament cron is deliberately excluded/i);
 assert.match(guide, /sport-schedule authority extension/i);
-assert.match(guide, /not applied to production/i);
+assert.match(guide, /applied to production and read back/i);
+assert.match(guide, /sport-schedule-empty-ingestion-repair-build21-REVIEW-ONLY\.sql/i);
 assert.match(guide, /one provider[\s\S]*`\/events` request per active sport, not per[\s\S]*league/i);
 assert.match(guide, /invoke it once manually/i);
 assert.match(guide, /nonmember and anonymous user cannot/i);

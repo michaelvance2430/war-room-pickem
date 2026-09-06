@@ -99,24 +99,27 @@ async function updateWindow(
   window: CardWindow,
   events: ScheduleEvent[],
 ) {
+  // A scan with no published games is not an ingestion. Leaving the reviewed
+  // estimate untouched lets later provider runs verify it when the schedule
+  // actually appears, and prevents the seed guard from freezing an empty row.
+  if (!events.length) return false;
+
   const now = new Date().toISOString();
+  const first = earliestEligibleEvent(
+    window.sport_id,
+    events,
+    window.window_starts_at,
+    window.window_ends_at,
+  );
+  if (!first) throw new Error(`${window.sport_id} Week ${window.week_number} has no eligible event`);
   const patch: Record<string, unknown> = {
     last_ingested_at: now,
     provider_event_count: events.length,
     updated_at: now,
+    first_game_at: first.commence_time,
+    timing_status: "official",
+    source_note: `The Odds API /events · ${providerSportKey(window.sport_id)} · earliest event ${first.id}`,
   };
-  if (events.length) {
-    const first = earliestEligibleEvent(
-      window.sport_id,
-      events,
-      window.window_starts_at,
-      window.window_ends_at,
-    );
-    if (!first) throw new Error(`${window.sport_id} Week ${window.week_number} has no eligible event`);
-    patch.first_game_at = first.commence_time;
-    patch.timing_status = "official";
-    patch.source_note = `The Odds API /events · ${providerSportKey(window.sport_id)} · earliest event ${first.id}`;
-  }
   const query = new URLSearchParams({
     sport_id: `eq.${window.sport_id}`,
     season_key: `eq.${window.season_key}`,
@@ -128,7 +131,7 @@ async function updateWindow(
     body: JSON.stringify(patch),
   });
   if (!response.ok) throw new Error(`${window.sport_id} Week ${window.week_number} update returned ${response.status}`);
-  return events.length > 0;
+  return true;
 }
 
 Deno.serve(async (request: Request) => {

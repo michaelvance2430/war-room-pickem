@@ -60,9 +60,10 @@ assert.match(worker, /authorize_sport_schedule_worker/);
 assert.match(worker, /query\.append\("window_starts_at", `gt\./);
 assert.match(worker, /query\.append\("window_starts_at", `lte\./);
 assert.match(worker, /provider_event_count/);
-assert.match(worker, /timing_status = "official"/);
+assert.match(worker, /timing_status: "official"/);
 assert.match(worker, /eligibleEventsForWindow/);
 assert.match(worker, /Schedule usage audit returned/);
+assert.match(worker, /if \(!events\.length\) return false/);
 
 for (const oddsWorker of [footballOdds, fieldhouseOdds]) {
   assert.match(oddsWorker, /sport_card_windows/);
