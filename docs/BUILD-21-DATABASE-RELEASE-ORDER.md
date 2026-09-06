@@ -33,7 +33,13 @@ league/sport membership binding, JWT verification, and a five-minute shared
 live-score provider gate. Build 21 requests the exact week being scored so an
 open future Fieldhouse card cannot suppress refreshes for the live board;
 requests from older production clients remain compatible through the guarded
-newest-card fallback. The tournament worker was hardened
+newest-card fallback. Production `autonomous-football-results` version 9 was
+then deployed with JWT verification enabled. Its first scheduled run returned
+`200`, inspected nine unfinished live cards, scored none prematurely, and
+reported each card's incomplete final count. The worker now shares the
+five-minute provider gate, supports distinct NCAAM/NCAAW feeds and ten-game
+cards, handles the four-game Championship Week card without a prop, and sends
+official final scores into the atomic scoring receipt. The tournament worker was hardened
 with a random Supabase Vault credential and a service-role-only authorization
 RPC. A request without that private credential returned `403`; a Vault-backed
 request returned `200` with zero published tournaments. The paid odds endpoint
