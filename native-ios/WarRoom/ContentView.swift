@@ -2,6 +2,17 @@
 import SwiftUI
 import UIKit
 
+enum SeasonOpeningPolicy {
+    static func storageKey(userID: UUID, sportID: String, week: Int) -> String {
+        [
+            "warroom", "opening", "seen",
+            userID.uuidString,
+            sportID.lowercased(),
+            String(week)
+        ].joined(separator: ".")
+    }
+}
+
 struct RootView: View {
     @EnvironmentObject private var auth: AuthStore
     // This belongs to the running app session, not to a league-specific view.
@@ -334,12 +345,11 @@ struct ContentView: View {
         else { return }
         activeSportId = active.leagues.sportId.lowercased()
         guard !suppressOpeningForLaunch else { return }
-        let openingKey = [
-            "warroom", "opening", "seen",
-            user.id.uuidString,
-            active.leagues.sportId.lowercased(),
-            String(active.leagues.currentWeek)
-        ].joined(separator: ".")
+        let openingKey = SeasonOpeningPolicy.storageKey(
+            userID: user.id,
+            sportID: active.leagues.sportId,
+            week: active.leagues.currentWeek
+        )
         guard !UserDefaults.standard.bool(forKey: openingKey) else { return }
         // Record at presentation time so force-quitting during the film does not
         // make it replay on every launch for the rest of the week.

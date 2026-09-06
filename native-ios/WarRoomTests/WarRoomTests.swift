@@ -11,6 +11,19 @@ import Foundation
 
 struct WarRoomTests {
 
+    @Test func seasonOpeningPlaysOncePerSportAndWeekNotOncePerLeagueSwitch() {
+        let userID = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
+        let cfbWeekOne = SeasonOpeningPolicy.storageKey(userID: userID, sportID: "CFB", week: 1)
+        let sameCFBWeek = SeasonOpeningPolicy.storageKey(userID: userID, sportID: "cfb", week: 1)
+        let cfbWeekTwo = SeasonOpeningPolicy.storageKey(userID: userID, sportID: "cfb", week: 2)
+        let nflWeekOne = SeasonOpeningPolicy.storageKey(userID: userID, sportID: "nfl", week: 1)
+
+        #expect(cfbWeekOne == sameCFBWeek)
+        #expect(cfbWeekOne != cfbWeekTwo)
+        #expect(cfbWeekOne != nflWeekOne)
+        #expect(!cfbWeekOne.contains("league"))
+    }
+
     @Test func everyCardDeskUnlocksExactlyOneWeekBeforeItsScheduledWindow() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = SeasonCardBuildGate.eastern
