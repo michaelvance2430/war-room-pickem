@@ -226,7 +226,8 @@ begin
     league_id, user_id, role, division, fieldhouse_region, total_points, weeks_played,
     is_bot, is_deputy, is_moderator, locker_muted
   ) values (
-    v_league_id, v_uid, 'commissioner', case when v_is_fieldhouse then 'East' else 'North' end,
+    v_league_id, v_uid, 'commissioner',
+    (case when v_is_fieldhouse then 'East' else 'North' end)::public.division,
     case when v_is_fieldhouse then 'East' else null end,
     0, 0, false, false, false, false
   );
