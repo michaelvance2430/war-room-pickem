@@ -612,9 +612,9 @@ struct FieldhouseChampionshipCardWritePlan {
 }
 
 enum FieldhouseReleaseGate {
-    // Keep the live route dark until authenticated writes, scoring, and the
-    // complete NCAAM/NCAAW release checklist have all passed.
-    static let isEnabled = false
+    // Build 22 exposes the authenticated NCAAM/NCAAW experience. The legacy
+    // `cbb` Foundry fixture remains isolated and can never enter this route.
+    static let isEnabled = true
 
     static func supports(sportID: String) -> Bool {
         // `cbb` is the legacy Foundry-only preview key. It must never enter
