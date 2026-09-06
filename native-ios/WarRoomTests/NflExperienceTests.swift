@@ -143,10 +143,14 @@ struct NflExperienceTests {
         #expect(!FoundryLabPolicy.accepts(mode: "production", sportId: "nfl", preferredSportId: "nfl"))
     }
 
-    @Test func nflJdamUsesItsDedicatedBundledStrikeVideo() throws {
+    @Test func everyRegularSeasonWeaponUsesItsDedicatedBundledStrikeVideo() throws {
         #expect(WeaponStrikeCatalog.presentation(for: "nfl")?.resourceName == "nuke-football-2")
-        #expect(WeaponStrikeCatalog.presentation(for: "cfb")?.resourceName != "nuke-football-2")
-        #expect(Bundle.main.url(forResource: "nuke-football-2", withExtension: "mp4") != nil)
+        #expect(["nuke-football-1", "nuke-football-3"].contains(WeaponStrikeCatalog.presentation(for: "cfb")?.resourceName ?? ""))
+        #expect(WeaponStrikeCatalog.presentation(for: "ncaam")?.resourceName == "hellfire-fieldhouse-1")
+        #expect(WeaponStrikeCatalog.presentation(for: "ncaaw")?.resourceName == "hellfire-fieldhouse-ncaaw-1")
+        for resource in ["nuke-football-1", "nuke-football-2", "nuke-football-3", "hellfire-fieldhouse-1", "hellfire-fieldhouse-ncaaw-1"] {
+            #expect(Bundle.main.url(forResource: resource, withExtension: "mp4") != nil)
+        }
     }
 
     @Test func nflIdentityRewritesInheritedCollegeVocabulary() {

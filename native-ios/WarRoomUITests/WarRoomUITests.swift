@@ -124,6 +124,19 @@ final class WarRoomUITests: XCTestCase {
     }
 
     @MainActor
+    func testEveryRegularSeasonWeaponOpensAWorkingFullScreenStrikeFeed() throws {
+        for launchArgument in ["--strike-preview-cfb", "--strike-preview-nfl", "--strike-preview-ncaam", "--strike-preview-ncaaw"] {
+            let app = XCUIApplication()
+            app.launchArguments = [launchArgument]
+            app.launch()
+
+            XCTAssertTrue(app.staticTexts["TACTICAL STRIKE · LIVE"].waitForExistence(timeout: 3), "Missing strike presentation for \(launchArgument)")
+            XCTAssertFalse(app.staticTexts["STRIKE FEED LOST"].exists, "Missing bundled strike video for \(launchArgument)")
+            app.terminate()
+        }
+    }
+
+    @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {

@@ -8,8 +8,14 @@ struct WarRoomApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--strike-preview-nfl") {
+            if ProcessInfo.processInfo.arguments.contains("--strike-preview-cfb") {
+                WeaponStrikeVideoView(presentation: StrikePresentation(resourceName: "nuke-football-1")) {}
+            } else if ProcessInfo.processInfo.arguments.contains("--strike-preview-nfl") {
                 WeaponStrikeVideoView(presentation: StrikePresentation(resourceName: "nuke-football-2")) {}
+            } else if ProcessInfo.processInfo.arguments.contains("--strike-preview-ncaam") {
+                WeaponStrikeVideoView(presentation: StrikePresentation(resourceName: "hellfire-fieldhouse-1")) {}
+            } else if ProcessInfo.processInfo.arguments.contains("--strike-preview-ncaaw") {
+                WeaponStrikeVideoView(presentation: StrikePresentation(resourceName: "hellfire-fieldhouse-ncaaw-1")) {}
             } else if ProcessInfo.processInfo.arguments.contains("--patreon-preview")
                         || ProcessInfo.processInfo.arguments.contains("--patreon-founder-preview") {
                 NavigationStack { PatreonConnectionView() }
