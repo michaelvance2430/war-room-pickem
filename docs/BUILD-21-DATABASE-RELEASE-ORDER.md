@@ -61,13 +61,19 @@ Fieldhouse bracket, NCAAM/NCAAW parity, regular- and postseason weapon rules,
 active-board refresh behavior, strike presentations, bottom-navigation return
 behavior, Patreon connection, and NFL JDAM scoring.
 
-A fresh unsigned Release archive then completed successfully at
-`/private/tmp/WarRoom-Build21.xcarchive`. Packaged-app inspection confirmed:
+A fresh unsigned Release archive of commit `6e65ef0` then completed
+successfully at `/private/tmp/WarRoom-Build21-Unsigned.xcarchive`.
+Packaged-app inspection confirmed:
 
 - marketing version `3.3` and build `21`;
 - `PrivacyInfo.xcprivacy` at the archived app root;
 - CFB nuclear, NFL JDAM, NCAAM Hellfire, and NCAAW Hellfire strike movies;
 - the War Room weekly-opening movie.
+
+The weekly-opening presentation key has a focused native test proving that it
+is scoped to the signed-in user, sport, and current week—not the selected
+league. Switching between leagues in the same sport therefore cannot replay the
+film, while a new week or a different sport can present its own opening.
 
 This proves that the current source can produce a complete local Release
 archive. Because code signing was intentionally disabled, it is **not** proof

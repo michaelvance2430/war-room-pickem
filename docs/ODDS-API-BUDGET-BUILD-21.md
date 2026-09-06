@@ -1,6 +1,7 @@
 # Build 21 Odds API budget
 
-Status: local review package. No Edge Function or cron deployment is authorized by this document.
+Status: production live-score functions deployed and read back on 2026-09-06;
+the separate Fieldhouse tournament cron remains intentionally unscheduled.
 
 ## Cost controls
 
