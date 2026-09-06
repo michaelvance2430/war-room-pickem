@@ -92,7 +92,9 @@ matching `War Room App Store 2026` provisioning profile were created and
 installed. A manual App Store Connect export then passed at
 `/private/tmp/WarRoom-Build21-AppStoreExport-ManualGate`, producing a signed
 Build 21 IPA with production push and associated-domain entitlements. Build 21
-is now distribution-signing-clean. This validation did not upload the build.
+is now distribution-signing-clean. A strict deep signature verification also
+passed and resolved the complete Apple Distribution, WWDR, and Apple Root CA
+trust chain. This validation did not upload the build.
 
 Because the authenticated Fieldhouse route remains disabled, the Create League
 sport picker is now governed by that same release gate. Build 21 cannot expose
