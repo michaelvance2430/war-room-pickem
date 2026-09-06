@@ -625,6 +625,10 @@ enum FieldhouseReleaseGate {
     static func shouldRoute(sportID: String) -> Bool {
         isEnabled && supports(sportID: sportID)
     }
+
+    static var leagueCreationSportIDs: [String] {
+        isEnabled ? ["cfb", "nfl", "ncaam", "ncaaw"] : ["cfb", "nfl"]
+    }
 }
 
 private struct FieldhouseLiveContext {

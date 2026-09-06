@@ -813,10 +813,9 @@ struct CreateLeagueView: View {
                     VStack(alignment: .leading, spacing: 11) {
                         createLabel("SPORT DESK")
                         Picker("Sport", selection: $sportId) {
-                            Text("CFB · SATURDAY").tag("cfb")
-                            Text("NFL · SUNDAY").tag("nfl")
-                            Text("FIELDHOUSE · NCAAM").tag("ncaam")
-                            Text("FIELDHOUSE · NCAAW").tag("ncaaw")
+                            ForEach(FieldhouseReleaseGate.leagueCreationSportIDs, id: \.self) { sportID in
+                                Text(sportDeskLabel(sportID)).tag(sportID)
+                            }
                         }.pickerStyle(.menu).tint(SportIdentity(sportId).accent)
                         Text(sportDetail)
                             .font(.caption).foregroundStyle(.white.opacity(0.45))
@@ -875,6 +874,15 @@ struct CreateLeagueView: View {
     }
 
     private var canCreate: Bool { !cleanName.isEmpty && cleanName.count <= 80 }
+    private func sportDeskLabel(_ sportID: String) -> String {
+        switch sportID {
+        case "nfl": return "NFL · SUNDAY"
+        case "ncaam": return "FIELDHOUSE · NCAAM"
+        case "ncaaw": return "FIELDHOUSE · NCAAW"
+        default: return "CFB · SATURDAY"
+        }
+    }
+
     private var sportDetail: String {
         switch sportId {
         case "nfl": return "Starts at NFL Week 1. No preseason."

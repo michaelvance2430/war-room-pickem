@@ -81,6 +81,7 @@ final class FieldhouseExperienceTests: XCTestCase {
         XCTAssertFalse(FieldhouseReleaseGate.shouldRoute(sportID: "ncaam"))
         XCTAssertFalse(FieldhouseReleaseGate.shouldRoute(sportID: "ncaaw"))
         XCTAssertFalse(FieldhouseReleaseGate.shouldRoute(sportID: "cbb"))
+        XCTAssertEqual(FieldhouseReleaseGate.leagueCreationSportIDs, ["cfb", "nfl"])
     }
 
     func testAuthenticatedSnapshotHydratesTheCorrectLeagueCardAndPlayerChoices() throws {
