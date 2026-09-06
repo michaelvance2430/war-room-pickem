@@ -96,8 +96,13 @@ is now distribution-signing-clean. A strict deep signature verification also
 passed and resolved the complete Apple Distribution, WWDR, and Apple Root CA
 trust chain. After refreshing the Xcode Apple account, a second export using
 automatic App Store signing and provisioning also passed at
-`/private/tmp/WarRoom-Build21-AppStoreExport-AccountGate2`. This validation did
-not upload the build.
+`/private/tmp/WarRoom-Build21-AppStoreExport-AccountGate2`.
+
+On 2026-09-06 at 18:09:23 EDT, Xcode uploaded version `3.4` build `21` to App
+Store Connect. Apple returned `UPLOAD SUCCEEDED with no errors` with delivery
+UUID `3548ebba-387c-4233-a395-aeba0a8fc51a`, and reported that the uploaded
+package had entered processing. This is upload evidence only: Build 21 has not
+been submitted for App Store review or released.
 
 Because the authenticated Fieldhouse route remains disabled, the Create League
 sport picker is now governed by that same release gate. Build 21 cannot expose
@@ -107,8 +112,9 @@ same release.
 
 The unsigned archive proves that the current source can produce a complete
 local Release archive. The subsequent manual export proves local distribution
-signing and App Store packaging. Neither step is proof of upload, TestFlight
-processing, App Store Connect validation, review submission, or release.
+signing and App Store packaging. The Apple delivery receipt proves upload and
+the start of App Store Connect processing, but does not prove completed
+processing, TestFlight availability, review submission, or release.
 
 ## Stop conditions
 
