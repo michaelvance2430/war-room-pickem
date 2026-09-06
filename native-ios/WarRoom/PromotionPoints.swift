@@ -245,6 +245,29 @@ enum CompetitiveLeagueBannerPolicy {
         let active = forceDemo ? 0 : status.activeHumanCount
         let needed = max(0, minimum - active)
         let hardwareEligible = !forceDemo && CompetitiveLeaguePolicy.isOfficial(activePlayers: active)
+        let earlySeason = status.maximumEligibleCards < status.minimumLockedCards
+
+        // Before four cards have been scored, nobody can satisfy the permanent
+        // active-player definition yet. Judge the room's current track by its
+        // human roster instead of falsely labeling every legitimate league Demo.
+        if !seasonIsFrozen && earlySeason && !forceDemo {
+            let humans = status.totalHumanCount
+            if humans >= minimum {
+                return CompetitiveLeagueBannerCopy(
+                    title: "HARDWARE TRACK · \(humans) PLAYERS",
+                    detail: "This room clears the eight-player floor. Final active status begins after four scored cards; players must lock at least 75% of their eligible season.",
+                    isHardwareEligible: true
+                )
+            }
+
+            let rosterNeeded = max(0, minimum - humans)
+            let noun = rosterNeeded == 1 ? "PLAYER" : "PLAYERS"
+            return CompetitiveLeagueBannerCopy(
+                title: "DEMO TRACK · NEED \(rosterNeeded) MORE \(noun)",
+                detail: "Eight human players are required before this room can enter the hardware track. Final active status begins after four scored cards and requires 75% participation.",
+                isHardwareEligible: false
+            )
+        }
 
         if hardwareEligible {
             return CompetitiveLeagueBannerCopy(
@@ -259,7 +282,6 @@ enum CompetitiveLeagueBannerPolicy {
         }
 
         let noun = needed == 1 ? "PLAYER" : "PLAYERS"
-        let earlySeason = status.maximumEligibleCards < status.minimumLockedCards
         return CompetitiveLeagueBannerCopy(
             title: seasonIsFrozen
                 ? "DEMO LEAGUE · NO PERMANENT HARDWARE"

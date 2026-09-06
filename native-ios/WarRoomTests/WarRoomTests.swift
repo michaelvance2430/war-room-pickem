@@ -421,12 +421,37 @@ struct WarRoomTests {
         #expect(!copy.isHardwareEligible)
     }
 
+    @Test func competitiveLeagueBannerDoesNotCallLargeRoomsDemoBeforeFourScoredCards() {
+        let status = CompetitiveLeagueStatus(
+            leagueId: UUID(), sportId: "cfb", status: "demo",
+            activeHumanCount: 0, totalHumanCount: 43,
+            minimumActivePlayers: 8, requiredParticipationPercent: 75,
+            minimumLockedCards: 4,
+            qualification: [
+                CompetitiveLeagueQualification(
+                    userId: UUID(), eligibleCards: 1, lockedCards: 1,
+                    requiredLockedCards: 1, qualifies: false
+                )
+            ]
+        )
+        let copy = CompetitiveLeagueBannerPolicy.copy(status: status, seasonIsFrozen: false)
+        #expect(copy.title == "HARDWARE TRACK · 43 PLAYERS")
+        #expect(copy.detail.contains("Final active status begins after four scored cards"))
+        #expect(copy.isHardwareEligible)
+    }
+
     @Test func competitiveLeagueBannerOnlyPromisesHardwareAfterTheThreshold() {
         let status = CompetitiveLeagueStatus(
             leagueId: UUID(), sportId: "nfl", status: "official",
             activeHumanCount: 8, totalHumanCount: 12,
             minimumActivePlayers: 8, requiredParticipationPercent: 75,
-            minimumLockedCards: 4, qualification: []
+            minimumLockedCards: 4,
+            qualification: [
+                CompetitiveLeagueQualification(
+                    userId: UUID(), eligibleCards: 6, lockedCards: 5,
+                    requiredLockedCards: 5, qualifies: true
+                )
+            ]
         )
         let tracking = CompetitiveLeagueBannerPolicy.copy(status: status, seasonIsFrozen: false)
         let frozen = CompetitiveLeagueBannerPolicy.copy(status: status, seasonIsFrozen: true)
