@@ -635,10 +635,14 @@ private struct PicksView: View {
     @State private var boardScoreStatus: String?
     @State private var boardLoading = false
     @State private var boardError: String?
+    @State private var cfbTab: CfbPollPreviewTab = .card
+
+    private var isCFB: Bool { league?.leagues.sportId.lowercased() == "cfb" }
 
     var body: some View {
         NavigationStack {
-            Group {
+            CfbPicksContainer(isEnabled: isCFB && !loading && loadErrorMessage == nil, selection: $cfbTab) {
+                Group {
                 if loading {
                     ProgressView("Loading this week…")
                 } else if let loadErrorMessage {
@@ -781,6 +785,7 @@ private struct PicksView: View {
                         retry: { Task { await load() } }
                     )
                 }
+            }
             }
             .task(id: auth.selectedLeagueId) { await load() }
             .toolbar {

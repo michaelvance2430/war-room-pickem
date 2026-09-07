@@ -56,7 +56,6 @@ enum CfbMemberPollEngine {
     }
 }
 
-#if DEBUG
 enum CfbPollPreviewTab: String, CaseIterable, Identifiable {
     case card = "WAR ROOM CARD"
     case ap = "AP TOP 25"
@@ -64,35 +63,88 @@ enum CfbPollPreviewTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+struct CfbPicksContainer<CardContent: View>: View {
+    let isEnabled: Bool
+    @Binding var selection: CfbPollPreviewTab
+    @ViewBuilder let cardContent: () -> CardContent
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if isEnabled { tabRail }
+            switch isEnabled ? selection : .card {
+            case .card: cardContent()
+            case .ap: CfbPollsPreviewView(embeddedTab: .ap)
+            case .members: CfbPollsPreviewView(embeddedTab: .members)
+            }
+        }
+    }
+
+    private var tabRail: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(CfbPollPreviewTab.allCases) { tab in
+                    Button {
+                        withAnimation(.easeOut(duration: 0.18)) { selection = tab }
+                    } label: {
+                        Text(tab.rawValue)
+                            .font(.system(size: 9, weight: .black))
+                            .tracking(0.6)
+                            .foregroundStyle(selection == tab ? .black : .white.opacity(0.66))
+                            .padding(.horizontal, 13)
+                            .frame(height: 34)
+                            .background(selection == tab ? Color.yellow : Color.black.opacity(0.72), in: Capsule())
+                            .overlay(Capsule().stroke(.yellow.opacity(selection == tab ? 0 : 0.35)))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 15)
+        }
+        .padding(.vertical, 8)
+        .background(Color.black.opacity(0.94))
+    }
+}
+
 struct CfbPollsPreviewView: View {
     @State private var selectedTab: CfbPollPreviewTab
+    private let embeddedTab: CfbPollPreviewTab?
     @State private var ballot: [String] = []
     @State private var ballotFiled = false
     @State private var revealBallots = false
 
-    init(initialTab: CfbPollPreviewTab = .ap) {
+    init(initialTab: CfbPollPreviewTab = .ap, embeddedTab: CfbPollPreviewTab? = nil) {
         _selectedTab = State(initialValue: initialTab)
+        self.embeddedTab = embeddedTab
     }
 
     var body: some View {
         ZStack {
             CfbPollBackdrop()
-            VStack(spacing: 0) {
-                header
-                tabRail
+            if let embeddedTab {
                 ScrollView {
-                    Group {
-                        switch selectedTab {
-                        case .card: cardPreview
-                        case .ap: apBoard
-                        case .members: memberBoard
-                        }
-                    }
+                    tabContent(embeddedTab)
                     .padding(.horizontal, 15).padding(.vertical, 14).padding(.bottom, 28)
+                }
+            } else {
+                VStack(spacing: 0) {
+                    header
+                    tabRail
+                    ScrollView {
+                        tabContent(selectedTab)
+                            .padding(.horizontal, 15).padding(.vertical, 14).padding(.bottom, 28)
+                    }
                 }
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder private func tabContent(_ tab: CfbPollPreviewTab) -> some View {
+        switch tab {
+        case .card: cardPreview
+        case .ap: apBoard
+        case .members: memberBoard
+        }
     }
 
     private var header: some View {
@@ -347,4 +399,3 @@ private extension View {
             .overlay(RoundedRectangle(cornerRadius: 15).stroke(color.opacity(0.35)))
     }
 }
-#endif
