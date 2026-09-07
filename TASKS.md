@@ -2,6 +2,8 @@
 
 ## Active
 
+- [ ] **Make every open weekly command card unmistakably actionable in the next live iOS build** - Audit CFB, NFL, NCAAM, and NCAAW for the misleading “Week X is ready” state. An unfinished player card must stay red and use direct task language such as “Week X picks are due” and “Make Picks”; reserve green/completed language for a genuinely submitted card.
+
 ## Waiting On
 
 ## Someday
