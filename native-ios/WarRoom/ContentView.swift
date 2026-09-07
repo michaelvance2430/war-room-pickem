@@ -2707,14 +2707,6 @@ struct HomeView: View {
                             }
                             .buttonStyle(WarRoomCardButtonStyle())
                         }
-                        if let competitiveStatus {
-                            CompetitiveLeagueStatusBanner(
-                                status: competitiveStatus,
-                                sportId: membership.leagues.sportId,
-                                seasonIsFrozen: membership.leagues.currentWeek > membership.leagues.regularSeasonWeeks,
-                                forceDemo: membership.leagues.mode == "foundry"
-                            )
-                        }
                         if let reigningChampion {
                             ReigningChampionHomeCard(presentation: reigningChampion, nextSeasonWindow: nextSeasonWindow)
                         }

@@ -2902,14 +2902,6 @@ private struct FieldhouseHomePage: View {
                     )
                 }.buttonStyle(.plain)
             }
-            if let displayedStatus = competitiveStatus ?? (state.isAuthenticatedSession ? nil : .foundryDemo(sportId: fieldhouseSportID)) {
-                CompetitiveLeagueStatusBanner(
-                    status: displayedStatus,
-                    sportId: fieldhouseSportID,
-                    seasonIsFrozen: state.phase == .postseason,
-                    forceDemo: !state.isAuthenticatedSession
-                )
-            }
             if let reigningChampion {
                 ReigningChampionHomeCard(presentation: reigningChampion, nextSeasonWindow: nextSeasonWindow)
             }
