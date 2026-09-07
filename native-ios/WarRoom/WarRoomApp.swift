@@ -26,6 +26,10 @@ struct WarRoomApp: App {
                 )
                 .environmentObject(auth)
                 .task { await auth.restore() }
+            } else if ProcessInfo.processInfo.arguments.contains("--cfb-polls-preview") {
+                CfbPollsPreviewView(
+                    initialTab: ProcessInfo.processInfo.arguments.contains("--cfb-polls-members") ? .members : .ap
+                )
             } else {
                 RootView()
                     .environmentObject(auth)
