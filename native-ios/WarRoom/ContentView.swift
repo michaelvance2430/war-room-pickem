@@ -641,7 +641,11 @@ private struct PicksView: View {
 
     var body: some View {
         NavigationStack {
-            CfbPicksContainer(isEnabled: isCFB && !loading && loadErrorMessage == nil, selection: $cfbTab) {
+            CfbPicksContainer(
+                isEnabled: isCFB && !loading && loadErrorMessage == nil,
+                liveContext: auth.token.flatMap { token in league.map { CfbPollLiveContext(token: token, leagueID: $0.leagueId, week: $0.leagues.currentWeek) } },
+                selection: $cfbTab
+            ) {
                 Group {
                 if loading {
                     ProgressView("Loading this week…")

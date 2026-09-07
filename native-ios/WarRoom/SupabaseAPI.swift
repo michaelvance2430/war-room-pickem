@@ -724,6 +724,35 @@ struct WeekCard: Decodable, Identifiable, Sendable {
     }
 }
 
+struct CfbAPRanking: Decodable, Identifiable, Sendable {
+    let id: String
+    let name: String
+    let market: String
+    let rank: Int
+    let points: Int
+    let firstPlaceVotes: Int
+    enum CodingKeys: String, CodingKey {
+        case id, name, market, rank, points
+        case firstPlaceVotes = "fp_votes"
+    }
+}
+
+struct CfbPollSnapshot: Decodable, Sendable {
+    let season: Int
+    let pollWeek: Int
+    let roomWeek: Int
+    let pollName: String
+    let effectiveAt: String?
+    let fetchedAt: String
+    let rankings: [CfbAPRanking]
+    let filedCount: Int
+    let official: Bool
+    let revealAt: String
+    let revealed: Bool
+    let ownBallot: [String]
+    let memberResults: [CfbMemberPollRow]
+}
+
 struct CardGame: Decodable, Identifiable, Sendable {
     let id: UUID
     let sortOrder: Int
@@ -1452,6 +1481,21 @@ enum SupabaseAPI {
         ]
         let request = authorizedRequest(url: components.url!, token: token)
         return try await send(request, as: [PlayerPick].self).first
+    }
+
+    static func cfbPolls(token: String, leagueId: UUID, week: Int, rankedTeamIds: [String]? = nil) async throws -> CfbPollSnapshot {
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/cfb-polls"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = [
+            "action": rankedTeamIds == nil ? "load" : "save",
+            "leagueId": leagueId.uuidString.lowercased(),
+            "week": week,
+            "season": Calendar.current.component(.year, from: Date()),
+        ]
+        if let rankedTeamIds { body["rankedTeamIds"] = rankedTeamIds }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return try await send(request, as: CfbPollSnapshot.self)
     }
 
     static func regularSeasonScorecards(token: String, leagueId: UUID, userId: UUID) async throws -> [RegularSeasonScorecard] {

@@ -18,11 +18,17 @@ struct CfbMemberBallot: Equatable, Sendable {
     }
 }
 
-struct CfbMemberPollRow: Identifiable, Equatable, Sendable {
+struct CfbMemberPollRow: Identifiable, Equatable, Codable, Sendable {
     let id: String
     let rank: Int
     let points: Int
     let firstPlaceVotes: Int
+}
+
+struct CfbPollLiveContext: Equatable {
+    let token: String
+    let leagueID: UUID
+    let week: Int
 }
 
 enum CfbMemberPollEngine {
@@ -65,6 +71,7 @@ enum CfbPollPreviewTab: String, CaseIterable, Identifiable {
 
 struct CfbPicksContainer<CardContent: View>: View {
     let isEnabled: Bool
+    let liveContext: CfbPollLiveContext?
     @Binding var selection: CfbPollPreviewTab
     @ViewBuilder let cardContent: () -> CardContent
 
@@ -73,8 +80,8 @@ struct CfbPicksContainer<CardContent: View>: View {
             if isEnabled { tabRail }
             switch isEnabled ? selection : .card {
             case .card: cardContent()
-            case .ap: CfbPollsPreviewView(embeddedTab: .ap)
-            case .members: CfbPollsPreviewView(embeddedTab: .members)
+            case .ap: CfbPollsPreviewView(embeddedTab: .ap, liveContext: liveContext)
+            case .members: CfbPollsPreviewView(embeddedTab: .members, liveContext: liveContext)
             }
         }
     }
@@ -108,13 +115,18 @@ struct CfbPicksContainer<CardContent: View>: View {
 struct CfbPollsPreviewView: View {
     @State private var selectedTab: CfbPollPreviewTab
     private let embeddedTab: CfbPollPreviewTab?
+    private let liveContext: CfbPollLiveContext?
     @State private var ballot: [String] = []
     @State private var ballotFiled = false
     @State private var revealBallots = false
+    @State private var liveSnapshot: CfbPollSnapshot?
+    @State private var liveError: String?
+    @State private var liveLoading = false
 
-    init(initialTab: CfbPollPreviewTab = .ap, embeddedTab: CfbPollPreviewTab? = nil) {
+    init(initialTab: CfbPollPreviewTab = .ap, embeddedTab: CfbPollPreviewTab? = nil, liveContext: CfbPollLiveContext? = nil) {
         _selectedTab = State(initialValue: initialTab)
         self.embeddedTab = embeddedTab
+        self.liveContext = liveContext
     }
 
     var body: some View {
@@ -137,6 +149,7 @@ struct CfbPollsPreviewView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .task(id: liveContext) { await loadLiveSnapshot() }
     }
 
     @ViewBuilder private func tabContent(_ tab: CfbPollPreviewTab) -> some View {
@@ -181,36 +194,43 @@ struct CfbPollsPreviewView: View {
         VStack(spacing: 12) {
             pollHero(kicker: "THE NATIONAL MEASURE", title: "AP TOP 25", detail: "The official weekly poll. Reference only—these rankings never change your card or score.", color: .yellow)
             VStack(spacing: 0) {
-                ForEach(Self.teams) { team in
+                ForEach(displayTeams) { team in
                     nationalRow(team)
-                    if team.id != Self.teams.last?.id { Divider().overlay(.white.opacity(0.08)) }
+                    if team.id != displayTeams.last?.id { Divider().overlay(.white.opacity(0.08)) }
                 }
             }.pollPanel(color: .yellow)
+            if liveLoading { ProgressView("Refreshing the AP poll…").tint(.yellow) }
+            if let liveError { Label(liveError, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.red) }
             sourceNotice
         }
     }
 
     private var memberBoard: some View {
-        let results = CfbMemberPollEngine.standings(ballots: Self.ballots)
+        let results = liveSnapshot?.memberResults ?? CfbMemberPollEngine.standings(ballots: Self.ballots)
         return VStack(spacing: 12) {
             pollHero(kicker: "YOUR ROOM · YOUR ARGUMENT", title: "MEMBERS’ TOP 10", detail: "The room’s collective ranking. Bragging rights only—zero standings points and zero Cheevos.", color: .green)
             HStack(spacing: 9) {
-                pollStatus(value: "6/8", label: "BALLOTS FILED", color: .green)
-                pollStatus(value: "OFFICIAL", label: "4 REQUIRED", color: .yellow)
-                pollStatus(value: "SAT 12:00", label: "REVEAL", color: .red)
+                pollStatus(value: liveSnapshot.map { "\($0.filedCount)" } ?? "6/8", label: "BALLOTS FILED", color: .green)
+                pollStatus(value: liveSnapshot.map { $0.official ? "OFFICIAL" : "BUILDING" } ?? "OFFICIAL", label: "4 REQUIRED", color: .yellow)
+                pollStatus(value: liveSnapshot.map { $0.revealed ? "REVEALED" : "AT LOCK" } ?? "SAT 12:00", label: "REVEAL", color: .red)
             }
-            VStack(spacing: 0) {
-                ForEach(results) { row in
-                    memberRow(row)
-                    if row.id != results.last?.id { Divider().overlay(.white.opacity(0.08)) }
+            if liveSnapshot?.revealed == false {
+                Text("ROOM RANKINGS STAY SEALED UNTIL THE CARD LOCKS.").font(.caption.weight(.black)).foregroundStyle(.yellow).pollPanel(color: .yellow)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(results) { row in
+                        memberRow(row)
+                        if row.id != results.last?.id { Divider().overlay(.white.opacity(0.08)) }
+                    }
+                }.pollPanel(color: .green)
+                Button { revealBallots.toggle() } label: {
+                    Label(revealBallots ? "HIDE INDIVIDUAL BALLOTS" : "OPEN INDIVIDUAL BALLOTS", systemImage: "person.3.fill")
+                        .font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 13)
+                }.buttonStyle(.bordered).tint(.green)
+                if revealBallots && liveContext == nil { individualBallots }
                 }
-            }.pollPanel(color: .green)
-            Button { revealBallots.toggle() } label: {
-                Label(revealBallots ? "HIDE INDIVIDUAL BALLOTS" : "OPEN INDIVIDUAL BALLOTS", systemImage: "person.3.fill")
-                    .font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 13)
-            }.buttonStyle(.bordered).tint(.green)
-            if revealBallots { individualBallots }
             ballotBuilder
+            if let liveError { Label(liveError, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.red) }
         }
     }
 
@@ -246,7 +266,7 @@ struct CfbPollsPreviewView: View {
     }
 
     private func memberRow(_ row: CfbMemberPollRow) -> some View {
-        let team = Self.teams.first { $0.id == row.id }
+        let team = displayTeams.first { $0.id == row.id }
         let prior = Self.previousMemberRanks[row.id]
         return HStack(spacing: 12) {
             Text("\(row.rank)").font(.title3.weight(.black)).foregroundStyle(.green).frame(width: 28)
@@ -272,7 +292,7 @@ struct CfbPollsPreviewView: View {
             }
             if !ballotFiled {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach(Self.teams) { team in
+                    ForEach(displayTeams) { team in
                         let position = ballot.firstIndex(of: team.id).map { $0 + 1 }
                         Button { toggleBallot(team.id) } label: {
                             HStack {
@@ -283,7 +303,7 @@ struct CfbPollsPreviewView: View {
                         }.buttonStyle(.plain)
                     }
                 }
-                Button { ballotFiled = ballot.count == 10 } label: {
+                Button { Task { await fileBallot() } } label: {
                     Label("FILE MY BALLOT", systemImage: "checkmark.seal.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 12)
                 }.buttonStyle(.borderedProminent).tint(ballot.count == 10 ? .green : .gray).disabled(ballot.count != 10)
             }
@@ -338,6 +358,38 @@ struct CfbPollsPreviewView: View {
     private func toggleBallot(_ id: String) {
         if let index = ballot.firstIndex(of: id) { ballot.remove(at: index) }
         else if ballot.count < 10 { ballot.append(id) }
+    }
+
+    private var displayTeams: [CfbPollTeam] {
+        guard let liveSnapshot else { return Self.teams }
+        return liveSnapshot.rankings.map {
+            CfbPollTeam(id: $0.id, name: $0.market.isEmpty ? $0.name : $0.market, record: liveSnapshot.pollWeek == 1 ? "PRESEASON" : "AP WEEK \(liveSnapshot.pollWeek)", apRank: $0.rank, previousAPRank: nil, firstPlaceVotes: $0.firstPlaceVotes)
+        }
+    }
+
+    @MainActor private func loadLiveSnapshot() async {
+        guard let liveContext else { return }
+        liveLoading = true
+        liveError = nil
+        do {
+            let snapshot = try await SupabaseAPI.cfbPolls(token: liveContext.token, leagueId: liveContext.leagueID, week: liveContext.week)
+            liveSnapshot = snapshot
+            ballot = snapshot.ownBallot
+            ballotFiled = snapshot.ownBallot.count == 10
+        } catch { liveError = error.localizedDescription }
+        liveLoading = false
+    }
+
+    @MainActor private func fileBallot() async {
+        guard ballot.count == 10 else { return }
+        guard let liveContext else { ballotFiled = true; return }
+        liveLoading = true
+        liveError = nil
+        do {
+            liveSnapshot = try await SupabaseAPI.cfbPolls(token: liveContext.token, leagueId: liveContext.leagueID, week: liveContext.week, rankedTeamIds: ballot)
+            ballotFiled = true
+        } catch { liveError = error.localizedDescription }
+        liveLoading = false
     }
 
     private static let matchups = ["Ohio State -7.5 vs Texas", "Georgia -3.0 at Alabama", "Oregon -10.5 vs Michigan", "Notre Dame -4.5 at Miami", "LSU -2.5 vs Clemson"]
