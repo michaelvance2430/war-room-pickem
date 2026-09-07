@@ -1991,6 +1991,11 @@ struct StandingsView: View {
                                 .overlay(alignment: .leading) { Rectangle().fill(identity.accent).frame(width: 4).padding(.vertical, 14) }
                                 .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 25, bottomTrailingRadius: 4, topTrailingRadius: 25).stroke(identity.accent.opacity(0.48)))
 
+                                ChampionshipHardwareCard(
+                                    trophyId: activeMembership?.leagues.championshipTrophyId,
+                                    sportId: sportId
+                                )
+
                                 if let competitiveStatus, let activeMembership {
                                     CompetitiveLeagueStatusBanner(
                                         status: competitiveStatus,
@@ -4711,30 +4716,7 @@ private struct ChampionshipTrophyPickerView: View {
     private var cardRadius: CGFloat { identity.isNFL ? 7 : (identity.isFieldhouse ? 14 : 20) }
 
     private var designs: [TrophyDesign] {
-        if identity.isNFL {
-            return [
-                TrophyDesign(id: "nfl_sunday_scepter", name: "Sunday Scepter", image: "NflSundayScepterArtifact", line: "Eighteen Sundays of evidence, forged into one merciless signal."),
-                TrophyDesign(id: "nfl_gridiron_crown", name: "Gridiron Crown", image: "NflGridironCrownArtifact", line: "Goalposts bent into a crown for the room’s final authority."),
-                TrophyDesign(id: "nfl_fourth_down_forge", name: "Fourth-Down Forge", image: "NflFourthDownForgeArtifact", line: "Four pillars. One suspended season. No safe decision."),
-                TrophyDesign(id: "nfl_two_minute_monument", name: "Two-Minute Monument", image: "NflTwoMinuteMonumentArtifact", line: "For the champion who stayed dangerous after every warning light."),
-                TrophyDesign(id: "nfl_iron_end_zone", name: "Iron End Zone", image: "NflIronEndZoneArtifact", line: "The final territory, defended all season and claimed once."),
-                TrophyDesign(id: "nfl_final_whistle", name: "The Final Whistle", image: "NflFinalWhistleArtifact", line: "When this sounds, the arguments become permanent records."),
-            ]
-        }
-        if identity.isFieldhouse {
-            let league: FieldhouseLeague = identity.isNCAAW ? .ncaaw : .ncaam
-            return FieldhouseTrophyCatalog.options(for: league).map {
-                TrophyDesign(id: $0.id, name: $0.name, image: $0.asset, line: $0.detail)
-            }
-        }
-        return [
-            TrophyDesign(id: "command_cup", name: "The Command Cup", image: "ChampionshipArtifact", line: "Traditional authority. Excessive brass. Zero civilian oversight."),
-            TrophyDesign(id: "golden_gut", name: "The Golden Gut", image: "GoldenGutArtifact", line: "For the champion whose instincts survived contact with evidence."),
-            TrophyDesign(id: "the_receipt", name: "The Receipt", image: "TheReceiptArtifact", line: "Every correct call, preserved forever and displayed without mercy."),
-            TrophyDesign(id: "insufferable_crown", name: "Crown of Insufferability", image: "InsufferableCrownArtifact", line: "Victory was not enough. Now everyone must hear about it."),
-            TrophyDesign(id: "brass_football", name: "Big Brass Football", image: "BigBrassFootballArtifact", line: "Subtle as a marching band in a courthouse."),
-            TrophyDesign(id: "last_one_standing", name: "Last One Standing", image: "LastOneStandingArtifact", line: "One survivor. Many ruined Saturdays. Beautiful work."),
-        ]
+        championshipTrophyDesigns(for: membership.leagues.sportId)
     }
 
     private var heroDesign: TrophyDesign {
@@ -4838,6 +4820,85 @@ private struct TrophyDesign: Identifiable {
     let name: String
     let image: String
     let line: String
+}
+
+private func championshipTrophyDesigns(for sportId: String) -> [TrophyDesign] {
+    let identity = SportIdentity(sportId)
+    if identity.isNFL {
+        return [
+            TrophyDesign(id: "nfl_sunday_scepter", name: "Sunday Scepter", image: "NflSundayScepterArtifact", line: "Eighteen Sundays of evidence, forged into one merciless signal."),
+            TrophyDesign(id: "nfl_gridiron_crown", name: "Gridiron Crown", image: "NflGridironCrownArtifact", line: "Goalposts bent into a crown for the room’s final authority."),
+            TrophyDesign(id: "nfl_fourth_down_forge", name: "Fourth-Down Forge", image: "NflFourthDownForgeArtifact", line: "Four pillars. One suspended season. No safe decision."),
+            TrophyDesign(id: "nfl_two_minute_monument", name: "Two-Minute Monument", image: "NflTwoMinuteMonumentArtifact", line: "For the champion who stayed dangerous after every warning light."),
+            TrophyDesign(id: "nfl_iron_end_zone", name: "Iron End Zone", image: "NflIronEndZoneArtifact", line: "The final territory, defended all season and claimed once."),
+            TrophyDesign(id: "nfl_final_whistle", name: "The Final Whistle", image: "NflFinalWhistleArtifact", line: "When this sounds, the arguments become permanent records."),
+        ]
+    }
+    if identity.isFieldhouse {
+        let league: FieldhouseLeague = identity.isNCAAW ? .ncaaw : .ncaam
+        return FieldhouseTrophyCatalog.options(for: league).map {
+            TrophyDesign(id: $0.id, name: $0.name, image: $0.asset, line: $0.detail)
+        }
+    }
+    return [
+        TrophyDesign(id: "command_cup", name: "The Command Cup", image: "ChampionshipArtifact", line: "Traditional authority. Excessive brass. Zero civilian oversight."),
+        TrophyDesign(id: "golden_gut", name: "The Golden Gut", image: "GoldenGutArtifact", line: "For the champion whose instincts survived contact with evidence."),
+        TrophyDesign(id: "the_receipt", name: "The Receipt", image: "TheReceiptArtifact", line: "Every correct call, preserved forever and displayed without mercy."),
+        TrophyDesign(id: "insufferable_crown", name: "Crown of Insufferability", image: "InsufferableCrownArtifact", line: "Victory was not enough. Now everyone must hear about it."),
+        TrophyDesign(id: "brass_football", name: "Big Brass Football", image: "BigBrassFootballArtifact", line: "Subtle as a marching band in a courthouse."),
+        TrophyDesign(id: "last_one_standing", name: "Last One Standing", image: "LastOneStandingArtifact", line: "One survivor. Many ruined Saturdays. Beautiful work."),
+    ]
+}
+
+private struct ChampionshipHardwareCard: View {
+    let trophyId: String?
+    let sportId: String
+    private var identity: SportIdentity { SportIdentity(sportId) }
+    private var trophy: TrophyDesign? {
+        guard let trophyId else { return nil }
+        return championshipTrophyDesigns(for: sportId).first { $0.id == trophyId }
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            if let trophy {
+                Image(trophy.image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 112, height: 128)
+                    .shadow(color: identity.accent.opacity(0.55), radius: 18)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("THE HARDWARE")
+                        .font(.system(size: 9, weight: .black)).tracking(2)
+                        .foregroundStyle(identity.accent)
+                    Text(trophy.name.uppercased())
+                        .font(.title3.weight(.black)).fontWidth(.condensed)
+                    Text("This is what the room is chasing.")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+                }
+            } else {
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 42, weight: .black))
+                    .foregroundStyle(.white.opacity(0.17))
+                    .frame(width: 82, height: 96)
+                    .overlay(Image(systemName: "slash").font(.system(size: 54, weight: .bold)).foregroundStyle(identity.accent.opacity(0.8)))
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("NO TROPHY SELECTED")
+                        .font(.system(size: 9, weight: .black)).tracking(1.7)
+                        .foregroundStyle(identity.accent)
+                    Text("Your commissioner is apparently waiting for the trophy to choose itself.")
+                        .font(.headline.weight(.black)).fontWidth(.condensed)
+                    Text("Commissioner: visit Room Operations to select the hardware.")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.50))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 18))
+        .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 18).stroke(identity.accent.opacity(0.42), lineWidth: 1.5))
+        .accessibilityElement(children: .combine)
+    }
 }
 
 private struct HomeMetric: View {
