@@ -2,7 +2,7 @@
 
 ## Active
 
-- [ ] **Make every open weekly command card unmistakably actionable in the next live iOS build** - Audit CFB, NFL, NCAAM, and NCAAW for the misleading “Week X is ready” state. An unfinished player card must stay red and use direct task language such as “Week X picks are due” and “Make Picks”; reserve green/completed language for a genuinely submitted card.
+- [ ] **Make NCAA double-card commands unmistakably actionable in the next live iOS build** - Apply the locked-current/open-next rule only to NCAAM and NCAAW: the current week remains locked/live while the red command card names the next open week, says its picks are due, and reads that next card’s submission status. Do not apply this two-card behavior to CFB or NFL. Reserve green/completed language for a genuinely submitted card.
 
 ## Waiting On
 
