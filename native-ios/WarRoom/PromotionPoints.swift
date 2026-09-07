@@ -209,7 +209,7 @@ worlds_greatest_cavalry_scout=200
 }
 
 enum CompetitiveLeaguePolicy {
-    static let minimumActivePlayers = 8
+    static let minimumActivePlayers = 4
     static let minimumLockedCards = 4
 
     /// Seventy-five percent, rounded up. Integer math keeps the rule identical
@@ -255,7 +255,7 @@ enum CompetitiveLeagueBannerPolicy {
             if humans >= minimum {
                 return CompetitiveLeagueBannerCopy(
                     title: "HARDWARE TRACK · \(humans) PLAYERS",
-                    detail: "This room clears the eight-player floor. Final active status begins after four scored cards; players must lock at least 75% of their eligible season.",
+                    detail: "This room clears the four-player floor. Final active status begins after four scored cards; players must lock at least 75% of their eligible season.",
                     isHardwareEligible: true
                 )
             }
@@ -264,7 +264,7 @@ enum CompetitiveLeagueBannerPolicy {
             let noun = rosterNeeded == 1 ? "PLAYER" : "PLAYERS"
             return CompetitiveLeagueBannerCopy(
                 title: "DEMO TRACK · NEED \(rosterNeeded) MORE \(noun)",
-                detail: "Eight human players are required before this room can enter the hardware track. Final active status begins after four scored cards and requires 75% participation.",
+                detail: "Four human players are required before this room can enter the hardware track. Final active status begins after four scored cards and requires 75% participation.",
                 isHardwareEligible: false
             )
         }
@@ -275,7 +275,7 @@ enum CompetitiveLeagueBannerPolicy {
                     ? "OFFICIAL LEAGUE · PROFILE HARDWARE ENABLED"
                     : "HARDWARE TRACK · \(active) ACTIVE PLAYERS",
                 detail: seasonIsFrozen
-                    ? "This season cleared the eight-active-player requirement and can award permanent profile hardware."
+                    ? "This season cleared the four-active-player requirement and can award permanent profile hardware."
                     : "Currently on pace for permanent profile hardware. Active players must lock at least 75% of their eligible cards, with a four-card minimum.",
                 isHardwareEligible: true
             )
@@ -287,7 +287,7 @@ enum CompetitiveLeagueBannerPolicy {
                 ? "DEMO LEAGUE · NO PERMANENT HARDWARE"
                 : "DEMO TRACK · NEED \(needed) MORE ACTIVE \(noun)",
             detail: earlySeason
-                ? "Eight active players are required. Active status begins after four scored cards, then requires picks in at least 75% of each player’s eligible season."
+                ? "Four active players are required. Active status begins after four scored cards, then requires picks in at least 75% of each player’s eligible season."
                 : "\(active) of \(minimum) active players currently qualify. Existing members can still qualify by locking at least 75% of their eligible cards, with a four-card minimum.",
             isHardwareEligible: false
         )

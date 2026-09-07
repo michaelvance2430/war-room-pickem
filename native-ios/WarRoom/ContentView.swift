@@ -2664,6 +2664,7 @@ struct HomeView: View {
     @State private var clock = Date()
     @State private var showingFeedbackFallback = false
     @State private var showingMoreFromWarRoom = false
+    @State private var showingRoomOperations = false
 
     init(leagueOverride: LeagueMembership? = nil, onOpenPicks: @escaping () -> Void, onOpenStandings: @escaping () -> Void, onOpenLocker: @escaping () -> Void) {
         self.leagueOverride = leagueOverride
@@ -3044,6 +3045,14 @@ struct HomeView: View {
                             .overlay(RoundedRectangle(cornerRadius: isNFL ? 8 : 16).stroke((isNFL ? Color.cyan : Color.green).opacity(0.42)))
                         }
                         .buttonStyle(WarRoomCardButtonStyle())
+
+                        FootballRoomOperationsSection(
+                            membership: membership,
+                            standingsCount: standings.count,
+                            gamesCount: card?.cardGames.count,
+                            cardStatus: pick == nil ? "OPEN" : "SAVED",
+                            expanded: $showingRoomOperations
+                        )
                     } else if let loadError {
                         VStack(spacing: 16) {
                             ContentUnavailableView("Room unavailable", systemImage: "wifi.exclamationmark", description: Text(loadError))
@@ -3279,6 +3288,60 @@ struct HomeView: View {
         if let requests = try? await SupabaseAPI.privateRoomJoinRequests(token: token, leagueId: membership.leagueId) {
             pendingJoinRequests = requests
         }
+    }
+}
+
+private struct FootballRoomOperationsSection: View {
+    let membership: LeagueMembership
+    let standingsCount: Int
+    let gamesCount: Int?
+    let cardStatus: String
+    @Binding var expanded: Bool
+
+    private var isNFL: Bool { membership.leagues.sportId.lowercased() == "nfl" }
+    private var accent: Color { isNFL ? .cyan : .green }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "door.left.hand.open").font(.title3.weight(.black)).foregroundStyle(accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isNFL ? "GAME-DAY DESK" : "ROOM OPERATIONS").font(.system(size: 12, weight: .black)).tracking(1.1)
+                        Text(expanded ? "CLOSE ROOM TOOLS" : "ROOM SNAPSHOT · CRYSTAL BALL")
+                            .font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.white.opacity(0.48))
+                    }
+                    Spacer()
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.caption.weight(.black)).foregroundStyle(accent)
+                }
+                .foregroundStyle(.white).padding(14).contentShape(Rectangle())
+            }.buttonStyle(.plain)
+
+            if expanded {
+                Divider().overlay(accent.opacity(0.24))
+                HStack(spacing: 8) {
+                    dossierStat("\(standingsCount)", "IN THE ROOM")
+                    dossierStat(gamesCount.map(String.init) ?? "—", "GAMES")
+                    dossierStat(cardStatus, "YOUR CARD")
+                }.padding(12)
+                NavigationLink { CrystalBallView(membership: membership) } label: {
+                    CompactHomeRow(kicker: "SEASON RECEIPT", title: "Crystal Ball", icon: "sparkles", accent: accent, embedded: true)
+                }.buttonStyle(WarRoomCardButtonStyle())
+            }
+        }
+        .background(.black.opacity(0.86), in: RoundedRectangle(cornerRadius: isNFL ? 8 : 16))
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 8 : 16).stroke(accent.opacity(0.42)))
+    }
+
+    private func dossierStat(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 3) {
+            Text(value).font(.headline.weight(.black)).foregroundStyle(.white)
+            Text(label).font(.system(size: 7, weight: .black)).tracking(0.7).foregroundStyle(.white.opacity(0.45))
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 10)
+        .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 9))
     }
 }
 
@@ -6535,31 +6598,6 @@ struct YouView: View {
                             if let user = auth.user { CampaignDogTagsView(userId: user.id) }
                             if let user = auth.user { ProfilePassportView(userId: user.id, isOwner: true) }
                         currentCampaignCard
-                        if let membership = selectedMembership {
-                            dossierLabel(
-                                identity.isNFL ? "GAME-DAY DESK" : "ROOM OPERATIONS",
-                                detail: "ROOM STATUS · STANDINGS · LOCKER ROOM"
-                            )
-                            HStack(spacing: 8) {
-                                dossierStat("\(leagueStandings.count)", "IN THE ROOM")
-                                dossierStat(activeWeekCard.map { "\($0.cardGames.count)" } ?? "—", "GAMES")
-                                dossierStat("\(submittedUserIds.count)/\(leagueStandings.count)", "SUBMITTED")
-                            }
-                            NavigationLink { StandingsView(leagueOverride: membership) } label: {
-                                dossierRow("Standings", identity.isNFL ? "Playoff race and live room order" : "Live room order", "chart.bar.fill", operationalAccent)
-                            }.buttonStyle(.plain)
-                            NavigationLink { LockerRoomView(leagueOverride: membership) } label: {
-                                dossierRow("Locker Room", "Open room communications", "bubble.left.and.bubble.right.fill", identity.isNFL ? .red : operationalAccent)
-                            }.buttonStyle(.plain)
-                            NavigationLink { CrystalBallView(membership: membership) } label: {
-                                dossierRow(
-                                    crystalBallPick == nil ? "Pick Your Crystal Ball" : "Crystal Ball · \(crystalBallPick?.teamName ?? "Sealed")",
-                                    crystalBallPick == nil ? "Required season-long champion call" : "Open the permanent preseason receipt",
-                                    crystalBallPick == nil ? "exclamationmark.triangle.fill" : "sparkles",
-                                    crystalBallPick == nil ? .red : operationalAccent
-                                )
-                            }.buttonStyle(.plain)
-                        }
                         if !regularSeasonScorecards.isEmpty {
                             dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
                             ForEach(regularSeasonScorecards) { scorecard in

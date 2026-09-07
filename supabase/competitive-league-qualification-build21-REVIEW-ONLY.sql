@@ -3,7 +3,7 @@
 --
 -- A human is active when they lock at least 75 percent of the regular-season
 -- cards published after their eligibility boundary, rounded up, with a hard
--- minimum of four locked cards. Eight active humans make a season official.
+-- minimum of four locked cards. Four active humans make a season official.
 
 begin;
 
@@ -15,7 +15,7 @@ create table if not exists public.league_competitive_seasons (
   status text not null check (status in ('official','demo')),
   active_human_count integer not null check (active_human_count >= 0),
   total_human_count integer not null check (total_human_count >= 0),
-  minimum_active_players integer not null default 8 check (minimum_active_players = 8),
+  minimum_active_players integer not null default 4 check (minimum_active_players = 4),
   required_participation_percent integer not null default 75 check (required_participation_percent = 75),
   minimum_locked_cards integer not null default 4 check (minimum_locked_cards = 4),
   qualification jsonb not null default '[]'::jsonb,
@@ -171,11 +171,11 @@ as $$
   select jsonb_build_object(
     'leagueId',p_league_id,
     'sportId',(select sport_id from room),
-    'status',case when coalesce(active_humans,0) >= 8 then 'official' else 'demo' end,
-    'official',coalesce(active_humans,0) >= 8,
+    'status',case when coalesce(active_humans,0) >= 4 then 'official' else 'demo' end,
+    'official',coalesce(active_humans,0) >= 4,
     'activeHumanCount',coalesce(active_humans,0),
     'totalHumanCount',coalesce(total_humans,0),
-    'minimumActivePlayers',8,
+    'minimumActivePlayers',4,
     'requiredParticipationPercent',75,
     'minimumLockedCards',4,
     'qualification',qualification
@@ -258,7 +258,7 @@ begin
   if new.winner_user_id is null then return new; end if;
   v_status := private.compute_league_competitive_status(new.league_id);
   if not coalesce((v_status->>'official')::boolean,false) then
-    raise exception 'Demo league: eight active players at 75 percent participation are required for permanent hardware';
+    raise exception 'Demo league: four active players at 75 percent participation are required for permanent hardware';
   end if;
   -- Every accepted hardware write leaves the durable qualification receipt
   -- needed by downstream career milestones and later audits. This keeps older

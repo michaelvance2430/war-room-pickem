@@ -92,7 +92,7 @@ struct NflPostseasonFieldCandidate: Equatable, Sendable {
 }
 
 enum NflPostseasonFieldPolicy {
-    static let minimumActivePlayers = 8
+    static let minimumActivePlayers = 4
     static let maximumBerthsPerDivision = 4
 
     static func berths(activePlayersInDivision count: Int) -> Int {

@@ -841,7 +841,7 @@ struct CreateLeagueView: View {
                     VStack(alignment: .leading, spacing: 7) {
                         Label("PERMANENT HARDWARE RULE", systemImage: "trophy.fill")
                             .font(.caption.weight(.black)).tracking(1.1).foregroundStyle(.orange)
-                        Text("Eight active players are required for trophies to become permanent profile hardware.")
+                        Text("Four active players are required for trophies to become permanent profile hardware.")
                             .font(.subheadline.weight(.bold)).foregroundStyle(.white)
                         Text("Active means locking picks in at least 75% of the player’s eligible season, with a four-card minimum. Smaller or inactive rooms remain playable as Demo leagues, but award no permanent hardware.")
                             .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.66))

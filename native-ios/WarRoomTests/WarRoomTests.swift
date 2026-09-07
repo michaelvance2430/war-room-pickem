@@ -391,21 +391,28 @@ struct WarRoomTests {
         #expect(!codes.contains("road_dog"))
     }
 
-    @Test func competitiveLeagueRequiresEightPlayersAtSeventyFivePercent() {
+    @Test func competitiveLeagueRequiresFourPlayersAtSeventyFivePercent() {
         #expect(CompetitiveLeaguePolicy.requiredLockedCards(eligibleCards: 10) == 8)
         #expect(CompetitiveLeaguePolicy.requiredLockedCards(eligibleCards: 9) == 7)
         #expect(!CompetitiveLeaguePolicy.playerQualifies(lockedCards: 7, eligibleCards: 10))
         #expect(CompetitiveLeaguePolicy.playerQualifies(lockedCards: 8, eligibleCards: 10))
         #expect(!CompetitiveLeaguePolicy.playerQualifies(lockedCards: 1, eligibleCards: 1))
-        #expect(!CompetitiveLeaguePolicy.isOfficial(activePlayers: 7))
-        #expect(CompetitiveLeaguePolicy.isOfficial(activePlayers: 8))
+        #expect(!CompetitiveLeaguePolicy.isOfficial(activePlayers: 1))
+        #expect(!CompetitiveLeaguePolicy.isOfficial(activePlayers: 3))
+        #expect(CompetitiveLeaguePolicy.isOfficial(activePlayers: 4))
+    }
+
+    @Test func tenSoloLeagueChampionshipsNeverEnterTheHardwareTrack() {
+        let farmedRooms = Array(repeating: 1, count: 10)
+        #expect(farmedRooms.allSatisfy { !CompetitiveLeaguePolicy.isOfficial(activePlayers: $0) })
+        #expect(farmedRooms.filter(CompetitiveLeaguePolicy.isOfficial(activePlayers:)).isEmpty)
     }
 
     @Test func competitiveLeagueBannerNeverConfusesMembersWithActivePlayers() {
         let status = CompetitiveLeagueStatus(
             leagueId: UUID(), sportId: "cfb", status: "demo",
-            activeHumanCount: 5, totalHumanCount: 14,
-            minimumActivePlayers: 8, requiredParticipationPercent: 75,
+            activeHumanCount: 3, totalHumanCount: 14,
+            minimumActivePlayers: 4, requiredParticipationPercent: 75,
             minimumLockedCards: 4,
             qualification: [
                 CompetitiveLeagueQualification(
@@ -415,9 +422,9 @@ struct WarRoomTests {
             ]
         )
         let copy = CompetitiveLeagueBannerPolicy.copy(status: status, seasonIsFrozen: false)
-        #expect(copy.title == "DEMO TRACK · NEED 3 MORE ACTIVE PLAYERS")
-        #expect(copy.detail.contains("5 of 8 active players currently qualify"))
-        #expect(!copy.detail.contains("14 of 8"))
+        #expect(copy.title == "DEMO TRACK · NEED 1 MORE ACTIVE PLAYER")
+        #expect(copy.detail.contains("3 of 4 active players currently qualify"))
+        #expect(!copy.detail.contains("14 of 4"))
         #expect(!copy.isHardwareEligible)
     }
 
@@ -425,7 +432,7 @@ struct WarRoomTests {
         let status = CompetitiveLeagueStatus(
             leagueId: UUID(), sportId: "cfb", status: "demo",
             activeHumanCount: 0, totalHumanCount: 43,
-            minimumActivePlayers: 8, requiredParticipationPercent: 75,
+            minimumActivePlayers: 4, requiredParticipationPercent: 75,
             minimumLockedCards: 4,
             qualification: [
                 CompetitiveLeagueQualification(
@@ -443,8 +450,8 @@ struct WarRoomTests {
     @Test func competitiveLeagueBannerOnlyPromisesHardwareAfterTheThreshold() {
         let status = CompetitiveLeagueStatus(
             leagueId: UUID(), sportId: "nfl", status: "official",
-            activeHumanCount: 8, totalHumanCount: 12,
-            minimumActivePlayers: 8, requiredParticipationPercent: 75,
+            activeHumanCount: 4, totalHumanCount: 12,
+            minimumActivePlayers: 4, requiredParticipationPercent: 75,
             minimumLockedCards: 4,
             qualification: [
                 CompetitiveLeagueQualification(
@@ -455,7 +462,7 @@ struct WarRoomTests {
         )
         let tracking = CompetitiveLeagueBannerPolicy.copy(status: status, seasonIsFrozen: false)
         let frozen = CompetitiveLeagueBannerPolicy.copy(status: status, seasonIsFrozen: true)
-        #expect(tracking.title == "HARDWARE TRACK · 8 ACTIVE PLAYERS")
+        #expect(tracking.title == "HARDWARE TRACK · 4 ACTIVE PLAYERS")
         #expect(frozen.title == "OFFICIAL LEAGUE · PROFILE HARDWARE ENABLED")
         #expect(frozen.isHardwareEligible)
     }

@@ -10,7 +10,7 @@
 -- Product law:
 --   * Week 18 freezes the postseason field.
 --   * Only active players (75 percent participation, four-card minimum) qualify.
---   * Fewer than eight active players makes the season a demo with no hardware.
+--   * Fewer than four active players makes the season a demo with no hardware.
 --   * Every player division sends equal top and bottom fields:
 --       min(4, floor(active division players / 2)).
 --   * Final Thirteen adjusted points decide each field.
@@ -96,7 +96,7 @@ begin
       'formula','division-top-bottom-min-4-floor-half',
       'engine','nfl-final-thirteen-v1',
       'official',v_competitive.status='official',
-      'minimum_active_players',8,
+      'minimum_active_players',4,
       'participation_percent',75,
       'postseason_score_source','final_thirteen_adjusted_points',
       'tiebreaker','regular_season_points_at_cut',

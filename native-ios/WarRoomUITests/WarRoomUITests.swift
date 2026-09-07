@@ -114,6 +114,43 @@ final class WarRoomUITests: XCTestCase {
     }
 
     @MainActor
+    func testFieldhouseTenPointConfidencePickerUsesTwoReadableRows() throws {
+        try assertFieldhouseTenPointConfidencePickerUsesTwoReadableRows(additionalLaunchArguments: [])
+    }
+
+    @MainActor
+    func testWomensFieldhouseTenPointConfidencePickerUsesTwoReadableRows() throws {
+        try assertFieldhouseTenPointConfidencePickerUsesTwoReadableRows(
+            additionalLaunchArguments: ["--fieldhouse-ncaaw"]
+        )
+    }
+
+    @MainActor
+    private func assertFieldhouseTenPointConfidencePickerUsesTwoReadableRows(
+        additionalLaunchArguments: [String]
+    ) throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--fieldhouse-preview", "--fieldhouse-review", "--fieldhouse-review-picks"]
+            + additionalLaunchArguments
+        app.launch()
+
+        let makePicks = app.buttons["fieldhouse.picks.lane.makePicks"]
+        XCTAssertTrue(makePicks.waitForExistence(timeout: 3))
+        makePicks.tap()
+
+        let one = app.buttons["fieldhouse.confidence.0.1"]
+        let five = app.buttons["fieldhouse.confidence.0.5"]
+        let six = app.buttons["fieldhouse.confidence.0.6"]
+        let ten = app.buttons["fieldhouse.confidence.0.10"]
+        XCTAssertTrue(one.waitForExistence(timeout: 2))
+        XCTAssertTrue(ten.exists)
+        XCTAssertEqual(one.frame.minY, five.frame.minY, accuracy: 1)
+        XCTAssertEqual(six.frame.minY, ten.frame.minY, accuracy: 1)
+        XCTAssertGreaterThan(six.frame.minY, one.frame.maxY)
+        XCTAssertTrue([one, five, six, ten].allSatisfy(\.isHittable))
+    }
+
+    @MainActor
     func testNflJdamStrikeFeedOpensItsDedicatedVideo() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--strike-preview-nfl"]

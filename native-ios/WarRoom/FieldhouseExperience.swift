@@ -2876,6 +2876,8 @@ private struct FieldhouseHomePage: View {
     @State private var showingMoreFromWarRoom = false
     @State private var showingDispatch = false
     @State private var showingFeedbackFallback = false
+    @State private var showingRoomOperations = false
+    @State private var roomOperationsDestination: FieldhouseProfileDestination?
     @State private var leagueAttention: [LeagueAttention] = []
     @State private var competitiveStatus: CompetitiveLeagueStatus?
     @State private var seasonCloseout: LeagueSeasonCloseout?
@@ -2935,6 +2937,7 @@ private struct FieldhouseHomePage: View {
             }
             moreFromWarRoom
             fieldReports
+            roomOperations
         }
         .sheet(isPresented: $showingLeagueSwitcher) {
             FieldhouseLeagueSwitcher(league: Binding(get: { state.league }, set: { state.selectLeague($0) }), dismiss: { showingLeagueSwitcher = false })
@@ -2967,6 +2970,9 @@ private struct FieldhouseHomePage: View {
         }
         .sheet(isPresented: $showingDispatch) {
             FieldhouseDispatchPage(state: state)
+        }
+        .sheet(item: $roomOperationsDestination) { destination in
+            FieldhouseProfileDestinationView(state: $state, destination: destination, playerName: auth.user?.email ?? "Player")
         }
         .onAppear {
             if ProcessInfo.processInfo.arguments.contains("--fieldhouse-review-trophies") {
@@ -3166,6 +3172,41 @@ private struct FieldhouseHomePage: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    private var roomOperations: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showingRoomOperations.toggle() }
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "door.left.hand.open").font(.title3.weight(.black)).foregroundStyle(accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("ROOM OPERATIONS").font(.system(size: 12, weight: .black)).tracking(1.1)
+                        Text(showingRoomOperations ? "CLOSE ROOM TOOLS" : "ROOM SNAPSHOT · CRYSTAL BALL")
+                            .font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.white.opacity(0.48))
+                    }
+                    Spacer()
+                    Image(systemName: showingRoomOperations ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.black)).foregroundStyle(accent)
+                }
+                .foregroundStyle(.white).padding(14).contentShape(Rectangle())
+            }.buttonStyle(.plain)
+
+            if showingRoomOperations {
+                Divider().overlay(accent.opacity(0.24))
+                HStack(spacing: 8) {
+                    FieldhouseMetric(value: "\(state.playerCount)", label: "IN THE ROOM")
+                    FieldhouseMetric(value: state.cardIsPublished ? "\(state.publishedGames.count)" : "—", label: "GAMES")
+                    FieldhouseMetric(value: state.playerPicksAreComplete ? "SAVED" : "OPEN", label: "YOUR CARD")
+                }.padding(12)
+                Button { roomOperationsDestination = .crystalBall } label: {
+                    FieldhouseAction(kicker: "SEASON RECEIPT", title: "Crystal Ball", detail: state.crystalBallChampion ?? "Champion not selected", icon: "sparkles")
+                }.buttonStyle(.plain)
+            }
+        }
+        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.38)))
     }
 
     @ViewBuilder private var playerCommand: some View {
@@ -4489,18 +4530,19 @@ private struct FieldhousePicksPage: View {
             }
             Text(state.cardKind.usesStraightUpScoring ? "PICK THE CHAMPION · STRAIGHT UP" : matchup.spread)
                 .font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.52))
-            HStack(spacing: 7) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("CONFIDENCE").font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.48))
-                ForEach(1...state.cardKind.requiredGameCount, id: \.self) { value in
-                    let chosen = state.confidenceSelections[index] == value
-                    let available = state.confidenceAvailable(value, for: index)
-                    Button {
-                        state.toggleConfidence(value, for: index)
-                    } label: {
-                        Text("\(value)").font(.caption.weight(.black)).frame(width: 32, height: 32)
-                            .foregroundStyle(chosen ? .black : (available ? .white : .white.opacity(0.22)))
-                            .background(chosen ? accent : Color.white.opacity(0.07), in: Circle())
-                    }.buttonStyle(.plain).disabled(!available || state.picksLocked || !state.canEditPicks(at: now))
+                if state.cardKind.requiredGameCount == 10 {
+                    HStack(spacing: 9) {
+                        ForEach(1...5, id: \.self) { confidenceButton($0, game: index) }
+                    }
+                    HStack(spacing: 9) {
+                        ForEach(6...10, id: \.self) { confidenceButton($0, game: index) }
+                    }
+                } else {
+                    HStack(spacing: 9) {
+                        ForEach(1...state.cardKind.requiredGameCount, id: \.self) { confidenceButton($0, game: index) }
+                    }
                 }
             }
             Button {
@@ -4521,6 +4563,21 @@ private struct FieldhousePicksPage: View {
             .opacity(state.picksLocked || !state.canEditPicks(at: now) ? 0.45 : 1)
             .accessibilityIdentifier("fieldhouse.best-bet.\(index)")
         }.padding(14).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(selected == nil ? .white.opacity(0.12) : accent.opacity(0.42)))
+    }
+
+    private func confidenceButton(_ value: Int, game index: Int) -> some View {
+        let chosen = state.confidenceSelections[index] == value
+        let available = state.confidenceAvailable(value, for: index)
+        return Button {
+            state.toggleConfidence(value, for: index)
+        } label: {
+            Text("\(value)").font(.caption.weight(.black)).frame(width: 32, height: 32)
+                .foregroundStyle(chosen ? .black : (available ? .white : .white.opacity(0.22)))
+                .background(chosen ? accent : Color.white.opacity(0.07), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!available || state.picksLocked || !state.canEditPicks(at: now))
+        .accessibilityIdentifier("fieldhouse.confidence.\(index).\(value)")
     }
 
     private func sideButton(_ team: String, game: Int, selected: String?) -> some View {
@@ -5617,23 +5674,6 @@ private struct FieldhouseProfilePage: View {
             CampaignDogTagsView(userId: profileUserID)
             ProfilePassportView(userId: profileUserID, isOwner: true)
             currentCampaign
-
-            dossierLabel("ROOM OPERATIONS", detail: "ROOM STATUS · STANDINGS · LOCKER ROOM")
-            HStack(spacing: 8) {
-                FieldhouseMetric(value: "\(state.playerCount)", label: "IN THE ROOM")
-                FieldhouseMetric(value: state.cardIsPublished ? "\(state.publishedGames.count)" : "—", label: "GAMES")
-                FieldhouseMetric(value: state.playerPicksAreComplete ? "SAVED" : "OPEN", label: "YOUR CARD")
-            }
-            dossierButton(.standings, "Standings", "Regional race and live room order", "chart.bar.fill", accent)
-            dossierButton(.locker, "Locker Room", "Open room communications", "bubble.left.and.bubble.right.fill", accent)
-            Button { activeDestination = .crystalBall } label: {
-                FieldhouseAction(
-                    kicker: "CRYSTAL BALL · SEALED",
-                    title: state.crystalBallChampion ?? "Champion not selected",
-                    detail: "Open your permanent preseason championship prediction.",
-                    icon: "sparkles"
-                )
-            }.buttonStyle(.plain)
 
             dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
             dossierButton(
