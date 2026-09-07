@@ -28,11 +28,19 @@ assert.match(copy, /DEMO TRACK · NEED \\\(needed\) MORE ACTIVE/);
 assert.match(copy, /PROFILE HARDWARE ENABLED/);
 assert.match(copy, /status\.maximumEligibleCards < status\.minimumLockedCards/);
 assert.match(content, /struct CompetitiveLeagueStatusBanner: View/);
-assert.ok((content.match(/CompetitiveLeagueStatusBanner\(/g) ?? []).length >= 2);
-assert.ok((fieldhouse.match(/CompetitiveLeagueStatusBanner\(/g) ?? []).length >= 2);
+assert.equal(
+  (content.match(/CompetitiveLeagueStatusBanner\(/g) ?? []).length,
+  1,
+  "Football hardware status belongs in Standings, not Home"
+);
+assert.equal(
+  (fieldhouse.match(/CompetitiveLeagueStatusBanner\(/g) ?? []).length,
+  1,
+  "Fieldhouse hardware status belongs in Standings, not Home"
+);
 assert.match(lobby, /PERMANENT HARDWARE RULE/);
 assert.match(lobby, /Smaller or inactive rooms remain playable as Demo leagues/);
 assert.match(tests, /competitiveLeagueBannerNeverConfusesMembersWithActivePlayers/);
 assert.match(tests, /competitiveLeagueBannerOnlyPromisesHardwareAfterTheThreshold/);
 
-console.log("Build 21 competitive hardware gate PASS — 8 active humans, 75 percent, four-card floor, member-only status, and all-sport UI coverage");
+console.log("Build 22 competitive hardware gate PASS — 8 active humans, 75 percent, four-card floor, and all-sport Standings coverage without Home clutter");

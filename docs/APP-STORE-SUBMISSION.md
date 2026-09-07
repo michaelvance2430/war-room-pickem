@@ -1,8 +1,8 @@
 # War Room Pick'Em — App Store Submission Packet
 
-**Prepared:** August 18, 2026
+**Prepared:** September 6, 2026
 **Bundle ID:** `com.warroompicks.app`  
-**Version:** 1.0  
+**Version:** 3.4 (Build 22)
 **Release model:** Free 1.0; no purchases, ads, cash prizes, or wagering
 
 ## Store URLs
@@ -83,14 +83,23 @@ War Room Pick'Em is a free, private friend-league sports prediction game. It doe
 Review path:
 
 1. Launch the app and allow or skip the native opening movie.
-2. Sign in with the review account.
-3. Open the populated review league.
-4. Visit Picks, Standings, Locker, another player's profile, and You/Account.
-5. On another player's profile, expand Safety to test report/block controls.
-6. The commissioner review account can open Moderation to review reports, mute members, and remove posts.
-7. Open Account → Delete account to inspect the permanent deletion flow. The populated commissioner account is intentionally blocked until it uses Pass the Keys; provide a second non-commissioner account if App Review needs to complete deletion.
+2. On the sign-in screen, note that Sign In is disabled until the Terms of Use and Privacy Policy agreement is selected. The same agreement is required before account creation. The screen states War Room's zero-tolerance policy for objectionable content and abusive users.
+3. Select the agreement and sign in with the review account.
+4. Open the populated review league and enter Locker.
+5. Tap the visible ellipsis beside another player's message. Choose Report Message to submit it to moderation, or Block Player to hide that player's Locker Room messages. The same controls are also available by pressing and holding the message.
+6. Visit Picks, Board, Standings, another player's profile, and You/Account.
+7. The commissioner review account can open Moderation to review reports, mute members, and remove posts.
+8. Open Account → Delete account to inspect the permanent deletion flow. The populated commissioner account is intentionally blocked until it uses Pass the Keys; provide a second non-commissioner account if App Review needs to complete deletion.
 
-The app loads War Room's canonical HTTPS product inside a Capacitor iOS container while native opening, lifecycle, link routing, haptics, and status-bar behavior are supplied by the iOS project.
+War Room is a native SwiftUI iOS app. Its public Terms, Privacy Policy, Community Standards, Support, and universal-link destinations are hosted on War Room's canonical HTTPS domain.
+
+Guideline 1.2 resubmission evidence:
+
+- Record on a physical iPhone, not the simulator.
+- Begin signed out and show the unchecked agreement plus disabled Sign In button.
+- Select the agreement, sign in, open a populated Locker Room, and tap the visible ellipsis on another player's message.
+- Show both Report Message and Block Player, file a report on a safe test message, then block that test player and show their messages disappear.
+- Attach the recording where App Store Connect makes it accessible to review and identify the attachment in Review Notes.
 
 ## Owner actions before upload
 

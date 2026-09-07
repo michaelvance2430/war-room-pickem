@@ -96,7 +96,7 @@ struct SafetyAndSupportView: View {
             }
 
             Section("Locker Room Safety") {
-                Text("Press and hold another player’s message to report it or block that player. Blocked players are hidden from your Locker Room.")
+                Text("War Room has zero tolerance for objectionable content or abusive users. Use the visible safety menu on another player’s message—or press and hold it—to report the content or block that player. Blocked players are hidden from your Locker Room.")
                 Link("Contact \(AppLinks.supportEmail)", destination: URL(string: "mailto:\(AppLinks.supportEmail)")!)
             }
 

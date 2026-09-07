@@ -507,6 +507,37 @@ struct WarRoomTests {
         #expect(FootballTeamCatalog.matches("Hawaii Rainbow Warriors", favorite: hawaii))
     }
 
+    @Test func loginRequiresCommunityTermsForExistingAndNewAccounts() {
+        #expect(!loginSubmissionIsAllowed(
+            creating: false,
+            validEmail: true,
+            validPassword: true,
+            validDisplayName: true,
+            acceptedCommunityTerms: false
+        ))
+        #expect(loginSubmissionIsAllowed(
+            creating: false,
+            validEmail: true,
+            validPassword: true,
+            validDisplayName: true,
+            acceptedCommunityTerms: true
+        ))
+        #expect(!loginSubmissionIsAllowed(
+            creating: true,
+            validEmail: true,
+            validPassword: true,
+            validDisplayName: false,
+            acceptedCommunityTerms: true
+        ))
+        #expect(loginSubmissionIsAllowed(
+            creating: true,
+            validEmail: true,
+            validPassword: true,
+            validDisplayName: true,
+            acceptedCommunityTerms: true
+        ))
+    }
+
     @Test func boardDeclassifiesEachGameAtItsOwnKickoff() {
         let noon = "2026-09-05T16:00:00Z"
         let five = "2026-09-05T21:00:00Z"

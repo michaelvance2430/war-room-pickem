@@ -1304,7 +1304,10 @@ private struct BoardGamePanel: View {
                 }
             }
             if selections.isEmpty {
-                Text("NO TAKERS").font(.system(size: 9, weight: .black)).foregroundStyle(.white.opacity(0.28))
+                Text(stage == .waiting ? "PICKS CLASSIFIED UNTIL KICKOFF" : "NO TAKERS")
+                    .font(.system(size: 8, weight: .black)).tracking(0.35)
+                    .foregroundStyle(.white.opacity(0.36))
+                    .multilineTextAlignment(leading ? .leading : .trailing)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 116, alignment: leading ? .leading : .trailing)
@@ -1789,6 +1792,18 @@ enum RankedTeamTier: Equatable {
     }
 }
 
+func loginSubmissionIsAllowed(
+    creating: Bool,
+    validEmail: Bool,
+    validPassword: Bool,
+    validDisplayName: Bool,
+    acceptedCommunityTerms: Bool
+) -> Bool {
+    guard acceptedCommunityTerms else { return false }
+    if creating { return validEmail && validPassword && validDisplayName }
+    return validEmail && validPassword
+}
+
 private struct LoginView: View {
     @EnvironmentObject private var auth: AuthStore
     @State private var email = ""
@@ -1796,6 +1811,7 @@ private struct LoginView: View {
     @State private var displayName = ""
     @State private var working = false
     @State private var creating = false
+    @State private var acceptedCommunityTerms = false
 
     private var cleanEmail: String { email.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var cleanDisplayName: String { displayName.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -1806,8 +1822,13 @@ private struct LoginView: View {
     private var validPassword: Bool { password.count >= 8 }
     private var validDisplayName: Bool { (2...30).contains(cleanDisplayName.count) }
     private var canSubmit: Bool {
-        if creating { return validEmail && validPassword && validDisplayName }
-        return validEmail && !password.isEmpty
+        loginSubmissionIsAllowed(
+            creating: creating,
+            validEmail: validEmail,
+            validPassword: creating ? validPassword : !password.isEmpty,
+            validDisplayName: validDisplayName,
+            acceptedCommunityTerms: acceptedCommunityTerms
+        )
     }
 
     var body: some View {
@@ -1853,6 +1874,37 @@ private struct LoginView: View {
                     .disabled(!validEmail || working)
                     .accessibilityHint("Sends a secure password-reset link to the email above")
                 }
+                VStack(alignment: .leading, spacing: 10) {
+                    Button {
+                        acceptedCommunityTerms.toggle()
+                    } label: {
+                        HStack(alignment: .top, spacing: 11) {
+                            Image(systemName: acceptedCommunityTerms ? "checkmark.square.fill" : "square")
+                                .font(.title3.weight(.black))
+                                .foregroundStyle(acceptedCommunityTerms ? .green : .white.opacity(0.70))
+                            Text("I agree to the Terms of Use and Privacy Policy.")
+                                .font(.footnote.weight(.bold))
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(acceptedCommunityTerms ? "Terms accepted" : "Accept Terms of Use and Privacy Policy")
+
+                    Text("War Room has zero tolerance for objectionable content or abusive users. Locker Room content can be reported and abusive players can be blocked.")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.68))
+                    HStack(spacing: 18) {
+                        Link("TERMS OF USE", destination: AppLinks.terms)
+                        Link("PRIVACY POLICY", destination: AppLinks.privacy)
+                    }
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(.green)
+                }
+                .padding(14)
+                .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(acceptedCommunityTerms ? Color.green.opacity(0.65) : Color.white.opacity(0.20)))
                 if let error = auth.errorMessage { Text(error).font(.footnote).foregroundStyle(.red) }
                 if let notice = auth.noticeMessage { Text(notice).font(.footnote).foregroundStyle(.green) }
                 Button {
@@ -6119,7 +6171,12 @@ struct LockerRoomView: View {
                                         sportId: league?.leagues.sportId ?? leagueOverride?.leagues.sportId ?? "cfb",
                                         trophy: latestTrophyByUser[message.userId],
                                         reactingTo: reactingTo,
-                                        onReaction: { emoji in Task { await react(to: message, emoji: emoji) } }
+                                        onReaction: { emoji in Task { await react(to: message, emoji: emoji) } },
+                                        onReport: { Task { await report(message) } },
+                                        onBlock: {
+                                            safety.block(message.userId)
+                                            reportNotice = "\(message.authorName) is blocked. Their Locker Room messages are now hidden on this device."
+                                        }
                                     )
                                     .id(message.id)
                                     .contextMenu {
@@ -6312,6 +6369,8 @@ private struct LockerBubble: View {
     let trophy: ProfileTrophy?
     let reactingTo: String?
     let onReaction: (String) -> Void
+    let onReport: () -> Void
+    let onBlock: () -> Void
     @State private var showingTrophy = false
 
     private let emojis = ["😂", "🔥", "💀", "🤡"]
@@ -6340,6 +6399,21 @@ private struct LockerBubble: View {
                         }.buttonStyle(.plain).accessibilityLabel("Open \(String(trophy.seasonYear)) championship trophy")
                     }
                     Text(timestamp.uppercased()).font(.system(size: 8, weight: .bold)).foregroundStyle(.white.opacity(0.35))
+                    if !isMine {
+                        Menu {
+                            Button(action: onReport) {
+                                Label("Report Message", systemImage: "exclamationmark.bubble.fill")
+                            }
+                            Button(role: .destructive, action: onBlock) {
+                                Label("Block Player", systemImage: "person.crop.circle.badge.xmark")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle.fill")
+                                .font(.system(size: 16, weight: .black))
+                                .foregroundStyle(.white.opacity(0.72))
+                        }
+                        .accessibilityLabel("Safety options for \(message.authorName)")
+                    }
                 }
                 Text(message.body)
                     .font(.body.weight(.medium)).textSelection(.enabled)
