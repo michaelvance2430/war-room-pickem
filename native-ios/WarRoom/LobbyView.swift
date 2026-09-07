@@ -775,13 +775,17 @@ struct JoinByCodeView: View {
     }
 }
 
+enum LeagueCreationDefaults {
+    static let maxMembers = 100
+}
+
 struct CreateLeagueView: View {
     @EnvironmentObject private var auth: AuthStore
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var sportId = "cfb"
     @State private var visibility = "private"
-    @State private var maxMembers = 16
+    @State private var maxMembers = LeagueCreationDefaults.maxMembers
     @State private var creating = false
     @State private var errorMessage: String?
     @State private var createdCode: String?

@@ -10,6 +10,10 @@ import Foundation
 @testable import WarRoom
 
 struct WarRoomTests {
+    @Test func newLeaguesDefaultToOneHundredPlayerSeats() {
+        #expect(LeagueCreationDefaults.maxMembers == 100)
+    }
+
 
     @Test func seasonOpeningPlaysOncePerSportAndWeekNotOncePerLeagueSwitch() {
         let userID = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!

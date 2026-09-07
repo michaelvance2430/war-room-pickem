@@ -48,7 +48,7 @@ struct CampaignDogTagsView: View {
     private func dogTag(_ tag: CampaignDogTag) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("WAR ROOM · \(tag.year) CAMPAIGN").font(.system(size: 9, weight: .black)).tracking(1.4)
+                Text(verbatim: "WAR ROOM · \(tag.year) CAMPAIGN").font(.system(size: 9, weight: .black)).tracking(1.4)
                 Spacer()
                 Circle().fill(.black.opacity(0.75)).frame(width: 13, height: 13).overlay(Circle().stroke(.black.opacity(0.55)))
             }
@@ -78,7 +78,7 @@ private struct DogTagServiceRecordView: View {
             VStack(spacing: 15) {
                 Text("PERMANENT SERVICE RECORD").font(.caption2.weight(.black)).tracking(2).foregroundStyle(.yellow)
                 Image(systemName: "tag.fill").font(.system(size: 48, weight: .black)).foregroundStyle(.gray)
-                Text("\(tag.year) CAMPAIGN").font(.title.weight(.black))
+                Text(verbatim: "\(tag.year) CAMPAIGN").font(.title.weight(.black))
                 Text(tag.league.uppercased()).font(.headline.weight(.black)).foregroundStyle(.yellow)
                 Divider().overlay(.white.opacity(0.2))
                 record("RECORD", tag.record)
