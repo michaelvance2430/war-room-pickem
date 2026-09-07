@@ -852,13 +852,11 @@ private struct PicksView: View {
                 guard let event = feed.events.first(where: {
                     normalizedFootballTeam($0.homeTeam) == normalizedFootballTeam(game.homeTeam)
                         && normalizedFootballTeam($0.awayTeam) == normalizedFootballTeam(game.awayTeam)
-                }),
-                let home = event.scores.first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(event.homeTeam) }).flatMap({ Int($0.score) }),
-                let away = event.scores.first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(event.awayTeam) }).flatMap({ Int($0.score) })
+                }), let synced = syncedFootballScore(event: event)
                 else { continue }
                 matched += 1
-                if event.completed { finals += 1 } else { live += 1 }
-                boardScores[game.id] = SyncedFootballScore(homeScore: home, awayScore: away, completed: event.completed)
+                if synced.completed { finals += 1 } else { live += 1 }
+                boardScores[game.id] = synced
             }
             boardScoreStatus = feed.stale == true
                 ? "SCORE FEED STALE · \(finals) FINAL · \(live) LIVE"
@@ -1039,7 +1037,7 @@ func boardGameStage(score: SyncedFootballScore?) -> BoardGameStage {
 }
 
 func footballCoverWinnerSide(game: CardGame, score: SyncedFootballScore?) -> String? {
-    guard let score, score.completed else { return nil }
+    guard let score, score.completed, score.scoreAvailable else { return nil }
     let favorite = game.favorite.lowercased() == "away" ? "away" : "home"
     let margin = favorite == "away"
         ? Double(score.awayScore - score.homeScore)
@@ -1152,19 +1150,19 @@ struct WeekBoardView: View {
                         if !finalGames.isEmpty {
                             boardSectionLabel("FINAL", count: finalGames.count, color: .green)
                             ForEach(finalGames) { game in
-                                BoardGamePanel(game: game, score: scores[game.id], sportId: sportId)
+                                BoardGamePanel(game: game, picks: picks, score: scores[game.id], sportId: sportId)
                             }
                         }
                         if !liveGames.isEmpty {
                             boardSectionLabel("LIVE NOW", count: liveGames.count, color: identity.isNFL ? .cyan : .orange)
                             ForEach(liveGames) { game in
-                                BoardGamePanel(game: game, score: scores[game.id], sportId: sportId)
+                                BoardGamePanel(game: game, picks: picks, score: scores[game.id], sportId: sportId)
                             }
                         }
                         if !waitingGames.isEmpty {
                             boardSectionLabel("WAITING TO PLAY", count: waitingGames.count, color: .white.opacity(0.72))
                             ForEach(waitingGames) { game in
-                                BoardGamePanel(game: game, score: nil, sportId: sportId)
+                                BoardGamePanel(game: game, picks: picks, score: nil, sportId: sportId)
                             }
                         }
                         if let nextKickoff, !scored {
@@ -1214,27 +1212,40 @@ private struct BoardMetric: View {
 
 private struct BoardGamePanel: View {
     let game: CardGame
+    let picks: [BoardPick]
     let score: SyncedFootballScore?
     let sportId: String
     private var identity: SportIdentity { SportIdentity(sportId) }
     private var stage: BoardGameStage { boardGameStage(score: score) }
     private var coverWinner: String? { footballCoverWinnerSide(game: game, score: score) }
     private var accent: Color { identity.isNFL ? .cyan : .green }
+    private var bestBetAccent: Color { identity.isNFL ? .red : .yellow }
     private var favoriteTeam: String { game.favorite.lowercased() == "away" ? game.awayTeam : game.homeTeam }
     private var lineLabel: String { favoriteSpreadLabel(favorite: favoriteTeam, spread: game.spread) }
+
+    private func selections(for team: String, sideKey: String) -> [(String, PickedGame, Bool)] {
+        picks.compactMap { player in
+            guard let choice = player.pickGames.first(where: { $0.cardGameId == game.id }),
+                  choice.side.caseInsensitiveCompare(team) == .orderedSame || choice.side.lowercased() == sideKey else { return nil }
+            return (player.displayName, choice, isFavorite(team, for: player))
+        }
+    }
+
+    private func isFavorite(_ team: String, for player: BoardPick) -> Bool {
+        guard let favorite = FootballTeamCatalog.team(forTeamId: player.favoriteTeamId, sportId: sportId) else { return false }
+        return FootballTeamCatalog.matches(team, favorite: favorite)
+    }
+
     var body: some View {
-        VStack(spacing: 10) {
+        let away = selections(for: game.awayTeam, sideKey: "away")
+        let home = selections(for: game.homeTeam, sideKey: "home")
+        VStack(spacing: 0) {
             HStack {
                 Text("GAME \(game.sortOrder + 1)").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(identity.isNFL ? .cyan : .green)
                 Spacer()
                 Label(statusLabel, systemImage: statusIcon)
                     .font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(statusColor)
-            }
-            HStack(spacing: 8) {
-                teamSide(game.awayTeam, score: score?.awayScore, side: "away")
-                Text("AT").font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.28))
-                teamSide(game.homeTeam, score: score?.homeScore, side: "home")
-            }
+            }.padding(12).background(.white.opacity(0.055))
             HStack(spacing: 6) {
                 Label(footballKickoffLabel(game.startTime) ?? "KICKOFF TO BE ANNOUNCED", systemImage: "clock.fill")
                 Spacer(minLength: 6)
@@ -1242,19 +1253,31 @@ private struct BoardGamePanel: View {
             }
             .font(.system(size: 8, weight: .black)).tracking(0.45)
             .foregroundStyle(.white.opacity(0.52))
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            HStack(alignment: .top, spacing: 1) {
+                teamSide(game.awayTeam, score: score?.scoreAvailable == true ? score?.awayScore : nil, selections: away, side: "away", leading: true)
+                Rectangle().fill(accent.opacity(0.28)).frame(width: 1)
+                teamSide(game.homeTeam, score: score?.scoreAvailable == true ? score?.homeScore : nil, selections: home, side: "home", leading: false)
+            }
         }
-        .padding(12)
         .background(.black.opacity(0.83), in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14))
         .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14).stroke(stage == .live ? statusColor.opacity(0.85) : accent.opacity(0.34), lineWidth: stage == .live ? 2 : 1))
         .shadow(color: stage == .live ? statusColor.opacity(0.30) : .clear, radius: 10)
+        .clipShape(RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14))
     }
 
-    private func teamSide(_ team: String, score: Int?, side: String) -> some View {
+    private func teamSide(
+        _ team: String,
+        score: Int?,
+        selections: [(String, PickedGame, Bool)],
+        side: String,
+        leading: Bool
+    ) -> some View {
         let won = coverWinner == side
-        return VStack(spacing: 5) {
+        return VStack(alignment: leading ? .leading : .trailing, spacing: 8) {
             Text(team.uppercased())
-                .font(.system(size: 11, weight: .black)).lineLimit(2).minimumScaleFactor(0.68)
-                .multilineTextAlignment(.center)
+                .font(.system(size: 11, weight: .black)).lineLimit(2).minimumScaleFactor(0.62)
+                .multilineTextAlignment(leading ? .leading : .trailing)
             Text(score.map(String.init) ?? "—")
                 .font(.system(size: 30, weight: .black)).monospacedDigit()
             if won {
@@ -1263,9 +1286,29 @@ private struct BoardGamePanel: View {
             } else if stage == .final {
                 Text("FINAL").font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.white.opacity(0.32))
             }
+            Divider().overlay(.white.opacity(0.10))
+            ForEach(Array(selections.enumerated()), id: \.offset) { _, item in
+                HStack(spacing: 5) {
+                    if !leading { Spacer(minLength: 0) }
+                    if item.1.isBestBet {
+                        Text("BB").font(.system(size: 7, weight: .black)).foregroundStyle(.black)
+                            .padding(.horizontal, 5).padding(.vertical, 2).background(bestBetAccent, in: Capsule())
+                    }
+                    if item.2 {
+                        Image(systemName: "heart.fill").font(.system(size: 8, weight: .black)).foregroundStyle(.red)
+                            .accessibilityLabel("Favorite team")
+                    }
+                    Text(item.0).font(.system(size: 10, weight: .bold)).lineLimit(1).minimumScaleFactor(0.65)
+                    Text("\(item.1.confidence)").font(.system(size: 10, weight: .black)).foregroundStyle(won ? .green : accent)
+                    if leading { Spacer(minLength: 0) }
+                }
+            }
+            if selections.isEmpty {
+                Text("NO TAKERS").font(.system(size: 9, weight: .black)).foregroundStyle(.white.opacity(0.28))
+            }
         }
-        .frame(maxWidth: .infinity, minHeight: 86)
-        .padding(.horizontal, 8).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 116, alignment: leading ? .leading : .trailing)
+        .padding(12)
         .background(won ? Color.green.opacity(0.16) : Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 11))
         .overlay(RoundedRectangle(cornerRadius: 11).stroke(won ? Color.green.opacity(0.95) : Color.white.opacity(0.08), lineWidth: won ? 2 : 1))
         .shadow(color: won ? Color.green.opacity(0.65) : .clear, radius: won ? 12 : 0)
@@ -1274,7 +1317,7 @@ private struct BoardGamePanel: View {
     private var statusLabel: String {
         switch stage {
         case .final: return "FINAL"
-        case .live: return "LIVE"
+        case .live: return score?.scoreAvailable == true ? "LIVE" : "LIVE · SCORE SYNCING"
         case .waiting: return "WAITING"
         }
     }
@@ -3164,13 +3207,11 @@ struct HomeView: View {
                 guard let event = feed.events.first(where: {
                     normalizedFootballTeam($0.homeTeam) == normalizedFootballTeam(game.homeTeam)
                         && normalizedFootballTeam($0.awayTeam) == normalizedFootballTeam(game.awayTeam)
-                }),
-                let home = event.scores.first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(event.homeTeam) }).flatMap({ Int($0.score) }),
-                let away = event.scores.first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(event.awayTeam) }).flatMap({ Int($0.score) })
+                }), let synced = syncedFootballScore(event: event)
                 else { continue }
                 matched += 1
-                if event.completed { finals += 1 } else { live += 1 }
-                homeScores[game.id] = SyncedFootballScore(homeScore: home, awayScore: away, completed: event.completed)
+                if synced.completed { finals += 1 } else { live += 1 }
+                homeScores[game.id] = synced
             }
             if feed.stale == true {
                 homeScoreStatus = matched == 0 ? "SCORE FEED STALE · RETRYING" : "STALE · \(finals) FINAL · \(live) LIVE"
@@ -4410,6 +4451,30 @@ struct SyncedFootballScore {
     let homeScore: Int
     let awayScore: Int
     let completed: Bool
+    let scoreAvailable: Bool
+
+    init(homeScore: Int, awayScore: Int, completed: Bool, scoreAvailable: Bool = true) {
+        self.homeScore = homeScore
+        self.awayScore = awayScore
+        self.completed = completed
+        self.scoreAvailable = scoreAvailable
+    }
+}
+
+func syncedFootballScore(event: FootballScoreEvent, now: Date = Date()) -> SyncedFootballScore? {
+    let home = event.scores
+        .first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(event.homeTeam) })
+        .flatMap { Int($0.score) }
+    let away = event.scores
+        .first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(event.awayTeam) })
+        .flatMap { Int($0.score) }
+
+    if let home, let away {
+        return SyncedFootballScore(homeScore: home, awayScore: away, completed: event.completed)
+    }
+
+    guard let start = event.commenceTime.flatMap(footballKickoffDate), start <= now else { return nil }
+    return SyncedFootballScore(homeScore: 0, awayScore: 0, completed: false, scoreAvailable: false)
 }
 
 extension View {

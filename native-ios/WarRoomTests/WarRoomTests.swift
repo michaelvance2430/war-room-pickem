@@ -533,6 +533,39 @@ struct WarRoomTests {
         #expect(boardGameStage(score: SyncedFootballScore(homeScore: 24, awayScore: 17, completed: true)) == .final)
     }
 
+    @Test func startedFootballEventWithoutScoresStillAppearsLive() {
+        let event = FootballScoreEvent(
+            id: "live-no-score",
+            commenceTime: "2026-09-06T23:45:00Z",
+            completed: false,
+            homeTeam: "Ole Miss Rebels",
+            awayTeam: "Louisville Cardinals",
+            scores: [],
+            lastUpdate: nil
+        )
+        let now = ISO8601DateFormatter().date(from: "2026-09-06T23:53:00Z")!
+        let score = syncedFootballScore(event: event, now: now)
+
+        #expect(score != nil)
+        #expect(score?.scoreAvailable == false)
+        #expect(boardGameStage(score: score) == .live)
+    }
+
+    @Test func futureFootballEventWithoutScoresRemainsWaiting() {
+        let event = FootballScoreEvent(
+            id: "future-no-score",
+            commenceTime: "2026-09-07T23:45:00Z",
+            completed: false,
+            homeTeam: "Ole Miss Rebels",
+            awayTeam: "Louisville Cardinals",
+            scores: [],
+            lastUpdate: nil
+        )
+        let now = ISO8601DateFormatter().date(from: "2026-09-06T23:53:00Z")!
+
+        #expect(syncedFootballScore(event: event, now: now) == nil)
+    }
+
     @Test func finalGameHighlightsTheTeamThatCoveredNotTheStraightUpWinner() {
         let game = CardGame(
             id: UUID(),
