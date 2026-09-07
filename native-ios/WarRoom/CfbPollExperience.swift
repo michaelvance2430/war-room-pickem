@@ -254,7 +254,7 @@ struct CfbPollsPreviewView: View {
     private var sourceNotice: some View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: "checkmark.shield.fill").foregroundStyle(.yellow)
-            Text("AP rankings must come from a verified weekly source. War Room will never infer the poll from odds or fabricate a missing week.")
+            Text("VERIFIED SPORTRADAR FEED · AP25 · 2026 WEEK 1 · PUBLISHED AUG 17. War Room never infers rankings from odds or fabricates a missing week.")
                 .font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.5))
         }.padding(13).background(.black.opacity(0.68), in: RoundedRectangle(cornerRadius: 12))
     }
@@ -290,39 +290,39 @@ struct CfbPollsPreviewView: View {
 
     private static let matchups = ["Ohio State -7.5 vs Texas", "Georgia -3.0 at Alabama", "Oregon -10.5 vs Michigan", "Notre Dame -4.5 at Miami", "LSU -2.5 vs Clemson"]
     private static let teams: [CfbPollTeam] = [
-        .init(id: "OSU", name: "Ohio State", record: "1–0", apRank: 1, previousAPRank: 2, firstPlaceVotes: 38),
-        .init(id: "TEX", name: "Texas", record: "1–0", apRank: 2, previousAPRank: 1, firstPlaceVotes: 19),
-        .init(id: "UGA", name: "Georgia", record: "1–0", apRank: 3, previousAPRank: 3, firstPlaceVotes: 4),
-        .init(id: "ORE", name: "Oregon", record: "1–0", apRank: 4, previousAPRank: 5, firstPlaceVotes: 0),
-        .init(id: "PSU", name: "Penn State", record: "1–0", apRank: 5, previousAPRank: 4, firstPlaceVotes: 0),
-        .init(id: "ND", name: "Notre Dame", record: "1–0", apRank: 6, previousAPRank: 7, firstPlaceVotes: 0),
-        .init(id: "BAMA", name: "Alabama", record: "1–0", apRank: 7, previousAPRank: 6, firstPlaceVotes: 0),
-        .init(id: "LSU", name: "LSU", record: "1–0", apRank: 8, previousAPRank: 9, firstPlaceVotes: 0),
-        .init(id: "CLEM", name: "Clemson", record: "1–0", apRank: 9, previousAPRank: 8, firstPlaceVotes: 0),
-        .init(id: "MIA", name: "Miami", record: "1–0", apRank: 10, previousAPRank: 12, firstPlaceVotes: 0),
-        .init(id: "TENN", name: "Tennessee", record: "1–0", apRank: 11, previousAPRank: 10, firstPlaceVotes: 0),
-        .init(id: "MICH", name: "Michigan", record: "1–0", apRank: 12, previousAPRank: 11, firstPlaceVotes: 0),
-        .init(id: "ASU", name: "Arizona State", record: "1–0", apRank: 13, previousAPRank: nil, firstPlaceVotes: 0),
-        .init(id: "SC", name: "South Carolina", record: "1–0", apRank: 14, previousAPRank: 13, firstPlaceVotes: 0),
-        .init(id: "FLA", name: "Florida", record: "1–0", apRank: 15, previousAPRank: 15, firstPlaceVotes: 0),
-        .init(id: "ILL", name: "Illinois", record: "1–0", apRank: 16, previousAPRank: 18, firstPlaceVotes: 0),
-        .init(id: "MISS", name: "Ole Miss", record: "1–0", apRank: 17, previousAPRank: 16, firstPlaceVotes: 0),
-        .init(id: "TTU", name: "Texas Tech", record: "1–0", apRank: 18, previousAPRank: 17, firstPlaceVotes: 0),
-        .init(id: "BYU", name: "BYU", record: "1–0", apRank: 19, previousAPRank: 20, firstPlaceVotes: 0),
-        .init(id: "KSU", name: "Kansas State", record: "1–0", apRank: 20, previousAPRank: 19, firstPlaceVotes: 0),
-        .init(id: "OU", name: "Oklahoma", record: "1–0", apRank: 21, previousAPRank: 21, firstPlaceVotes: 0),
-        .init(id: "ISU", name: "Iowa State", record: "1–0", apRank: 22, previousAPRank: 23, firstPlaceVotes: 0),
-        .init(id: "AUB", name: "Auburn", record: "1–0", apRank: 23, previousAPRank: nil, firstPlaceVotes: 0),
-        .init(id: "MIZ", name: "Missouri", record: "1–0", apRank: 24, previousAPRank: 22, firstPlaceVotes: 0),
-        .init(id: "UTAH", name: "Utah", record: "1–0", apRank: 25, previousAPRank: 25, firstPlaceVotes: 0)
+        .init(id: "OSU", name: "Ohio State", record: "PRESEASON", apRank: 1, previousAPRank: nil, firstPlaceVotes: 40),
+        .init(id: "ORE", name: "Oregon", record: "PRESEASON", apRank: 2, previousAPRank: nil, firstPlaceVotes: 14),
+        .init(id: "UGA", name: "Georgia", record: "PRESEASON", apRank: 3, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "ND", name: "Notre Dame", record: "PRESEASON", apRank: 4, previousAPRank: nil, firstPlaceVotes: 6),
+        .init(id: "TEX", name: "Texas", record: "PRESEASON", apRank: 5, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "IU", name: "Indiana", record: "PRESEASON", apRank: 6, previousAPRank: nil, firstPlaceVotes: 8),
+        .init(id: "MIA", name: "Miami (FL)", record: "PRESEASON", apRank: 7, previousAPRank: nil, firstPlaceVotes: 1),
+        .init(id: "TAMU", name: "Texas A&M", record: "PRESEASON", apRank: 8, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "MISS", name: "Ole Miss", record: "PRESEASON", apRank: 9, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "OU", name: "Oklahoma", record: "PRESEASON", apRank: 10, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "LSU", name: "LSU", record: "PRESEASON", apRank: 11, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "TTU", name: "Texas Tech", record: "PRESEASON", apRank: 12, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "BAMA", name: "Alabama", record: "PRESEASON", apRank: 13, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "USC", name: "USC", record: "PRESEASON", apRank: 14, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "BYU", name: "BYU", record: "PRESEASON", apRank: 14, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "MICH", name: "Michigan", record: "PRESEASON", apRank: 16, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "WASH", name: "Washington", record: "PRESEASON", apRank: 17, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "PSU", name: "Penn State", record: "PRESEASON", apRank: 18, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "SMU", name: "SMU", record: "PRESEASON", apRank: 19, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "TENN", name: "Tennessee", record: "PRESEASON", apRank: 20, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "UTAH", name: "Utah", record: "PRESEASON", apRank: 21, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "IOWA", name: "Iowa", record: "PRESEASON", apRank: 22, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "HOU", name: "Houston", record: "PRESEASON", apRank: 23, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "LOU", name: "Louisville", record: "PRESEASON", apRank: 24, previousAPRank: nil, firstPlaceVotes: 0),
+        .init(id: "MIZ", name: "Missouri", record: "PRESEASON", apRank: 25, previousAPRank: nil, firstPlaceVotes: 0)
     ]
     private static let ballots: [CfbMemberBallot] = [
-        .init(voterID: "Mike", rankedTeamIDs: ["UGA", "OSU", "ORE", "TEX", "ND", "LSU", "BAMA", "MIA", "CLEM", "TENN"]),
-        .init(voterID: "Maria", rankedTeamIDs: ["OSU", "TEX", "UGA", "ORE", "PSU", "ND", "BAMA", "LSU", "MIA", "CLEM"]),
-        .init(voterID: "Andy", rankedTeamIDs: ["ORE", "OSU", "UGA", "TEX", "LSU", "ND", "BAMA", "CLEM", "MIA", "MICH"]),
-        .init(voterID: "Ben", rankedTeamIDs: ["TEX", "UGA", "OSU", "ORE", "BAMA", "LSU", "ND", "CLEM", "MIA", "TENN"]),
-        .init(voterID: "JStray", rankedTeamIDs: ["UGA", "ORE", "OSU", "TEX", "ND", "PSU", "LSU", "BAMA", "MIA", "CLEM"]),
-        .init(voterID: "Riley", rankedTeamIDs: ["OSU", "UGA", "TEX", "ORE", "PSU", "BAMA", "ND", "LSU", "CLEM", "MIA"])
+        .init(voterID: "Mike", rankedTeamIDs: ["UGA", "OSU", "ORE", "TEX", "ND", "LSU", "BAMA", "MIA", "OU", "TENN"]),
+        .init(voterID: "Maria", rankedTeamIDs: ["OSU", "TEX", "UGA", "ORE", "PSU", "ND", "BAMA", "LSU", "MIA", "IU"]),
+        .init(voterID: "Andy", rankedTeamIDs: ["ORE", "OSU", "UGA", "TEX", "LSU", "ND", "BAMA", "OU", "MIA", "MICH"]),
+        .init(voterID: "Ben", rankedTeamIDs: ["TEX", "UGA", "OSU", "ORE", "BAMA", "LSU", "ND", "TAMU", "MIA", "TENN"]),
+        .init(voterID: "JStray", rankedTeamIDs: ["UGA", "ORE", "OSU", "TEX", "ND", "PSU", "LSU", "BAMA", "MIA", "IU"]),
+        .init(voterID: "Riley", rankedTeamIDs: ["OSU", "UGA", "TEX", "ORE", "PSU", "BAMA", "ND", "LSU", "OU", "MIA"])
     ]
     private static let previousMemberRanks = ["OSU": 2, "UGA": 1, "TEX": 3, "ORE": 5, "PSU": 4, "ND": 6, "BAMA": 7, "LSU": 9, "CLEM": 8, "MIA": 10]
 }
