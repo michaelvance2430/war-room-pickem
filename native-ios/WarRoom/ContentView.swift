@@ -5890,6 +5890,8 @@ struct CommissionerCardBuilderView: View {
         return source
             .replacingOccurrences(of: "all five games", with: "all \(targetCardSize) games", options: .caseInsensitive)
             .replacingOccurrences(of: "the five games", with: "the \(targetCardSize) games", options: .caseInsensitive)
+            .replacingOccurrences(of: "the 5 games", with: "the \(targetCardSize) games", options: .caseInsensitive)
+            .replacingOccurrences(of: "of 5 games", with: "of \(targetCardSize) games", options: .caseInsensitive)
             .replacingOccurrences(of: "all five", with: "all \(targetCardSize)", options: .caseInsensitive)
             .replacingOccurrences(of: "5–0", with: "\(targetCardSize)–0")
     }
