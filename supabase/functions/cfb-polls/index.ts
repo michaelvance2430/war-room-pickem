@@ -45,16 +45,21 @@ Deno.serve(async (request: Request) => {
   const callerHeaders = { apikey: publishable, Authorization: authorization };
   const serviceHeaders = { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json" };
 
-  const [authResponse, membershipResponse, cardResponse] = await Promise.all([
+  const [authResponse, cardResponse] = await Promise.all([
     fetch(`${supabaseUrl}/auth/v1/user`, { headers: callerHeaders }),
-    fetch(`${supabaseUrl}/rest/v1/memberships?select=user_id,leagues!inner(sport_id)&league_id=eq.${encodeURIComponent(leagueId)}&limit=1`, { headers: callerHeaders }),
     fetch(`${supabaseUrl}/rest/v1/week_cards?select=lock_time&league_id=eq.${encodeURIComponent(leagueId)}&week_number=eq.${requestedWeek}&limit=1`, { headers: serviceHeaders }),
   ]);
-  if (!authResponse.ok || !membershipResponse.ok) return reply({ error: "Could not verify league membership" }, 403);
+  if (!authResponse.ok) return reply({ error: "Could not verify league membership" }, 403);
   const user = await authResponse.json();
+  if (!user?.id) return reply({ error: "Authentication required" }, 401);
+  const membershipResponse = await fetch(
+    `${supabaseUrl}/rest/v1/memberships?select=user_id,leagues!inner(sport_id)&league_id=eq.${encodeURIComponent(leagueId)}&user_id=eq.${encodeURIComponent(user.id)}&limit=1`,
+    { headers: callerHeaders },
+  );
+  if (!membershipResponse.ok) return reply({ error: "Could not verify league membership" }, 403);
   const membership = (await membershipResponse.json())?.[0];
   const league = Array.isArray(membership?.leagues) ? membership.leagues[0] : membership?.leagues;
-  if (!user?.id || !membership || league?.sport_id !== "cfb") return reply({ error: "CFB league membership required" }, 403);
+  if (!membership || league?.sport_id !== "cfb") return reply({ error: "CFB league membership required" }, 403);
   const card = cardResponse.ok ? (await cardResponse.json())?.[0] : null;
   const revealAt = card?.lock_time || new Date(Date.now() + 24 * 60 * 60_000).toISOString();
 
