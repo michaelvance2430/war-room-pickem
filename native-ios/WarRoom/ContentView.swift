@@ -1732,17 +1732,25 @@ private struct EditableGamePickRow: View {
                 sideButton(game.awayTeam, side: "away")
                 sideButton(game.homeTeam, side: "home")
             }
-            HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("CONFIDENCE").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.secondary)
-                Spacer()
-                ForEach(confidenceOptions, id: \.self) { confidence in
-                    Button("\(confidence)") {
-                        onConfidence(draft.confidence == confidence ? nil : confidence)
+                if confidenceOptions.count > 5 {
+                    HStack(spacing: 8) {
+                        ForEach(Array(confidenceOptions.prefix(5)), id: \.self) { confidence in
+                            confidenceButton(confidence)
+                        }
                     }
-                        .buttonStyle(.borderedProminent)
-                        .tint(draft.confidence == confidence ? selection : .secondary)
-                        .disabled(usedConfidences.contains(confidence))
-                        .accessibilityLabel(draft.confidence == confidence ? "Clear confidence \(confidence)" : "Set confidence \(confidence)")
+                    HStack(spacing: 8) {
+                        ForEach(Array(confidenceOptions.dropFirst(5)), id: \.self) { confidence in
+                            confidenceButton(confidence)
+                        }
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        ForEach(confidenceOptions, id: \.self) { confidence in
+                            confidenceButton(confidence)
+                        }
+                    }
                 }
             }
             Button { onBestBet() } label: {
@@ -1766,6 +1774,17 @@ private struct EditableGamePickRow: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(draft.side == side ? selection : .gray.opacity(0.30))
+    }
+
+    private func confidenceButton(_ confidence: Int) -> some View {
+        Button("\(confidence)") {
+            onConfidence(draft.confidence == confidence ? nil : confidence)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(draft.confidence == confidence ? selection : .secondary)
+        .disabled(usedConfidences.contains(confidence))
+        .frame(maxWidth: .infinity)
+        .accessibilityLabel(draft.confidence == confidence ? "Clear confidence \(confidence)" : "Set confidence \(confidence)")
     }
 
     private var line: String {
