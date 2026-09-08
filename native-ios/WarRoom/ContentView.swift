@@ -1789,6 +1789,7 @@ private struct EditableGamePickRow: View {
                 .background(chosen ? selection : Color.white.opacity(0.07), in: Circle())
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
         .disabled(!available)
         .accessibilityLabel(chosen ? "Clear confidence \(confidence)" : "Set confidence \(confidence)")
     }
