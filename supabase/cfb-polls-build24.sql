@@ -11,16 +11,16 @@ create table if not exists public.cfb_ap_polls (
   primary key (season, week)
 );
 
-create or replace function public.cfb_ballot_has_ten_unique(candidate text[])
+create or replace function public.cfb_ballot_has_twelve_unique(candidate text[])
 returns boolean
 language sql
 immutable
 strict
 set search_path = pg_catalog
 as $$
-  select cardinality(candidate) = 10
+  select cardinality(candidate) = 12
     and array_position(candidate, null) is null
-    and cardinality(array(select distinct unnest(candidate))) = 10
+    and cardinality(array(select distinct unnest(candidate))) = 12
 $$;
 
 create table if not exists public.cfb_member_ballots (
@@ -28,7 +28,7 @@ create table if not exists public.cfb_member_ballots (
   season integer not null check (season between 2000 and 2200),
   week integer not null check (week between 0 and 30),
   user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
-  ranked_team_ids text[] not null check (public.cfb_ballot_has_ten_unique(ranked_team_ids)),
+  ranked_team_ids text[] not null check (public.cfb_ballot_has_twelve_unique(ranked_team_ids)),
   reveal_at timestamptz not null,
   submitted_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -82,10 +82,10 @@ grant select on table public.cfb_ap_polls to authenticated;
 grant select, insert, update on table public.cfb_member_ballots to authenticated;
 grant select, insert, update, delete on table public.cfb_ap_polls to service_role;
 grant select, insert, update, delete on table public.cfb_member_ballots to service_role;
-revoke all on function public.cfb_ballot_has_ten_unique(text[]) from public, anon;
-grant execute on function public.cfb_ballot_has_ten_unique(text[]) to authenticated, service_role;
+revoke all on function public.cfb_ballot_has_twelve_unique(text[]) from public, anon;
+grant execute on function public.cfb_ballot_has_twelve_unique(text[]) to authenticated, service_role;
 
 comment on table public.cfb_ap_polls is
   'Server-refreshed Sportradar AP Top 25 snapshots. No provider secret is exposed to clients.';
 comment on table public.cfb_member_ballots is
-  'One persistent Top 10 ballot per league member and CFB week; visible room-wide only after reveal.';
+  'One persistent Top 12 playoff-field ballot per league member and CFB week; visible room-wide only after reveal.';

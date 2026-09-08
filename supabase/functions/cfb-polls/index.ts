@@ -17,15 +17,15 @@ const aggregate = (ballots: Ballot[]) => {
   const points = new Map<string, number>();
   const firsts = new Map<string, number>();
   for (const ballot of ballots) {
-    if (!Array.isArray(ballot.ranked_team_ids) || ballot.ranked_team_ids.length !== 10 || new Set(ballot.ranked_team_ids).size !== 10) continue;
+    if (!Array.isArray(ballot.ranked_team_ids) || ballot.ranked_team_ids.length !== 12 || new Set(ballot.ranked_team_ids).size !== 12) continue;
     ballot.ranked_team_ids.forEach((id, index) => {
-      points.set(id, (points.get(id) || 0) + 10 - index);
+      points.set(id, (points.get(id) || 0) + 12 - index);
       if (index === 0) firsts.set(id, (firsts.get(id) || 0) + 1);
     });
   }
   return [...points.keys()].sort((a, b) =>
     (points.get(b)! - points.get(a)!) || (firsts.get(b)! - firsts.get(a)!) || a.localeCompare(b)
-  ).slice(0, 10).map((id, index) => ({ id, rank: index + 1, points: points.get(id), firstPlaceVotes: firsts.get(id) || 0 }));
+  ).slice(0, 12).map((id, index) => ({ id, rank: index + 1, points: points.get(id), firstPlaceVotes: firsts.get(id) || 0 }));
 };
 
 Deno.serve(async (request: Request) => {
@@ -90,7 +90,7 @@ Deno.serve(async (request: Request) => {
   if (body.action === "save") {
     const ids = Array.isArray(body.rankedTeamIds) ? body.rankedTeamIds.map(String) : [];
     const validIDs = new Set((cached.rankings || []).map((ranking: Ranking) => ranking.id));
-    if (ids.length !== 10 || new Set(ids).size !== 10 || ids.some((id: string) => !validIDs.has(id))) return reply({ error: "Choose ten unique AP-ranked teams" }, 400);
+    if (ids.length !== 12 || new Set(ids).size !== 12 || ids.some((id: string) => !validIDs.has(id))) return reply({ error: "Choose 12 unique AP-ranked teams" }, 400);
     if (Date.now() >= Date.parse(revealAt)) return reply({ error: "This ballot is already locked" }, 409);
     const saveResponse = await fetch(`${ballotBase}?on_conflict=league_id,season,week,user_id`, {
       method: "POST", headers: { ...serviceHeaders, Prefer: "resolution=merge-duplicates,return=minimal" },

@@ -14,7 +14,7 @@ struct CfbMemberBallot: Equatable, Sendable {
     let rankedTeamIDs: [String]
 
     var isValid: Bool {
-        rankedTeamIDs.count == 10 && Set(rankedTeamIDs).count == 10
+        rankedTeamIDs.count == 12 && Set(rankedTeamIDs).count == 12
     }
 }
 
@@ -40,7 +40,7 @@ enum CfbMemberPollEngine {
         var firsts: [String: Int] = [:]
         for ballot in valid {
             for (index, teamID) in ballot.rankedTeamIDs.enumerated() {
-                points[teamID, default: 0] += 10 - index
+                points[teamID, default: 0] += 12 - index
                 if index == 0 { firsts[teamID, default: 0] += 1 }
             }
         }
@@ -52,7 +52,7 @@ enum CfbMemberPollEngine {
             let rhsFirsts = firsts[$1, default: 0]
             if lhsFirsts != rhsFirsts { return lhsFirsts > rhsFirsts }
             return $0 < $1
-        }.prefix(10).enumerated().map { index, id in
+        }.prefix(12).enumerated().map { index, id in
             CfbMemberPollRow(id: id, rank: index + 1, points: points[id, default: 0], firstPlaceVotes: firsts[id, default: 0])
         }
     }
@@ -65,7 +65,7 @@ enum CfbMemberPollEngine {
 enum CfbPollPreviewTab: String, CaseIterable, Identifiable {
     case card = "WAR ROOM CARD"
     case ap = "AP TOP 25"
-    case members = "MEMBERS’ TOP 10"
+    case members = "MEMBERS’ TOP 12"
     var id: String { rawValue }
 }
 
@@ -208,7 +208,7 @@ struct CfbPollsPreviewView: View {
     private var memberBoard: some View {
         let results = liveSnapshot?.memberResults ?? CfbMemberPollEngine.standings(ballots: Self.ballots)
         return VStack(spacing: 12) {
-            pollHero(kicker: "YOUR ROOM · YOUR ARGUMENT", title: "MEMBERS’ TOP 10", detail: "The room’s collective ranking. Bragging rights only—zero standings points and zero Cheevos.", color: .green)
+            pollHero(kicker: "YOUR ROOM · YOUR PLAYOFF FIELD", title: "MEMBERS’ TOP 12", detail: "Rank the room’s 12-team playoff field. It becomes the season-long argument heading into the postseason—zero standings points and zero Cheevos.", color: .green)
             HStack(spacing: 9) {
                 pollStatus(value: liveSnapshot.map { "\($0.filedCount)" } ?? "6/8", label: "BALLOTS FILED", color: .green)
                 pollStatus(value: liveSnapshot.map { $0.official ? "OFFICIAL" : "BUILDING" } ?? "OFFICIAL", label: "4 REQUIRED", color: .yellow)
@@ -284,11 +284,11 @@ struct CfbPollsPreviewView: View {
         VStack(alignment: .leading, spacing: 11) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(ballotFiled ? "MY BALLOT · FILED" : "BUILD MY TOP 10").font(.caption.weight(.black)).foregroundStyle(ballotFiled ? .green : .yellow)
-                    Text(ballotFiled ? "Visible after the room poll reveals." : "Tap ten teams in order. First tap gets your No. 1 vote.")
+                    Text(ballotFiled ? "MY BALLOT · FILED" : "BUILD MY TOP 12").font(.caption.weight(.black)).foregroundStyle(ballotFiled ? .green : .yellow)
+                    Text(ballotFiled ? "Visible after the room poll reveals." : "Tap 12 teams in order. First tap gets your No. 1 vote.")
                         .font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.48))
                 }
-                Spacer(); Text("\(ballot.count)/10").font(.headline.weight(.black)).foregroundStyle(.yellow)
+                Spacer(); Text("\(ballot.count)/12").font(.headline.weight(.black)).foregroundStyle(.yellow)
             }
             if !ballotFiled {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
@@ -305,7 +305,7 @@ struct CfbPollsPreviewView: View {
                 }
                 Button { Task { await fileBallot() } } label: {
                     Label("FILE MY BALLOT", systemImage: "checkmark.seal.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 12)
-                }.buttonStyle(.borderedProminent).tint(ballot.count == 10 ? .green : .gray).disabled(ballot.count != 10)
+                }.buttonStyle(.borderedProminent).tint(ballot.count == 12 ? .green : .gray).disabled(ballot.count != 12)
             }
         }.pollPanel(color: ballotFiled ? .green : .yellow)
     }
@@ -357,7 +357,7 @@ struct CfbPollsPreviewView: View {
 
     private func toggleBallot(_ id: String) {
         if let index = ballot.firstIndex(of: id) { ballot.remove(at: index) }
-        else if ballot.count < 10 { ballot.append(id) }
+        else if ballot.count < 12 { ballot.append(id) }
     }
 
     private var displayTeams: [CfbPollTeam] {
@@ -375,13 +375,13 @@ struct CfbPollsPreviewView: View {
             let snapshot = try await SupabaseAPI.cfbPolls(token: liveContext.token, leagueId: liveContext.leagueID, week: liveContext.week)
             liveSnapshot = snapshot
             ballot = snapshot.ownBallot
-            ballotFiled = snapshot.ownBallot.count == 10
+            ballotFiled = snapshot.ownBallot.count == 12
         } catch { liveError = error.localizedDescription }
         liveLoading = false
     }
 
     @MainActor private func fileBallot() async {
-        guard ballot.count == 10 else { return }
+        guard ballot.count == 12 else { return }
         guard let liveContext else { ballotFiled = true; return }
         liveLoading = true
         liveError = nil
@@ -421,12 +421,12 @@ struct CfbPollsPreviewView: View {
         .init(id: "MIZ", name: "Missouri", record: "PRESEASON", apRank: 25, previousAPRank: nil, firstPlaceVotes: 0)
     ]
     private static let ballots: [CfbMemberBallot] = [
-        .init(voterID: "Mike", rankedTeamIDs: ["UGA", "OSU", "ORE", "TEX", "ND", "LSU", "BAMA", "MIA", "OU", "TENN"]),
-        .init(voterID: "Maria", rankedTeamIDs: ["OSU", "TEX", "UGA", "ORE", "PSU", "ND", "BAMA", "LSU", "MIA", "IU"]),
-        .init(voterID: "Andy", rankedTeamIDs: ["ORE", "OSU", "UGA", "TEX", "LSU", "ND", "BAMA", "OU", "MIA", "MICH"]),
-        .init(voterID: "Ben", rankedTeamIDs: ["TEX", "UGA", "OSU", "ORE", "BAMA", "LSU", "ND", "TAMU", "MIA", "TENN"]),
-        .init(voterID: "JStray", rankedTeamIDs: ["UGA", "ORE", "OSU", "TEX", "ND", "PSU", "LSU", "BAMA", "MIA", "IU"]),
-        .init(voterID: "Riley", rankedTeamIDs: ["OSU", "UGA", "TEX", "ORE", "PSU", "BAMA", "ND", "LSU", "OU", "MIA"])
+        .init(voterID: "Mike", rankedTeamIDs: ["UGA", "OSU", "ORE", "TEX", "ND", "LSU", "BAMA", "MIA", "OU", "TENN", "TTU", "MIZ"]),
+        .init(voterID: "Maria", rankedTeamIDs: ["OSU", "TEX", "UGA", "ORE", "PSU", "ND", "BAMA", "LSU", "MIA", "IU", "TTU", "MIZ"]),
+        .init(voterID: "Andy", rankedTeamIDs: ["ORE", "OSU", "UGA", "TEX", "LSU", "ND", "BAMA", "OU", "MIA", "MICH", "TTU", "MIZ"]),
+        .init(voterID: "Ben", rankedTeamIDs: ["TEX", "UGA", "OSU", "ORE", "BAMA", "LSU", "ND", "TAMU", "MIA", "TENN", "TTU", "MIZ"]),
+        .init(voterID: "JStray", rankedTeamIDs: ["UGA", "ORE", "OSU", "TEX", "ND", "PSU", "LSU", "BAMA", "MIA", "IU", "TTU", "MIZ"]),
+        .init(voterID: "Riley", rankedTeamIDs: ["OSU", "UGA", "TEX", "ORE", "PSU", "BAMA", "ND", "LSU", "OU", "MIA", "TTU", "MIZ"])
     ]
     private static let previousMemberRanks = ["OSU": 2, "UGA": 1, "TEX": 3, "ORE": 5, "PSU": 4, "ND": 6, "BAMA": 7, "LSU": 9, "CLEM": 8, "MIA": 10]
 }
