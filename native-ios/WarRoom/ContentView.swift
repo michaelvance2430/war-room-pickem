@@ -5577,6 +5577,7 @@ struct CommissionerCardBuilderView: View {
     @State private var oddsNotice: String?
     @State private var errorMessage: String?
     @State private var operationalWeek: Int
+    @State private var lockedCardSize: Int?
     init(membership: LeagueMembership) {
         self.membership = membership
         let initialSize = SportIdentity(membership.leagues.sportId).isNFL ? 5 : 10
@@ -5820,7 +5821,9 @@ struct CommissionerCardBuilderView: View {
         ["ODDS", "GAMES", "PROP", "PREVIEW"][number - 1]
     }
 
-    private var targetCardSize: Int { WeeklyCardSizePolicy.size(sportId: identity.sportId, requested: cardSize) }
+    private var targetCardSize: Int {
+        lockedCardSize ?? WeeklyCardSizePolicy.size(sportId: identity.sportId, requested: cardSize)
+    }
     private var selectionMaximum: Int { identity.isNFL ? 5 : 10 }
     private var selectionCountIsValid: Bool {
         identity.isNFL ? selectedOddsIds.count == 5 : (5...10).contains(selectedOddsIds.count)
@@ -5836,13 +5839,16 @@ struct CommissionerCardBuilderView: View {
 
     private func lockSelectionAndOpenProp() {
         guard selectionCountIsValid else { return }
-        cardSize = selectedOddsIds.count
-        games = Array(games.prefix(selectedOddsIds.count))
+        let chosenSize = selectedOddsIds.count
+        lockedCardSize = chosenSize
+        cardSize = chosenSize
+        games = Array(games.prefix(chosenSize))
         prepareProp()
         step = 3
     }
 
     private func reopenSelection() {
+        lockedCardSize = nil
         if !identity.isNFL, games.count < 10 {
             games.append(contentsOf: (games.count..<10).map { _ in CommissionerGameDraft() })
             cardSize = 10
