@@ -2082,6 +2082,7 @@ struct StandingsView: View {
                                         careerRank: careerRankByUser[standing.userId] ?? CareerRanks.resolve(points: 0, seasons: 0, sports: 1),
                                         postseasonScore: postseasonScoreByUser[standing.userId],
                                         projectedPoints: liveProjectionActive ? liveProjectionByUser[standing.userId] : nil,
+                                        rankMovement: rankMovementByUser[standing.userId] ?? 0,
                                         onOpenProfile: { selectedProfileUserId = standing.userId },
                                         onOpenTrophy: { selectedTrophy = latestTrophyByUser[standing.userId] }
                                     )
@@ -2153,6 +2154,26 @@ struct StandingsView: View {
             let right = liveProjectionByUser[$1.userId] ?? $1.totalPoints
             return left == right ? $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending : left > right
         }
+    }
+
+    private var rankMovementByUser: [UUID: Int] {
+        let currentRows = displayStandings
+        guard currentRows.contains(where: { !$0.weeklyPoints.isEmpty }) else {
+            return Dictionary(uniqueKeysWithValues: currentRows.map { ($0.userId, 0) })
+        }
+        let currentIndex = Dictionary(uniqueKeysWithValues: currentRows.enumerated().map { ($0.element.userId, $0.offset) })
+        let previousRows = currentRows.sorted { left, right in
+            let leftPrevious = left.totalPoints - (left.weeklyPoints.last ?? 0)
+            let rightPrevious = right.totalPoints - (right.weeklyPoints.last ?? 0)
+            if leftPrevious != rightPrevious { return leftPrevious > rightPrevious }
+            return currentIndex[left.userId, default: 0] < currentIndex[right.userId, default: 0]
+        }
+        let previousIndex = Dictionary(uniqueKeysWithValues: previousRows.enumerated().map { ($0.element.userId, $0.offset) })
+        return Dictionary(uniqueKeysWithValues: currentRows.map { standing in
+            let current = currentIndex[standing.userId, default: 0]
+            let previous = previousIndex[standing.userId, default: current]
+            return (standing.userId, previous - current)
+        })
     }
 
     private func conferenceLabel(for division: String?) -> String {
@@ -2290,6 +2311,25 @@ struct StandingsView: View {
     }
 }
 
+private struct StandingMovementBadge: View {
+    let change: Int
+
+    private var color: Color { change > 0 ? .green : (change < 0 ? .red : .blue) }
+    private var symbol: String { change > 0 ? "▲" : (change < 0 ? "▼" : "—") }
+    private var amount: String { change == 0 ? "" : " \(abs(change))" }
+
+    var body: some View {
+        Text("\(symbol)\(amount)")
+            .font(.system(size: 9, weight: .black).monospacedDigit())
+            .foregroundStyle(color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.14), in: Capsule())
+            .overlay(Capsule().stroke(color.opacity(0.55), lineWidth: 0.75))
+            .accessibilityLabel(change > 0 ? "Moved up \(change) places" : (change < 0 ? "Dropped \(abs(change)) places" : "Rank unchanged"))
+    }
+}
+
 private struct StandingRankCard: View {
     let rank: Int
     let standing: Standing
@@ -2298,6 +2338,7 @@ private struct StandingRankCard: View {
     let careerRank: CareerRankProgress
     let postseasonScore: CfbPostseasonScore?
     let projectedPoints: Int?
+    let rankMovement: Int
     let onOpenProfile: () -> Void
     let onOpenTrophy: () -> Void
     private var identity: SportIdentity { SportIdentity(sportId) }
@@ -2323,13 +2364,18 @@ private struct StandingRankCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 11) {
-            ZStack {
-                if rank <= 3 {
-                    Circle().fill(medal.opacity(0.14))
-                    Circle().stroke(medal.opacity(0.75), lineWidth: 1.5)
+            VStack(spacing: 4) {
+                ZStack {
+                    if rank <= 3 {
+                        Circle().fill(medal.opacity(0.14))
+                        Circle().stroke(medal.opacity(0.75), lineWidth: 1.5)
+                    }
+                    Text("\(rank)").font(rank == 1 ? .title.weight(.black) : .headline.weight(.black)).monospacedDigit().foregroundStyle(medal)
                 }
-                Text("\(rank)").font(rank == 1 ? .title.weight(.black) : .headline.weight(.black)).monospacedDigit().foregroundStyle(medal)
-            }.frame(width: 37, height: rank == 1 ? 54 : 48)
+                .frame(width: 37, height: rank == 1 ? 48 : 42)
+                StandingMovementBadge(change: rankMovement)
+            }
+            .frame(width: 42)
             VStack(alignment: .leading, spacing: 9) {
                 HStack(alignment: .center, spacing: 10) {
                     ProfileAvatar(
