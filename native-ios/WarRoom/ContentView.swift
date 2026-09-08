@@ -5766,7 +5766,7 @@ struct CommissionerCardBuilderView: View {
                 if let firstKickoff = games.map(\.kickoff).min() {
                     KickoffCountdownView(kickoff: firstKickoff, sportId: membership.leagues.sportId, week: operationalWeek)
                 }
-                ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
+                ForEach(Array(cardGames.enumerated()), id: \.element.id) { index, game in
                     HStack {
                         Text("\(index + 1). \(game.away) at \(game.home)").fontWeight(.semibold)
                         if game.isRivalry || (isRivalryWeek && RivalryMatchupCatalog.match(away: game.away, home: game.home) != nil) { Spacer(); Text("🔥 GRUDGE").font(.caption2.weight(.black)).foregroundStyle(.red) }
@@ -5805,8 +5805,15 @@ struct CommissionerCardBuilderView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    private var cardGames: [CommissionerGameDraft] {
+        guard !availableOdds.isEmpty else { return games }
+        let count = lockedCardSize ?? selectedOddsIds.count
+        return Array(games.prefix(count))
+    }
+
     private var isComplete: Bool {
-        games.allSatisfy {
+        cardGames.count == targetCardSize
+        && cardGames.allSatisfy {
             !$0.away.trimmingCharacters(in: .whitespaces).isEmpty
             && !$0.home.trimmingCharacters(in: .whitespaces).isEmpty
             && Double($0.spread).map(isNoPushSpread) == true
@@ -5822,7 +5829,9 @@ struct CommissionerCardBuilderView: View {
     }
 
     private var targetCardSize: Int {
-        lockedCardSize ?? WeeklyCardSizePolicy.size(sportId: identity.sportId, requested: cardSize)
+        if let lockedCardSize { return lockedCardSize }
+        if step >= 3, !selectedOddsIds.isEmpty { return selectedOddsIds.count }
+        return WeeklyCardSizePolicy.size(sportId: identity.sportId, requested: cardSize)
     }
     private var selectionMaximum: Int { identity.isNFL ? 5 : 10 }
     private var selectionCountIsValid: Bool {
@@ -5974,7 +5983,7 @@ struct CommissionerCardBuilderView: View {
         publishing = true
         do {
             let formatter = ISO8601DateFormatter()
-            let payload: [[String: Any]] = games.enumerated().map { index, game in
+            let payload: [[String: Any]] = cardGames.enumerated().map { index, game in
                 ["sort_order": index, "away_team": game.away, "home_team": game.home, "spread": noPushSpread(Double(game.spread) ?? 0.5),
                  "favorite": game.favorite, "start_time": formatter.string(from: game.kickoff), "bookmaker": "Manual", "away_rank": NSNull(), "home_rank": NSNull(),
                  "is_rivalry": isRivalryWeek && (game.isRivalry || RivalryMatchupCatalog.match(away: game.away, home: game.home) != nil)]
