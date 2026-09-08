@@ -5579,6 +5579,9 @@ struct CommissionerCardBuilderView: View {
     @State private var operationalWeek: Int
     init(membership: LeagueMembership) {
         self.membership = membership
+        let initialSize = SportIdentity(membership.leagues.sportId).isNFL ? 5 : 10
+        _cardSize = State(initialValue: initialSize)
+        _games = State(initialValue: (0..<initialSize).map { _ in CommissionerGameDraft() })
         _operationalWeek = State(initialValue: membership.leagues.currentWeek)
     }
     private var identity: SportIdentity { SportIdentity(membership.leagues.sportId) }
@@ -5603,17 +5606,8 @@ struct CommissionerCardBuilderView: View {
                     .font(.subheadline.weight(.bold)).foregroundStyle(deskAccent)
                 Text("Four steps. One decision at a time.").foregroundStyle(.secondary)
                 if !identity.isNFL {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Label("WEEKLY CARD SIZE", systemImage: "rectangle.stack.badge.plus")
-                                .font(.caption.weight(.black)).foregroundStyle(.green)
-                            Spacer()
-                            Text("\(cardSize) GAMES").font(.caption.weight(.black)).foregroundStyle(.green)
-                        }
-                        Slider(value: Binding(get: { Double(cardSize) }, set: { resizeCard(to: Int($0.rounded())) }), in: 5...10, step: 1)
-                        Text("Choose 5–10 before pulling odds. Once published, the size is locked for the week.")
-                            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                    }
+                    Label("PULL THE BOARD · KEEP THE BEST 5–10 GAMES", systemImage: "rectangle.stack.badge.plus")
+                        .font(.caption.weight(.black)).foregroundStyle(.green)
                 }
                 if isRivalryWeek {
                     Label("RIVALRY WEEK CONTROL · ONLY THE GRUDGES GET THE RED LIGHT", systemImage: "flame.fill")
@@ -5665,7 +5659,7 @@ struct CommissionerCardBuilderView: View {
             }
             }
             if step == 2 && !availableOdds.isEmpty {
-                Section("Choose \(targetCardSize) · \(selectedOddsIds.count)/\(targetCardSize)") {
+                Section(identity.isNFL ? "Choose 5 · \(selectedOddsIds.count)/5" : "Choose 5–10 · \(selectedOddsIds.count)/10") {
                     if !identity.isNFL {
                         HStack(spacing: 14) {
                             Label("TOP 10", systemImage: "star.fill").foregroundStyle(.yellow)
@@ -5709,12 +5703,13 @@ struct CommissionerCardBuilderView: View {
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(rivalry != nil && isRivalryWeek ? Color.red.opacity(0.75) : Color.clear, lineWidth: 2))
                         }
                         .foregroundStyle(.primary)
-                        .disabled(!selectedOddsIds.contains(odds.id) && selectedOddsIds.count >= targetCardSize)
+                        .disabled(!selectedOddsIds.contains(odds.id) && selectedOddsIds.count >= selectionMaximum)
                     }
                     HStack {
                         Button("BACK") { step = 1 }
                         Spacer()
-                        Button("NEXT · PROP") { prepareProp(); step = 3 }.fontWeight(.black).disabled(selectedOddsIds.count != targetCardSize)
+                        Button(identity.isNFL ? "PROP QUESTION" : "PROP QUESTION · USE \(selectedOddsIds.count)") { lockSelectionAndOpenProp() }
+                            .fontWeight(.black).disabled(!selectionCountIsValid)
                     }
                 }
             }
@@ -5760,7 +5755,7 @@ struct CommissionerCardBuilderView: View {
                     Text("3 POINTS · AUTO-SCORED").font(.caption2.weight(.black)).foregroundStyle(deskAccent)
                 }
                 HStack {
-                    Button("BACK") { step = 2 }
+                    Button("BACK") { reopenSelection() }
                     Spacer()
                     Button("PREVIEW") { step = 4 }.fontWeight(.black).disabled(!propIsComplete)
                 }
@@ -5826,6 +5821,10 @@ struct CommissionerCardBuilderView: View {
     }
 
     private var targetCardSize: Int { WeeklyCardSizePolicy.size(sportId: identity.sportId, requested: cardSize) }
+    private var selectionMaximum: Int { identity.isNFL ? 5 : 10 }
+    private var selectionCountIsValid: Bool {
+        identity.isNFL ? selectedOddsIds.count == 5 : (5...10).contains(selectedOddsIds.count)
+    }
 
     private func resizeCard(to requestedSize: Int) {
         guard !identity.isNFL, step == 1, !pullingOdds else { return }
@@ -5833,6 +5832,23 @@ struct CommissionerCardBuilderView: View {
         cardSize = size
         selectedOddsIds = []
         games = (0..<size).map { _ in CommissionerGameDraft() }
+    }
+
+    private func lockSelectionAndOpenProp() {
+        guard selectionCountIsValid else { return }
+        cardSize = selectedOddsIds.count
+        games = Array(games.prefix(selectedOddsIds.count))
+        prepareProp()
+        step = 3
+    }
+
+    private func reopenSelection() {
+        if !identity.isNFL, games.count < 10 {
+            games.append(contentsOf: (games.count..<10).map { _ in CommissionerGameDraft() })
+            cardSize = 10
+            toggleOddsPopulation()
+        }
+        step = 2
     }
 
     private var propIsComplete: Bool {
@@ -5885,7 +5901,9 @@ struct CommissionerCardBuilderView: View {
             availableOdds = feed.games
             selectedOddsIds = []
             let quota = feed.remaining.map { " · \($0) API requests remain" } ?? ""
-            oddsNotice = "Pulled \(feed.games.count) games\(quota). Pick \(targetCardSize). Try to look decisive."
+            oddsNotice = identity.isNFL
+                ? "Pulled \(feed.games.count) games\(quota). Pick 5. Try to look decisive."
+                : "Pulled \(feed.games.count) games\(quota). Keep the best 5–10, then open the prop question."
         } catch { errorMessage = error.localizedDescription }
         pullingOdds = false
     }
@@ -5893,9 +5911,13 @@ struct CommissionerCardBuilderView: View {
     private func toggleOdds(_ odds: OddsGame) {
         if selectedOddsIds.contains(odds.id) {
             selectedOddsIds.remove(odds.id)
-        } else if selectedOddsIds.count < targetCardSize {
+        } else if selectedOddsIds.count < selectionMaximum {
             selectedOddsIds.insert(odds.id)
         }
+        toggleOddsPopulation()
+    }
+
+    private func toggleOddsPopulation() {
         let chosen = availableOdds.filter { selectedOddsIds.contains($0.id) }
         for index in games.indices {
             guard index < chosen.count else { continue }
