@@ -306,7 +306,11 @@ struct CfbPollsPreviewView: View {
                             HStack {
                                 Text(position.map(String.init) ?? "–").font(.caption.weight(.black)).foregroundStyle(position == nil ? .white.opacity(0.3) : .black)
                                     .frame(width: 23, height: 23).background(position == nil ? Color.white.opacity(0.06) : Color.yellow, in: Circle())
-                                Text(team.id).font(.caption.weight(.black)); Spacer()
+                                Text(team.name.uppercased())
+                                    .font(.caption.weight(.black))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.62)
+                                Spacer()
                             }.padding(9).background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 9))
                         }.buttonStyle(.plain)
                     }

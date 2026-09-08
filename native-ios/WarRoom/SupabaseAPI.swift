@@ -737,6 +737,16 @@ struct CfbAPRanking: Decodable, Identifiable, Sendable {
         case id, name, market, rank, points
         case firstPlaceVotes = "fp_votes"
     }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        market = try values.decode(String.self, forKey: .market)
+        rank = try values.decode(Int.self, forKey: .rank)
+        points = try values.decode(Int.self, forKey: .points)
+        firstPlaceVotes = try values.decodeIfPresent(Int.self, forKey: .firstPlaceVotes) ?? 0
+    }
 }
 
 struct CfbPollSnapshot: Decodable, Sendable {

@@ -10,6 +10,13 @@ import Foundation
 @testable import WarRoom
 
 struct WarRoomTests {
+    @Test func apRankingTreatsOmittedFirstPlaceVotesAsZero() throws {
+        let data = Data(#"{"id":"team-id","name":"Rebels","market":"Ole Miss","rank":9,"points":921}"#.utf8)
+        let ranking = try JSONDecoder().decode(CfbAPRanking.self, from: data)
+        #expect(ranking.firstPlaceVotes == 0)
+        #expect(ranking.market == "Ole Miss")
+    }
+
     @Test func newLeaguesDefaultToOneHundredPlayerSeats() {
         #expect(LeagueCreationDefaults.maxMembers == 100)
     }

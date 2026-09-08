@@ -635,18 +635,9 @@ private struct PicksView: View {
     @State private var boardScoreStatus: String?
     @State private var boardLoading = false
     @State private var boardError: String?
-    @State private var cfbTab: CfbPollPreviewTab = .card
-
-    private var isCFB: Bool { league?.leagues.sportId.lowercased() == "cfb" }
-
     var body: some View {
         NavigationStack {
-            CfbPicksContainer(
-                isEnabled: isCFB && !loading && loadErrorMessage == nil,
-                liveContext: auth.token.flatMap { token in league.map { CfbPollLiveContext(token: token, leagueID: $0.leagueId, week: $0.leagues.currentWeek) } },
-                selection: $cfbTab
-            ) {
-                Group {
+            Group {
                 if loading {
                     ProgressView("Loading this week…")
                 } else if let loadErrorMessage {
@@ -789,7 +780,6 @@ private struct PicksView: View {
                         retry: { Task { await load() } }
                     )
                 }
-            }
             }
             .task(id: auth.selectedLeagueId) { await load() }
             .toolbar {
@@ -1988,6 +1978,7 @@ struct StandingsView: View {
     @State private var liveProjectionStale = false
     @State private var activeMembership: LeagueMembership?
     @State private var competitiveStatus: CompetitiveLeagueStatus?
+    @State private var cfbTab: CfbPollPreviewTab = .card
     private var identity: SportIdentity { SportIdentity(sportId) }
 
     private var conferences: [String] {
@@ -2009,6 +2000,14 @@ struct StandingsView: View {
                 if loading { ProgressView("Loading standings…") }
                 else if let errorMessage { ContentUnavailableView("Standings unavailable", systemImage: "exclamationmark.triangle", description: Text(errorMessage)) }
                 else if standings.isEmpty { ContentUnavailableView("No scored standings yet", systemImage: "list.number", description: Text("The live league has no scored weeks.")) }
+                else if sportId == "cfb", cfbTab != .card {
+                    CfbPollsPreviewView(
+                        embeddedTab: cfbTab,
+                        liveContext: auth.token.flatMap { token in
+                            activeMembership.map { CfbPollLiveContext(token: token, leagueID: $0.leagueId, week: $0.leagues.currentWeek) }
+                        }
+                    )
+                }
                 else {
                     ZStack {
                         if identity.isNFL { NflHomeBackdrop(phase: .regularSeason) } else { StandingsHallBackdrop() }
@@ -2106,6 +2105,11 @@ struct StandingsView: View {
                     }
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if sportId == "cfb", !loading, errorMessage == nil {
+                    cfbStandingsTabRail
+                }
+            }
             .toolbar {
                 if let onBack {
                     ToolbarItem(placement: .topBarLeading) {
@@ -2136,6 +2140,31 @@ struct StandingsView: View {
                 }
             }
         }
+    }
+
+    private var cfbStandingsTabRail: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(CfbPollPreviewTab.allCases) { tab in
+                    Button {
+                        withAnimation(.easeOut(duration: 0.18)) { cfbTab = tab }
+                    } label: {
+                        Text(tab == .card ? "ROOM STANDINGS" : tab.rawValue)
+                            .font(.system(size: 9, weight: .black))
+                            .tracking(0.6)
+                            .foregroundStyle(cfbTab == tab ? .black : .white.opacity(0.66))
+                            .padding(.horizontal, 13)
+                            .frame(height: 34)
+                            .background(cfbTab == tab ? Color.yellow : Color.black.opacity(0.72), in: Capsule())
+                            .overlay(Capsule().stroke(.yellow.opacity(cfbTab == tab ? 0 : 0.35)))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 15)
+        }
+        .padding(.vertical, 8)
+        .background(Color.black.opacity(0.94))
     }
 
     private var filteredStandings: [Standing] {
@@ -2208,6 +2237,7 @@ struct StandingsView: View {
             sportId = membership.leagues.sportId.lowercased()
             activeMembership = membership
             activeConference = "OVERALL"
+            cfbTab = .card
             try? await SupabaseAPI.touchLastSeen(token: token, userId: user.id)
             async let loadedStandings = SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
             async let loadedTrophies = SupabaseAPI.leagueTrophies(token: token, leagueId: membership.leagueId)
