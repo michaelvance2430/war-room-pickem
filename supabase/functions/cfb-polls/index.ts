@@ -13,6 +13,11 @@ const keyFromBundle = (bundle: string, legacy: string) => {
 type Ranking = { id: string; name: string; market: string; rank: number; points: number; fp_votes: number };
 type Ballot = { user_id: string; ranked_team_ids: string[] };
 
+// The AP poll is published weekly. Keep one shared server copy and allow at
+// most one provider check per day; opening or refreshing the iOS screen never
+// calls Sportradar again while this snapshot is fresh.
+const AP_POLL_REFRESH_INTERVAL_MS = 24 * 60 * 60_000;
+
 const aggregate = (ballots: Ballot[]) => {
   const points = new Map<string, number>();
   const firsts = new Map<string, number>();
@@ -77,7 +82,8 @@ Deno.serve(async (request: Request) => {
   let cached: any = null;
   const cachedResponse = await fetch(`${cacheBase}?season=eq.${season}&order=week.desc&limit=1&select=*`, { headers: serviceHeaders });
   if (cachedResponse.ok) cached = (await cachedResponse.json())?.[0] || null;
-  const stale = !cached || Date.now() - Date.parse(cached.fetched_at || "") > 6 * 60 * 60_000;
+  const fetchedAt = Date.parse(cached?.fetched_at || "");
+  const stale = !cached || !Number.isFinite(fetchedAt) || Date.now() - fetchedAt >= AP_POLL_REFRESH_INTERVAL_MS;
   if (stale) {
     const providerKey = (Deno.env.get("SPORTRADAR_NCAAFB_API_KEY") || "").trim();
     if (!providerKey && !cached) return reply({ error: "Sportradar secret is not configured" }, 503);
