@@ -1777,14 +1777,20 @@ private struct EditableGamePickRow: View {
     }
 
     private func confidenceButton(_ confidence: Int) -> some View {
-        Button("\(confidence)") {
+        let chosen = draft.confidence == confidence
+        let available = !usedConfidences.contains(confidence)
+        return Button {
             onConfidence(draft.confidence == confidence ? nil : confidence)
+        } label: {
+            Text("\(confidence)")
+                .font(.caption.weight(.black))
+                .frame(width: 32, height: 32)
+                .foregroundStyle(chosen ? .black : (available ? .white : .white.opacity(0.22)))
+                .background(chosen ? selection : Color.white.opacity(0.07), in: Circle())
         }
-        .buttonStyle(.borderedProminent)
-        .tint(draft.confidence == confidence ? selection : .secondary)
-        .disabled(usedConfidences.contains(confidence))
-        .frame(maxWidth: .infinity)
-        .accessibilityLabel(draft.confidence == confidence ? "Clear confidence \(confidence)" : "Set confidence \(confidence)")
+        .buttonStyle(.plain)
+        .disabled(!available)
+        .accessibilityLabel(chosen ? "Clear confidence \(confidence)" : "Set confidence \(confidence)")
     }
 
     private var line: String {
