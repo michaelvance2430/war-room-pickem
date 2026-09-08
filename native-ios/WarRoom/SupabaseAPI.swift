@@ -331,6 +331,7 @@ struct CfbPostseasonEntry: Decodable, Sendable {
     let deadHand: Bool
     let bowlLockedAt: String?
     let cfpPicks: [String: String]
+    let cfpTotalPredictions: [String: Int]
     let cfpLockedAt: String?
     let bowlScore: Int?
     let cfpScore: Int?
@@ -344,6 +345,7 @@ struct CfbPostseasonEntry: Decodable, Sendable {
         case deadHand = "dead_hand"
         case bowlLockedAt = "bowl_locked_at"
         case cfpPicks = "cfp_picks"
+        case cfpTotalPredictions = "cfp_total_predictions"
         case cfpLockedAt = "cfp_locked_at"
         case bowlScore = "bowl_score"
         case cfpScore = "cfp_score"
@@ -888,6 +890,10 @@ struct PostseasonScorecard: Decodable, Identifiable, Sendable {
     let rankBefore: Int?
     let rankAfter: Int?
     let createdAt: String
+    var weeklyPredictedTotal: Int? = nil
+    var weeklyActualTotal: Int? = nil
+    var tiebreakDistance: Int? = nil
+    var weeklyTiebreakWon: Bool? = nil
     var id: String { "\(leagueId.uuidString)-\(userId.uuidString)-\(seasonKey)-\(weekNumber)" }
     enum CodingKeys: String, CodingKey {
         case phase, components
@@ -895,6 +901,10 @@ struct PostseasonScorecard: Decodable, Identifiable, Sendable {
         case weekNumber = "week_number", weeklyTotal = "weekly_total"
         case seasonTotalBefore = "season_total_before", seasonTotalAfter = "season_total_after"
         case rankBefore = "rank_before", rankAfter = "rank_after", createdAt = "created_at"
+        case weeklyPredictedTotal = "weekly_predicted_total"
+        case weeklyActualTotal = "weekly_actual_total"
+        case tiebreakDistance = "tiebreak_distance"
+        case weeklyTiebreakWon = "weekly_tiebreak_won"
     }
 }
 
@@ -1299,6 +1309,7 @@ struct GazetteStory: Decodable, Sendable {
 }
 
 struct GazetteWeather: Decodable, Sendable { let kicker: String?; let body: String? }
+private struct DormantLeagueWeekPayload: Decodable, Sendable { let week: Int }
 struct GazetteSideStory: Decodable, Sendable { let kicker: String?; let headline: String?; let body: String? }
 struct GazettePullQuote: Decodable, Sendable { let text: String?; let by: String? }
 struct GazettePromotionOrder: Decodable, Sendable { let name: String?; let from: String?; let to: String?; let deck: String? }
@@ -1768,7 +1779,7 @@ enum SupabaseAPI {
         return try await send(request, as: CfbPostseasonEntry.self)
     }
 
-    static func lockCfbPlayoffBracket(token: String, leagueId: UUID, seasonKey: Int, picks: [String: String]) async throws -> CfbPostseasonEntry {
+    static func lockCfbPlayoffBracket(token: String, leagueId: UUID, seasonKey: Int, picks: [String: String], totalPredictions: [String: Int]) async throws -> CfbPostseasonEntry {
         var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/save_cfb_playoff_bracket"), token: token)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -1776,6 +1787,7 @@ enum SupabaseAPI {
             "p_league_id": leagueId.uuidString.lowercased(),
             "p_season_key": seasonKey,
             "p_picks": picks,
+            "p_total_predictions": totalPredictions,
         ])
         return try await send(request, as: CfbPostseasonEntry.self)
     }
@@ -2080,6 +2092,14 @@ enum SupabaseAPI {
             "week": weekNumber,
         ])
         return try await send(request, as: OddsFeed.self)
+    }
+
+    static func syncDormantLeagueWeek(token: String, leagueId: UUID) async throws -> Int {
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/sync_dormant_league_week"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["p_league_id": leagueId.uuidString.lowercased()])
+        return try await send(request, as: DormantLeagueWeekPayload.self).week
     }
 
     static func fieldhouseOdds(token: String, leagueId: UUID, sportId: String, window: Int) async throws -> OddsFeed {

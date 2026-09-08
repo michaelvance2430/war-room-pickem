@@ -45,7 +45,11 @@ begin
   end if;
 
   select extract(year from wr.scored_at)::integer,
-         count(distinct pg.card_game_id) = 5,
+         count(distinct pg.card_game_id) = (
+           select count(*) from public.card_games expected
+           join public.week_cards card on card.id=expected.week_card_id
+           where card.league_id=new.league_id and card.week_number=13
+         ),
          count(*) filter (where cg.is_rivalry and gr.winner <> 'push' and pg.side = gr.winner),
          count(*) filter (where cg.is_rivalry and pg.is_best_bet and gr.winner <> 'push' and pg.side = gr.winner)
   into v_season, v_card_completed, v_hits, v_best_bet_hits
@@ -79,7 +83,7 @@ begin
   insert into public.achievements(league_id,user_id,code,title,flavor)
   select new.league_id,new.user_id,r.code,r.title,r.flavor
   from (values
-    ('hate_week_roll_call','Picked a Fight','Five grudges selected. The gravy boat has been moved out of punching range.',coalesce(v_card_completed,false)),
+    ('hate_week_roll_call','Picked a Fight','The entire grudge card was selected. The gravy boat has been moved out of punching range.',coalesce(v_card_completed,false)),
     ('rivalry_week','Family Group Chat Muted','One rivalry pick cashed. Notifications entered witness protection.',v_hit_seasons >= 1),
     ('grudge_veteran','Two-Year Restraining Order','The same bad blood survived two distinct CFB seasons.',v_hit_seasons >= 2),
     ('dynasty_of_spite','Generational Hater','Three distinct seasons of rivalry receipts, plus a Best Bet planted in enemy territory.',v_hit_seasons >= 3 and v_best_bet_seasons >= 1)

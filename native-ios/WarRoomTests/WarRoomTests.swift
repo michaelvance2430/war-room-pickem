@@ -14,6 +14,23 @@ struct WarRoomTests {
         #expect(LeagueCreationDefaults.maxMembers == 100)
     }
 
+    @Test func lateCreatedFootballLeaguesOpenOnTheCalendarWeek() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = SeasonCardBuildGate.eastern
+        let septemberEight = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 8, hour: 12)))
+        let octoberSix = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 6, hour: 12)))
+        #expect(LeagueWeekPolicy.currentWeek(sportId: "cfb", at: septemberEight) == 2)
+        #expect(LeagueWeekPolicy.currentWeek(sportId: "cfb", at: octoberSix) == 6)
+        #expect(LeagueWeekPolicy.currentWeek(sportId: "nfl", at: septemberEight) == 1)
+    }
+
+    @Test func cfbWeeklyCardsFlexFromFiveThroughTenWhileNFLStaysFive() {
+        #expect(WeeklyCardSizePolicy.size(sportId: "cfb", requested: 4) == 5)
+        #expect(WeeklyCardSizePolicy.size(sportId: "cfb", requested: 7) == 7)
+        #expect(WeeklyCardSizePolicy.size(sportId: "cfb", requested: 11) == 10)
+        #expect(WeeklyCardSizePolicy.size(sportId: "nfl", requested: 10) == 5)
+    }
+
 
     @Test func seasonOpeningPlaysOncePerSportAndWeekNotOncePerLeagueSwitch() {
         let userID = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!

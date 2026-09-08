@@ -220,7 +220,7 @@ extension SupabaseAPI {
                 "p_sport_id": sportId,
                 "p_list_as_open": visibility == "public",
                 "p_crystal_ball_enabled": crystalBallEnabled,
-                "p_current_week": SportIdentity(sportId).openingWeek,
+                "p_current_week": LeagueWeekPolicy.currentWeek(sportId: sportId),
                 "p_cut_percent": 50,
                 "p_max_human_members": maxMembers,
                 "p_late_join_policy": "reinforcement_credit"
@@ -889,10 +889,10 @@ struct CreateLeagueView: View {
 
     private var sportDetail: String {
         switch sportId {
-        case "nfl": return "Starts at NFL Week 1. No preseason."
+        case "nfl": return "Starts in the current NFL week. No preseason."
         case "ncaam": return "Men’s Division I basketball · ten-game Monday–Sunday cards."
         case "ncaaw": return "Women’s Division I basketball · ten-game Monday–Sunday cards."
-        default: return "Starts at the CFB opening week."
+        default: return "Starts in the current CFB week, even when the room opens midseason."
         }
     }
     private func createLabel(_ text: String) -> some View {

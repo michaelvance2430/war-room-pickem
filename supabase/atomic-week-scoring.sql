@@ -271,7 +271,17 @@ begin
         count(*)::integer as weeks_played,
         max(p.total_points)::integer as best_week,
         min(p.total_points)::integer as worst_week,
-        count(*) filter (where p.total_points >= 18)::integer as perfect_weeks,
+        count(*) filter (where
+          p.prop_choice = wr.prop_result
+          and not exists (
+            select 1
+            from public.pick_games pgp
+            join public.game_results grp
+              on grp.week_result_id = wr.id and grp.card_game_id = pgp.card_game_id
+            where pgp.pick_id = p.id
+              and (grp.winner = 'push' or pgp.side <> grp.winner)
+          )
+        )::integer as perfect_weeks,
         count(*) filter (where p.prop_choice = wr.prop_result)::integer as prop_hits,
         count(*) filter (where p.prop_choice is not null and wr.prop_result is not null)::integer as prop_total,
         (

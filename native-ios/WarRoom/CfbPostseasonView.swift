@@ -16,6 +16,124 @@ struct CfbPostseasonHubView: View {
     }
 }
 
+#if DEBUG
+struct CfbPostseasonTiebreakPreviewView: View {
+    private let games: [(id: String, title: String, first: String, second: String, firstLine: String, secondLine: String)] = [
+        ("g1", "CAMPUS PLAYOFF · GAME 1", "PENN STATE", "NOTRE DAME", "+2.5", "-2.5"),
+        ("g2", "CAMPUS PLAYOFF · GAME 2", "MIAMI", "OHIO STATE", "+6.5", "-6.5"),
+        ("g3", "CAMPUS PLAYOFF · GAME 3", "OREGON", "GEORGIA", "-1.5", "+1.5"),
+    ]
+    @State private var picks = ["g1": "PENN STATE", "g2": "MIAMI"]
+    @State private var totals = ["g1": 48, "g2": 55]
+    @State private var confidences = ["g1": 3, "g2": 2]
+    @State private var bestBetGame: String? = "g1"
+    @State private var locked = false
+    @State private var confirmingLock = false
+    private var predicted: Int { totals.values.reduce(0, +) }
+    private var complete: Bool { games.allSatisfy { picks[$0.id] != nil && totals[$0.id] != nil && confidences[$0.id] != nil } && bestBetGame != nil }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                LinearGradient(colors: [.yellow.opacity(0.16), .clear, .green.opacity(0.13)], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("CFB POSTSEASON · WEEK 16").font(.caption2.weight(.black)).tracking(2).foregroundStyle(.yellow)
+                        Text("YOUR CFP CARD").font(.system(size: 36, weight: .black)).fontWidth(.condensed)
+                        Text("Tap a winner, then enter your predicted combined score. The running weekly total updates below.")
+                            .font(.footnote.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
+                        ForEach(games, id: \.id) { game in
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(game.title).font(.system(size: 9, weight: .black)).tracking(1.3).foregroundStyle(.green)
+                                HStack(spacing: 8) {
+                                    pickButton(game.first, line: game.firstLine, gameId: game.id)
+                                    pickButton(game.second, line: game.secondLine, gameId: game.id)
+                                }
+                                Divider().overlay(.white.opacity(0.12))
+                                HStack {
+                                    Text("CONFIDENCE").font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.55))
+                                    Spacer()
+                                    ForEach(1...games.count, id: \.self) { value in confidenceButton(value, gameId: game.id) }
+                                    Button { bestBetGame = bestBetGame == game.id ? nil : game.id } label: {
+                                        Label("BEST BET", systemImage: bestBetGame == game.id ? "star.fill" : "star")
+                                            .font(.system(size: 8, weight: .black)).padding(.horizontal, 8).frame(height: 30)
+                                            .foregroundStyle(bestBetGame == game.id ? .black : .yellow)
+                                            .background(bestBetGame == game.id ? Color.yellow : Color.yellow.opacity(0.09), in: Capsule())
+                                    }.buttonStyle(.plain)
+                                }
+                                HStack {
+                                    Label("TOTAL SCORE", systemImage: "sum").font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.55))
+                                    Spacer()
+                                    TextField("ENTER", value: Binding(get: { totals[game.id] }, set: { totals[game.id] = $0 }), format: .number)
+                                        .keyboardType(.numberPad).multilineTextAlignment(.trailing)
+                                        .font(.title3.weight(.black)).foregroundStyle(.yellow).frame(width: 90)
+                                }
+                            }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(.green.opacity(0.34)))
+                        }
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label("RUNNING WEEKLY TIEBREAK", systemImage: "scope").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(.yellow)
+                            HStack(spacing: 9) {
+                                metric("\(predicted)", "PREDICTED")
+                                metric("\(totals.count)/\(games.count)", "TOTALS IN")
+                                metric("\(picks.count)/\(games.count)", "PICKS IN")
+                            }
+                            Text(complete ? "CARD READY TO LOCK" : "FINISH EVERY PICK AND TOTAL TO LOCK")
+                                .font(.system(size: 9, weight: .black)).tracking(0.8).foregroundStyle(complete ? .green : .orange)
+                            Text("ACTUAL TOTAL AND DISTANCE APPEAR AFTER THE GAMES ARE FINAL").font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(.white.opacity(0.46))
+                        }.padding(16).background(.yellow.opacity(0.08), in: RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(.yellow.opacity(0.42)))
+                        Button { confirmingLock = true } label: {
+                            Label(locked ? "CFP CARD LOCKED" : complete ? "LOCK CFP CARD" : "COMPLETE CARD TO LOCK",
+                                  systemImage: locked ? "lock.fill" : "lock.open.fill")
+                                .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
+                                .foregroundStyle(complete && !locked ? .black : .white.opacity(0.5))
+                                .background(complete && !locked ? Color.yellow : Color.gray.opacity(0.24), in: RoundedRectangle(cornerRadius: 14))
+                        }.buttonStyle(.plain).disabled(!complete || locked)
+                    }.padding(18).padding(.bottom, 30)
+                }
+            }.navigationTitle("CFB Tiebreak Preview").navigationBarTitleDisplayMode(.inline).preferredColorScheme(.dark)
+                .confirmationDialog("Lock this CFP card?", isPresented: $confirmingLock, titleVisibility: .visible) {
+                    Button("Lock CFP Card") { locked = true }
+                    Button("Keep Editing", role: .cancel) { }
+                } message: { Text("Your winners, confidence points, Best Bet, and predicted totals cannot be changed after locking.") }
+        }
+    }
+
+    private func metric(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 4) { Text(value).font(.title2.weight(.black)); Text(label).font(.system(size: 7, weight: .black)).tracking(0.8).foregroundStyle(.white.opacity(0.45)) }
+            .frame(maxWidth: .infinity).padding(.vertical, 10).background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 9))
+    }
+
+    private func pickButton(_ team: String, line: String, gameId: String) -> some View {
+        Button { picks[gameId] = team } label: {
+            VStack(spacing: 4) {
+                HStack(spacing: 5) {
+                    Text(team).lineLimit(1).minimumScaleFactor(0.65)
+                    if picks[gameId] == team { Image(systemName: "checkmark.circle.fill") }
+                }
+                Text(line).font(.system(size: 10, weight: .black, design: .monospaced)).opacity(0.72)
+            }
+            .font(.caption.weight(.black)).frame(maxWidth: .infinity, minHeight: 52)
+            .foregroundStyle(picks[gameId] == team ? .black : .white)
+            .background(picks[gameId] == team ? Color.green : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
+        }.buttonStyle(.plain)
+    }
+
+    private func confidenceButton(_ value: Int, gameId: String) -> some View {
+        let selected = confidences[gameId] == value
+        let usedElsewhere = confidences.contains { $0.key != gameId && $0.value == value }
+        return Button {
+            guard !usedElsewhere else { return }
+            confidences[gameId] = selected ? nil : value
+        } label: {
+            Text("\(value)").font(.caption.weight(.black)).frame(width: 30, height: 30)
+                .foregroundStyle(selected ? .black : .white)
+                .background(selected ? Color.yellow : Color.white.opacity(usedElsewhere ? 0.03 : 0.09), in: Circle())
+        }.buttonStyle(.plain).disabled(usedElsewhere).opacity(usedElsewhere ? 0.3 : 1)
+    }
+}
+#endif
+
 private struct ConferenceChampionshipGateView: View {
     @EnvironmentObject private var auth: AuthStore
     let membership: LeagueMembership
@@ -469,6 +587,7 @@ private struct CfbPlayoffBracketView: View {
     let seeds: [String]
     let bowlGames: [CfbBowlGame]
     @State private var picks: [String: String] = [:]
+    @State private var totalPredictions: [String: Int] = [:]
     @State private var locked = false
     @State private var loading = true
     @State private var saving = false
@@ -477,7 +596,7 @@ private struct CfbPlayoffBracketView: View {
     @State private var cfpResultsCount = 0
     @State private var foundryStandings: [FoundryCfbPostseasonStanding] = []
     private let order = ["r1a","r1b","r1c","r1d","q1","q2","q3","q4","s1","s2","final"]
-    private var complete: Bool { order.allSatisfy { picks[$0] != nil } }
+    private var complete: Bool { order.allSatisfy { picks[$0] != nil && totalPredictions[$0].map { $0 >= 0 } == true } }
     private var seasonKey: Int { Calendar.current.component(.year, from: Date()) }
     private var championshipTrophyAsset: String {
         switch membership.leagues.championshipTrophyId {
@@ -573,6 +692,21 @@ private struct CfbPlayoffBracketView: View {
                 .padding(.horizontal, 10).padding(.vertical, 5).frame(maxWidth: .infinity)
                 .background(id == "final" ? Color.yellow : Color.orange, in: Capsule())
             team(first, id); team(second, id)
+            HStack(spacing: 8) {
+                Image(systemName: "sum")
+                TextField("TOTAL SCORE", value: Binding(
+                    get: { totalPredictions[id] },
+                    set: { totalPredictions[id] = $0 }
+                ), format: .number)
+                .keyboardType(.numberPad)
+                .textFieldStyle(.plain)
+                .font(.caption.weight(.black))
+                .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 10).frame(minHeight: 38)
+            .foregroundStyle(totalPredictions[id] == nil ? .white.opacity(0.45) : .yellow)
+            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+            .accessibilityLabel("Predicted combined score for \(bowlName)")
         }.padding(10).background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 11)).overlay(RoundedRectangle(cornerRadius: 11).stroke(id == "final" ? .yellow.opacity(0.55) : .green.opacity(0.34)))
     }
     private func team(_ name: String, _ game: String) -> some View {
@@ -594,7 +728,7 @@ private struct CfbPlayoffBracketView: View {
             async let loadedEntry = SupabaseAPI.cfbPostseasonEntry(token: token, leagueId: membership.leagueId, userId: user.id, seasonKey: seasonKey)
             async let loadedResults = SupabaseAPI.cfbPostseasonResults(token: token, leagueId: membership.leagueId, seasonKey: seasonKey)
             let (entry, results) = try await (loadedEntry, loadedResults)
-            if let entry { if !entry.cfpPicks.isEmpty { picks = entry.cfpPicks }; locked = entry.cfpLockedAt != nil; cfpScore = entry.cfpScore }
+            if let entry { if !entry.cfpPicks.isEmpty { picks = entry.cfpPicks }; totalPredictions = entry.cfpTotalPredictions; locked = entry.cfpLockedAt != nil; cfpScore = entry.cfpScore }
             cfpResultsCount = results?.cfpResults.count ?? 0
             if membership.leagues.mode == "foundry" { foundryStandings = try await SupabaseAPI.foundryCfbPostseasonStandings(token: token, leagueId: membership.leagueId, seasonKey: seasonKey) }
         } catch { self.error = error.localizedDescription }
@@ -604,7 +738,7 @@ private struct CfbPlayoffBracketView: View {
         guard !saving, let token = auth.token else { return }
         saving = true; error = nil
         do {
-            let entry = try await SupabaseAPI.lockCfbPlayoffBracket(token: token, leagueId: membership.leagueId, seasonKey: seasonKey, picks: picks)
+            let entry = try await SupabaseAPI.lockCfbPlayoffBracket(token: token, leagueId: membership.leagueId, seasonKey: seasonKey, picks: picks, totalPredictions: totalPredictions)
             locked = entry.cfpLockedAt != nil
         } catch { self.error = error.localizedDescription }
         saving = false

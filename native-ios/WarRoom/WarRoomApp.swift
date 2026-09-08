@@ -30,6 +30,8 @@ struct WarRoomApp: App {
                 CfbPollsPreviewView(
                     initialTab: ProcessInfo.processInfo.arguments.contains("--cfb-polls-members") ? .members : .ap
                 )
+            } else if ProcessInfo.processInfo.arguments.contains("--cfb-postseason-tiebreak-preview") {
+                CfbPostseasonTiebreakPreviewView()
             } else {
                 RootView()
                     .environmentObject(auth)

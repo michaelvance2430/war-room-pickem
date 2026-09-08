@@ -101,6 +101,23 @@ enum CfbPostseasonRules {
 
     static func cfpPoints(round: Int) -> Int { [1, 2, 4, 8][safe: round] ?? 0 }
 
+    /// CFB-only weekly tiebreak. Predictions never add points; they only order
+    /// players whose earned postseason points are equal for the same week.
+    static func weeklyTotalPrediction(gameIds: [String], predictions: [String: Int]) -> Int? {
+        guard !gameIds.isEmpty, gameIds.allSatisfy({ predictions[$0].map { $0 >= 0 } == true }) else { return nil }
+        return gameIds.reduce(0) { $0 + (predictions[$1] ?? 0) }
+    }
+
+    static func weeklyTiebreakDistance(
+        gameIds: [String],
+        predictions: [String: Int],
+        actualTotals: [String: Int]
+    ) -> Int? {
+        guard let predicted = weeklyTotalPrediction(gameIds: gameIds, predictions: predictions),
+              let actual = weeklyTotalPrediction(gameIds: gameIds, predictions: actualTotals) else { return nil }
+        return abs(predicted - actual)
+    }
+
     nonisolated private static func bowlOrder(_ lhs: CfbBowlCandidate, _ rhs: CfbBowlCandidate) -> Bool {
         lhs.rank == rhs.rank ? lhs.name < rhs.name : lhs.rank < rhs.rank
     }

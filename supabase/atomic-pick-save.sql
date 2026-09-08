@@ -68,7 +68,12 @@ begin
     when v_card.card_kind = 'conference_championship' then 4
     when lower(v_league.sport_id) in ('cbb','ncaam','ncaaw') then 10
     else 5 end;
-  if v_game_count <> v_expected_count then
+  if lower(v_league.sport_id) = 'cfb' and v_card.card_kind <> 'conference_championship' then
+    if v_game_count < 5 or v_game_count > 10 then
+      raise exception 'CFB week card must contain between 5 and 10 games';
+    end if;
+    v_expected_count := v_game_count;
+  elsif v_game_count <> v_expected_count then
     raise exception 'Week card must contain exactly % games', v_expected_count;
   end if;
   if v_first_kickoff is null then

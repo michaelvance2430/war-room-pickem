@@ -4011,6 +4011,25 @@ struct PostseasonScorecardView: View {
                         scoreMetric("\(scorecard.seasonTotalAfter)", "AFTER")
                         scoreMetric(rankMovement, "STANDING")
                     }
+                    if sportId.lowercased() == "cfb", let predicted = scorecard.weeklyPredictedTotal,
+                       let actual = scorecard.weeklyActualTotal, let distance = scorecard.tiebreakDistance {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("CFB WEEKLY TIEBREAK", systemImage: "scope")
+                                .font(.system(size: 10, weight: .black)).tracking(1.8).foregroundStyle(.yellow)
+                            HStack(spacing: 9) {
+                                scoreMetric("\(predicted)", "PREDICTED")
+                                scoreMetric("\(actual)", "ACTUAL")
+                                scoreMetric("\(distance)", "DISTANCE")
+                            }
+                            Text(scorecard.weeklyTiebreakWon == true
+                                 ? "TIE RESOLVED · CLOSEST WEEKLY COMBINED TOTAL"
+                                 : "NO BONUS POINTS · USED ONLY WHEN WEEKLY SCORES TIE")
+                                .font(.system(size: 8, weight: .black)).tracking(1)
+                                .foregroundStyle(scorecard.weeklyTiebreakWon == true ? .green : .white.opacity(0.55))
+                        }
+                        .padding(14).background(.yellow.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.yellow.opacity(0.35)))
+                    }
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.seal.fill")
                         Text("CERTIFIED · IMMUTABLE · UUID ATTACHED")
@@ -5543,7 +5562,8 @@ struct CommissionerCardBuilderView: View {
     @Environment(\.dismiss) private var dismiss
     let membership: LeagueMembership
     @State private var step = 1
-    @State private var games = (0..<5).map { _ in CommissionerGameDraft() }
+    @State private var cardSize = 10
+    @State private var games = (0..<10).map { _ in CommissionerGameDraft() }
     @State private var propQuestion = ""
     @State private var propA = ""
     @State private var propB = ""
@@ -5556,27 +5576,45 @@ struct CommissionerCardBuilderView: View {
     @State private var roomFavoriteTeamIds: [String] = []
     @State private var oddsNotice: String?
     @State private var errorMessage: String?
+    @State private var operationalWeek: Int
+    init(membership: LeagueMembership) {
+        self.membership = membership
+        _operationalWeek = State(initialValue: membership.leagues.currentWeek)
+    }
     private var identity: SportIdentity { SportIdentity(membership.leagues.sportId) }
     private var deskAccent: Color { identity.isNFL ? .cyan : .green }
     private var seasonBuildIsOpen: Bool {
         SeasonCardBuildGate.allowsBuild(
             sportId: membership.leagues.sportId,
-            week: membership.leagues.currentWeek
+            week: operationalWeek
         )
     }
 
     private var isRivalryWeek: Bool {
-        membership.leagues.sportId.lowercased() == "cfb" && membership.leagues.currentWeek == 13
+        membership.leagues.sportId.lowercased() == "cfb" && operationalWeek == 13
     }
 
     var body: some View {
         Form {
             Section {
                 Label("COMMISSIONER MODE", systemImage: "hammer.fill").font(.caption.weight(.black)).foregroundStyle(.red)
-                Text("Build \(membership.leagues.sportId.uppercased()) Week \(membership.leagues.currentWeek)").font(.title2.weight(.black))
-                Label(footballWeekDateRangeLabel(sportId: membership.leagues.sportId, week: membership.leagues.currentWeek), systemImage: "calendar")
+                Text("Build \(membership.leagues.sportId.uppercased()) Week \(operationalWeek)").font(.title2.weight(.black))
+                Label(footballWeekDateRangeLabel(sportId: membership.leagues.sportId, week: operationalWeek), systemImage: "calendar")
                     .font(.subheadline.weight(.bold)).foregroundStyle(deskAccent)
                 Text("Four steps. One decision at a time.").foregroundStyle(.secondary)
+                if !identity.isNFL {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Label("WEEKLY CARD SIZE", systemImage: "rectangle.stack.badge.plus")
+                                .font(.caption.weight(.black)).foregroundStyle(.green)
+                            Spacer()
+                            Text("\(cardSize) GAMES").font(.caption.weight(.black)).foregroundStyle(.green)
+                        }
+                        Slider(value: Binding(get: { Double(cardSize) }, set: { resizeCard(to: Int($0.rounded())) }), in: 5...10, step: 1)
+                        Text("Choose 5–10 before pulling odds. Once published, the size is locked for the week.")
+                            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                    }
+                }
                 if isRivalryWeek {
                     Label("RIVALRY WEEK CONTROL · ONLY THE GRUDGES GET THE RED LIGHT", systemImage: "flame.fill")
                         .font(.caption.weight(.black)).foregroundStyle(.red)
@@ -5593,9 +5631,9 @@ struct CommissionerCardBuilderView: View {
             }
             if !seasonBuildIsOpen {
                 Section {
-                    Label("WEEK \(membership.leagues.currentWeek) LOCK", systemImage: "lock.fill")
+                    Label("WEEK \(operationalWeek) LOCK", systemImage: "lock.fill")
                         .font(.headline.weight(.black)).foregroundStyle(.red)
-                    Text(SeasonCardBuildGate.lockedMessage(sportId: membership.leagues.sportId, week: membership.leagues.currentWeek))
+                    Text(SeasonCardBuildGate.lockedMessage(sportId: membership.leagues.sportId, week: operationalWeek))
                         .font(.subheadline.weight(.semibold))
                     Text("The paid odds feed is disabled until then. Nobody can burn provider credits by opening this desk early.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -5627,7 +5665,7 @@ struct CommissionerCardBuilderView: View {
             }
             }
             if step == 2 && !availableOdds.isEmpty {
-                Section("Choose five · \(selectedOddsIds.count)/5") {
+                Section("Choose \(targetCardSize) · \(selectedOddsIds.count)/\(targetCardSize)") {
                     if !identity.isNFL {
                         HStack(spacing: 14) {
                             Label("TOP 10", systemImage: "star.fill").foregroundStyle(.yellow)
@@ -5671,12 +5709,12 @@ struct CommissionerCardBuilderView: View {
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(rivalry != nil && isRivalryWeek ? Color.red.opacity(0.75) : Color.clear, lineWidth: 2))
                         }
                         .foregroundStyle(.primary)
-                        .disabled(!selectedOddsIds.contains(odds.id) && selectedOddsIds.count >= 5)
+                        .disabled(!selectedOddsIds.contains(odds.id) && selectedOddsIds.count >= targetCardSize)
                     }
                     HStack {
                         Button("BACK") { step = 1 }
                         Spacer()
-                        Button("NEXT · PROP") { prepareProp(); step = 3 }.fontWeight(.black).disabled(selectedOddsIds.count != 5)
+                        Button("NEXT · PROP") { prepareProp(); step = 3 }.fontWeight(.black).disabled(selectedOddsIds.count != targetCardSize)
                     }
                 }
             }
@@ -5728,9 +5766,9 @@ struct CommissionerCardBuilderView: View {
                 }
             }
             }
-            if step == 4 { Section("Week \(membership.leagues.currentWeek) preview") {
+            if step == 4 { Section("Week \(operationalWeek) preview") {
                 if let firstKickoff = games.map(\.kickoff).min() {
-                    KickoffCountdownView(kickoff: firstKickoff, sportId: membership.leagues.sportId, week: membership.leagues.currentWeek)
+                    KickoffCountdownView(kickoff: firstKickoff, sportId: membership.leagues.sportId, week: operationalWeek)
                 }
                 ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
                     HStack {
@@ -5747,12 +5785,12 @@ struct CommissionerCardBuilderView: View {
                 Button {
                     Task { await publish() }
                 } label: {
-                    HStack { Spacer(); if publishing { ProgressView() } else { Text("PUBLISH WEEK \(membership.leagues.currentWeek)").fontWeight(.black) }; Spacer() }
+                    HStack { Spacer(); if publishing { ProgressView() } else { Text("PUBLISH WEEK \(operationalWeek)").fontWeight(.black) }; Spacer() }
                 }
                 .disabled(!isComplete || publishing)
                 .tint(.red)
                 if !isComplete {
-                    Label("Finish all five games and the prop. Almost only counts in horseshoes and bad parlays.", systemImage: "arrow.up.circle.fill")
+                    Label("Finish all \(targetCardSize) games and the prop. Almost only counts in horseshoes and bad parlays.", systemImage: "arrow.up.circle.fill")
                         .font(.footnote).foregroundStyle(identity.isNFL ? .red : .yellow)
                 }
                 if let errorMessage { Text(errorMessage).font(.footnote).foregroundStyle(.red) }
@@ -5765,7 +5803,7 @@ struct CommissionerCardBuilderView: View {
         .scrollContentBackground(.hidden)
         .background { if identity.isNFL { NflHomeBackdrop(phase: .regularSeason) } }
         .tint(identity.isNFL ? .blue : .green)
-        .task { await loadRoomFavorites() }
+        .task { await prepareLeagueWeek(); await loadRoomFavorites() }
         .contentMargins(.bottom, 36, for: .scrollContent)
         .navigationTitle("Build Card")
         .navigationBarTitleDisplayMode(.inline)
@@ -5787,6 +5825,16 @@ struct CommissionerCardBuilderView: View {
         ["ODDS", "GAMES", "PROP", "PREVIEW"][number - 1]
     }
 
+    private var targetCardSize: Int { WeeklyCardSizePolicy.size(sportId: identity.sportId, requested: cardSize) }
+
+    private func resizeCard(to requestedSize: Int) {
+        guard !identity.isNFL, step == 1, !pullingOdds else { return }
+        let size = WeeklyCardSizePolicy.size(sportId: identity.sportId, requested: requestedSize)
+        cardSize = size
+        selectedOddsIds = []
+        games = (0..<size).map { _ in CommissionerGameDraft() }
+    }
+
     private var propIsComplete: Bool {
         !propQuestion.trimmingCharacters(in: .whitespaces).isEmpty
         && !propA.trimmingCharacters(in: .whitespaces).isEmpty
@@ -5798,7 +5846,7 @@ struct CommissionerCardBuilderView: View {
         let sport = membership.leagues.sportId.lowercased() == "nfl" ? "nfl" : "cfb"
         return automaticFootballProps.filter {
             ($0.sport == nil || $0.sport == sport)
-            && ($0.week == nil || $0.week == membership.leagues.currentWeek)
+            && ($0.week == nil || $0.week == operationalWeek)
         }
     }
 
@@ -5809,26 +5857,35 @@ struct CommissionerCardBuilderView: View {
 
     private func applySelectedProp() {
         guard let preset = availableAutomaticProps.first(where: { $0.id == selectedPropId }) else { return }
-        propQuestion = preset.question
-        propA = preset.yes
-        propB = preset.no
+        propQuestion = cardSizedCopy(preset.question)
+        propA = cardSizedCopy(preset.yes)
+        propB = cardSizedCopy(preset.no)
         propPoints = 3
+    }
+
+    private func cardSizedCopy(_ source: String) -> String {
+        guard !identity.isNFL, targetCardSize != 5 else { return source }
+        return source
+            .replacingOccurrences(of: "all five games", with: "all \(targetCardSize) games", options: .caseInsensitive)
+            .replacingOccurrences(of: "the five games", with: "the \(targetCardSize) games", options: .caseInsensitive)
+            .replacingOccurrences(of: "all five", with: "all \(targetCardSize)", options: .caseInsensitive)
+            .replacingOccurrences(of: "5–0", with: "\(targetCardSize)–0")
     }
 
     private func pullOdds() async {
         guard let token = auth.token else { return }
         guard seasonBuildIsOpen else {
-            errorMessage = SeasonCardBuildGate.lockedMessage(sportId: membership.leagues.sportId, week: membership.leagues.currentWeek)
+            errorMessage = SeasonCardBuildGate.lockedMessage(sportId: membership.leagues.sportId, week: operationalWeek)
             return
         }
         pullingOdds = true
         errorMessage = nil
         do {
-            let feed = try await SupabaseAPI.footballOdds(token: token, leagueId: membership.leagueId, sportId: membership.leagues.sportId, weekNumber: membership.leagues.currentWeek)
+            let feed = try await SupabaseAPI.footballOdds(token: token, leagueId: membership.leagueId, sportId: membership.leagues.sportId, weekNumber: operationalWeek)
             availableOdds = feed.games
             selectedOddsIds = []
             let quota = feed.remaining.map { " · \($0) API requests remain" } ?? ""
-            oddsNotice = "Pulled \(feed.games.count) games\(quota). Pick five. Try to look decisive."
+            oddsNotice = "Pulled \(feed.games.count) games\(quota). Pick \(targetCardSize). Try to look decisive."
         } catch { errorMessage = error.localizedDescription }
         pullingOdds = false
     }
@@ -5836,7 +5893,7 @@ struct CommissionerCardBuilderView: View {
     private func toggleOdds(_ odds: OddsGame) {
         if selectedOddsIds.contains(odds.id) {
             selectedOddsIds.remove(odds.id)
-        } else if selectedOddsIds.count < 5 {
+        } else if selectedOddsIds.count < targetCardSize {
             selectedOddsIds.insert(odds.id)
         }
         let chosen = availableOdds.filter { selectedOddsIds.contains($0.id) }
@@ -5876,6 +5933,12 @@ struct CommissionerCardBuilderView: View {
         roomFavoriteTeamIds = favorites.map(\.teamId)
     }
 
+    @MainActor private func prepareLeagueWeek() async {
+        guard let token = auth.token else { return }
+        do { operationalWeek = try await SupabaseAPI.syncDormantLeagueWeek(token: token, leagueId: membership.leagueId) }
+        catch { errorMessage = error.localizedDescription }
+    }
+
     private func publish() async {
         guard let token = auth.token else { return }
         publishing = true
@@ -5886,10 +5949,16 @@ struct CommissionerCardBuilderView: View {
                  "favorite": game.favorite, "start_time": formatter.string(from: game.kickoff), "bookmaker": "Manual", "away_rank": NSNull(), "home_rank": NSNull(),
                  "is_rivalry": isRivalryWeek && (game.isRivalry || RivalryMatchupCatalog.match(away: game.away, home: game.home) != nil)]
             }
-            try await SupabaseAPI.publishWeekCard(token: token, leagueId: membership.leagueId, weekNumber: membership.leagues.currentWeek, games: payload, propQuestion: propQuestion, propA: propA, propB: propB, propPoints: propPoints)
+            try await SupabaseAPI.publishWeekCard(token: token, leagueId: membership.leagueId, weekNumber: operationalWeek, games: payload, propQuestion: propQuestion, propA: propA, propB: propB, propPoints: propPoints)
             dismiss()
         } catch { errorMessage = error.localizedDescription }
         publishing = false
+    }
+}
+
+enum WeeklyCardSizePolicy {
+    static func size(sportId: String, requested: Int) -> Int {
+        SportIdentity(sportId).isNFL ? 5 : min(10, max(5, requested))
     }
 }
 

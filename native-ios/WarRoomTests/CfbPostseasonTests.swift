@@ -27,4 +27,13 @@ struct CfbPostseasonTests {
         #expect(CfbPostseasonRules.deadHandScore(raw: 60) == 90)
         #expect(CfbPostseasonRules.deadHandScore(raw: 59) == 30)
     }
+
+    @Test func weeklyTotalPredictionOnlyResolvesCompleteCfpWindows() {
+        let games = ["r1a", "r1b", "r1c"]
+        let mike = ["r1a": 48, "r1b": 55, "r1c": 61]
+        let actual = ["r1a": 52, "r1b": 49, "r1c": 58]
+        #expect(CfbPostseasonRules.weeklyTotalPrediction(gameIds: games, predictions: mike) == 164)
+        #expect(CfbPostseasonRules.weeklyTiebreakDistance(gameIds: games, predictions: mike, actualTotals: actual) == 5)
+        #expect(CfbPostseasonRules.weeklyTotalPrediction(gameIds: games, predictions: ["r1a": 48]) == nil)
+    }
 }

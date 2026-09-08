@@ -1,4 +1,4 @@
--- Publish a complete sport-sized card atomically (five football, ten Fieldhouse).
+-- Publish a complete sport-sized card atomically (5–10 CFB, five NFL, ten Fieldhouse).
 -- Once any player has a pick row, the card is immutable so republishing cannot
 -- cascade-delete pick_games or detach Best Bets.
 
@@ -36,11 +36,14 @@ begin
   select lower(coalesce(sport_id, 'cfb')) into v_sport_id
   from public.leagues where id = p_league_id;
   if v_sport_id is null then raise exception 'League not found'; end if;
-  v_expected_count := case when v_sport_id in ('cbb', 'ncaam', 'ncaaw') then 10 else 5 end;
   if jsonb_typeof(p_games)<>'array' then raise exception 'Games payload must be an array'; end if;
   select count(*) into v_game_count from jsonb_array_elements(p_games);
-  if v_game_count<>v_expected_count then
-    raise exception 'Select exactly % games', v_expected_count;
+  if v_sport_id = 'cfb' then
+    if v_game_count < 5 or v_game_count > 10 then raise exception 'Select between 5 and 10 games'; end if;
+    v_expected_count := v_game_count;
+  else
+    v_expected_count := case when v_sport_id in ('cbb', 'ncaam', 'ncaaw') then 10 else 5 end;
+    if v_game_count<>v_expected_count then raise exception 'Select exactly % games', v_expected_count; end if;
   end if;
 
   if exists (

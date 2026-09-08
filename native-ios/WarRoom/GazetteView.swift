@@ -307,7 +307,7 @@ private struct GazettePaperView: View {
 
     private var pageTitle: String {
         if page == 0, payload.chaosDetonation?.names?.isEmpty == false {
-            return "THE NUCLEAR OPTION"
+            return "THE \(weaponName) OPTION"
         }
         let titles = [
             ["THE WEEK DETONATED", "WINNERS, LOSERS & WAR CRIMES", "BEEF SURVEILLANCE", "EVIDENCE LOCKER"],
@@ -326,7 +326,7 @@ private struct GazettePaperView: View {
     private var blastRadius: Int { max(0, crownPoints - shamePoints) }
 
     private var pageArtwork: String {
-        if page == 0, payload.chaosDetonation?.names?.isEmpty == false { return "NationalNightmareArtifact" }
+        if page == 0, payload.chaosDetonation?.names?.isEmpty == false { return weaponArtwork }
         if page == 0, let announcement = phaseAnnouncement { return announcement.artwork }
         let rotations = [
             ["SituationRoomBunker", "WarRoomGeneralEpic", "NationalNightmareArtifact", "TheCloserArtifact", "LastOneStandingArtifact", "ChampionshipArtifact"],
@@ -337,6 +337,22 @@ private struct GazettePaperView: View {
         let choices = rotations[min(max(page, 0), rotations.count - 1)]
         return choices[abs(edition.weekNumber + page * 2) % choices.count]
     }
+
+    private var weaponName: String {
+        if identity.isNFL { return "JDAM" }
+        if sportId.lowercased() == "nhl" { return "AIM-9 SIDEWINDER" }
+        if identity.isFieldhouse { return "HELLFIRE" }
+        return "NUCLEAR"
+    }
+
+    private var weaponArtwork: String {
+        if identity.isNFL { return "JdamStadiumFrontPage" }
+        if sportId.lowercased() == "nhl" { return "HockeyHellfireFrontPage" }
+        if identity.isFieldhouse { return "HellfireArenaFrontPage" }
+        return "NuclearFalloutFrontPage"
+    }
+
+    private var weaponGlyph: String { identity.isNFL ? "⌖" : ((identity.isFieldhouse || sportId.lowercased() == "nhl") ? "🔥" : "☢") }
 
     private var pageArtworkCaption: String {
         [
@@ -410,15 +426,15 @@ private struct GazettePaperView: View {
     private var frontPage: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let chaos = payload.chaosDetonation, let names = chaos.names, !names.isEmpty {
-                Text("☢ NUCLEAR AUTHORIZATION CONFIRMED").font(.system(size: 9, weight: .black)).tracking(1.8).foregroundStyle(.red)
-                Text(chaos.headline ?? "\(names.map { $0.uppercased() }.joined(separator: " · ")) WENT NUCLEAR")
+                Text("\(weaponGlyph) \(weaponName) AUTHORIZATION CONFIRMED").font(.system(size: 9, weight: .black)).tracking(1.8).foregroundStyle(.red)
+                Text(chaos.headline ?? "\(names.map { $0.uppercased() }.joined(separator: " · ")) CALLED \(weaponName)")
                     .font(.system(size: 34, weight: .black, design: .serif)).fontWidth(.condensed).fixedSize(horizontal: false, vertical: true)
-                Text(chaos.deck ?? "Every Nuclear authorization is now part of the permanent record.")
+                Text(chaos.deck ?? "Every \(weaponName) authorization is now part of the permanent record.")
                     .font(.system(size: 16, weight: .bold, design: .serif)).italic().foregroundStyle(.white.opacity(0.76))
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("NUCLEAR ROLL CALL").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.red)
+                    Text("\(weaponName) ROLL CALL").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.red)
                     ForEach(names, id: \.self) { name in
-                        Text("☢ \(name.uppercased())").font(.headline.weight(.black))
+                        Text("\(weaponGlyph) \(name.uppercased())").font(.headline.weight(.black))
                     }
                 }
                 .padding(12)
@@ -500,9 +516,9 @@ private struct GazettePaperView: View {
                 GazetteBrief(kicker: "BUTTON PUSHED", story: chaos, color: .red)
                 if let names = chaos.names, !names.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("NUCLEAR ROLL CALL").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.red)
+                        Text("\(weaponName) ROLL CALL").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.red)
                         ForEach(names, id: \.self) { name in
-                            Text("☢ \(name.uppercased())").font(.headline.weight(.black))
+                            Text("\(weaponGlyph) \(name.uppercased())").font(.headline.weight(.black))
                         }
                     }
                     .padding(12)

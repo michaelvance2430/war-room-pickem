@@ -141,6 +141,18 @@ enum SeasonCardBuildGate {
     }
 }
 
+enum LeagueWeekPolicy {
+    static func currentWeek(sportId: String, at date: Date = Date()) -> Int {
+        let identity = SportIdentity(sportId)
+        let lastRegularWeek = identity.isNFL ? 18 : (identity.isFieldhouse ? 18 : 14)
+        return stride(from: lastRegularWeek, through: identity.openingWeek, by: -1)
+            .first { week in
+                guard let start = SeasonCardBuildGate.firstScheduledDay(sportId: identity.sportId, week: week) else { return false }
+                return start <= date
+            } ?? identity.openingWeek
+    }
+}
+
 enum CfbWeekTimeline {
     /// ESPN's 2026 regular-season week buckets roll Tuesday through Monday.
     /// Week 2 begins Tuesday, September 8; Week 14 contains conference titles.
