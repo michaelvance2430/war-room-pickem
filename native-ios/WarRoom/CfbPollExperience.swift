@@ -38,10 +38,13 @@ enum CfbMemberPollEngine {
         let valid = ballots.filter(\.isValid)
         var points: [String: Int] = [:]
         var firsts: [String: Int] = [:]
+        var positionVotes: [String: [Int]] = [:]
         for ballot in valid {
             for (index, teamID) in ballot.rankedTeamIDs.enumerated() {
                 points[teamID, default: 0] += 12 - index
                 if index == 0 { firsts[teamID, default: 0] += 1 }
+                if positionVotes[teamID] == nil { positionVotes[teamID] = Array(repeating: 0, count: 12) }
+                positionVotes[teamID]?[index] += 1
             }
         }
         return points.keys.sorted {
@@ -51,6 +54,11 @@ enum CfbMemberPollEngine {
             let lhsFirsts = firsts[$0, default: 0]
             let rhsFirsts = firsts[$1, default: 0]
             if lhsFirsts != rhsFirsts { return lhsFirsts > rhsFirsts }
+            for position in 1..<12 {
+                let lhsVotes = positionVotes[$0]?[position] ?? 0
+                let rhsVotes = positionVotes[$1]?[position] ?? 0
+                if lhsVotes != rhsVotes { return lhsVotes > rhsVotes }
+            }
             return $0 < $1
         }.prefix(12).enumerated().map { index, id in
             CfbMemberPollRow(id: id, rank: index + 1, points: points[id, default: 0], firstPlaceVotes: firsts[id, default: 0])

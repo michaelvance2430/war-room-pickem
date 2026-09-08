@@ -16,16 +16,26 @@ type Ballot = { user_id: string; ranked_team_ids: string[] };
 const aggregate = (ballots: Ballot[]) => {
   const points = new Map<string, number>();
   const firsts = new Map<string, number>();
+  const positionVotes = new Map<string, number[]>();
   for (const ballot of ballots) {
     if (!Array.isArray(ballot.ranked_team_ids) || ballot.ranked_team_ids.length !== 12 || new Set(ballot.ranked_team_ids).size !== 12) continue;
     ballot.ranked_team_ids.forEach((id, index) => {
       points.set(id, (points.get(id) || 0) + 12 - index);
       if (index === 0) firsts.set(id, (firsts.get(id) || 0) + 1);
+      const counts = positionVotes.get(id) || Array(12).fill(0);
+      counts[index] += 1;
+      positionVotes.set(id, counts);
     });
   }
-  return [...points.keys()].sort((a, b) =>
-    (points.get(b)! - points.get(a)!) || (firsts.get(b)! - firsts.get(a)!) || a.localeCompare(b)
-  ).slice(0, 12).map((id, index) => ({ id, rank: index + 1, points: points.get(id), firstPlaceVotes: firsts.get(id) || 0 }));
+  return [...points.keys()].sort((a, b) => {
+    const primary = (points.get(b)! - points.get(a)!) || (firsts.get(b)! - firsts.get(a)!);
+    if (primary) return primary;
+    for (let position = 1; position < 12; position += 1) {
+      const positionDifference = (positionVotes.get(b)?.[position] || 0) - (positionVotes.get(a)?.[position] || 0);
+      if (positionDifference) return positionDifference;
+    }
+    return a.localeCompare(b);
+  }).slice(0, 12).map((id, index) => ({ id, rank: index + 1, points: points.get(id), firstPlaceVotes: firsts.get(id) || 0 }));
 };
 
 Deno.serve(async (request: Request) => {

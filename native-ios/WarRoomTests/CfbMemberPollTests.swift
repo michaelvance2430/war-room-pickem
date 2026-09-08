@@ -25,4 +25,19 @@ struct CfbMemberPollTests {
         #expect(CfbMemberPollEngine.isOfficial(ballots: three) == false)
         #expect(CfbMemberPollEngine.isOfficial(ballots: four))
     }
+
+    @Test func equalPointsAndFirstsCompareSecondPlaceVotesBeforeLowerPositions() {
+        let ballots = [
+            CfbMemberBallot(voterID: "1", rankedTeamIDs: ["A", "C", "B", "D", "E", "F", "G", "H", "I", "J", "K", "L"]),
+            CfbMemberBallot(voterID: "2", rankedTeamIDs: ["B", "A", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]),
+            CfbMemberBallot(voterID: "3", rankedTeamIDs: ["C", "D", "B", "A", "E", "F", "G", "H", "I", "J", "K", "L"])
+        ]
+
+        let rows = CfbMemberPollEngine.standings(ballots: ballots)
+        let a = rows.first { $0.id == "A" }!
+        let b = rows.first { $0.id == "B" }!
+        #expect(a.points == b.points)
+        #expect(a.firstPlaceVotes == b.firstPlaceVotes)
+        #expect(a.rank < b.rank)
+    }
 }
