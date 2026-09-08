@@ -1735,18 +1735,18 @@ private struct EditableGamePickRow: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("CONFIDENCE").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.secondary)
                 if confidenceOptions.count > 5 {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 7) {
                         ForEach(Array(confidenceOptions.prefix(5)), id: \.self) { confidence in
                             confidenceButton(confidence)
                         }
                     }
-                    HStack(spacing: 8) {
+                    HStack(spacing: 7) {
                         ForEach(Array(confidenceOptions.dropFirst(5)), id: \.self) { confidence in
                             confidenceButton(confidence)
                         }
                     }
                 } else {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 7) {
                         ForEach(confidenceOptions, id: \.self) { confidence in
                             confidenceButton(confidence)
                         }
@@ -1784,12 +1784,11 @@ private struct EditableGamePickRow: View {
         } label: {
             Text("\(confidence)")
                 .font(.caption.weight(.black))
-                .frame(width: 32, height: 32)
+                .frame(width: 52, height: 34)
                 .foregroundStyle(chosen ? .black : (available ? .white : .white.opacity(0.22)))
-                .background(chosen ? selection : Color.white.opacity(0.07), in: Circle())
+                .background(chosen ? selection : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
         .disabled(!available)
         .accessibilityLabel(chosen ? "Clear confidence \(confidence)" : "Set confidence \(confidence)")
     }
