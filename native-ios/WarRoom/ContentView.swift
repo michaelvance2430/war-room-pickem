@@ -5803,6 +5803,24 @@ struct CommissionerCardBuilderView: View {
         .contentMargins(.bottom, 36, for: .scrollContent)
         .navigationTitle("Build Card")
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if step == 2, !availableOdds.isEmpty {
+                HStack {
+                    Text(identity.isNFL ? "CHOOSE 5 GAMES" : "CHOOSE 5–10 GAMES")
+                        .font(.caption.weight(.black))
+                    Spacer()
+                    Text("\(selectedOddsIds.count) / \(selectionMaximum)")
+                        .font(.headline.monospacedDigit().weight(.black))
+                        .foregroundStyle(selectionCountIsValid ? deskAccent : .primary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(deskAccent.opacity(0.65)).frame(height: 1)
+                }
+            }
+        }
     }
 
     private var cardGames: [CommissionerGameDraft] {
