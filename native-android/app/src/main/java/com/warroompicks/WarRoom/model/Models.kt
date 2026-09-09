@@ -257,6 +257,11 @@ object CfbBracketEngine {
     }
 }
 
+object WeeklyCardSizePolicy {
+    fun size(sport: Sport, requested: Int): Int = if (sport == Sport.CFB) requested.coerceIn(5, 10) else 5
+    fun isValid(sport: Sport, count: Int): Boolean = count == size(sport, count)
+}
+
 data class Announcement(
     val id: UUID,
     val title: String,

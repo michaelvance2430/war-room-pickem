@@ -29,12 +29,18 @@ class SupabaseApi {
                 .put("p_cut_percent", 50).put("p_max_human_members", maxMembers).put("p_late_join_policy", "reinforcement_credit"),
         )
         val id = UUID.fromString(created.getString("league_id"))
+        syncDormantLeagueWeek(token, id)
         request(
             "/rest/v1/rpc/set_league_lobby_visibility", "POST", token,
             JSONObject().put("p_league_id", id.toString()).put("p_visibility", if (public) "public" else "private"),
         )
         return id
     }
+
+    suspend fun syncDormantLeagueWeek(token: String, leagueId: UUID): Int = request(
+        "/rest/v1/rpc/sync_dormant_league_week", "POST", token,
+        JSONObject().put("p_league_id", leagueId.toString()),
+    ).optInt("week")
     suspend fun signIn(email: String, password: String): UserSession {
         val body = JSONObject().put("email", email.trim()).put("password", password)
         val json = request("/auth/v1/token?grant_type=password", "POST", body = body)

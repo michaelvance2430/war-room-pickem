@@ -1,13 +1,13 @@
 # Android release readiness
 
-Last audited: 2026-08-30
+Last audited: 2026-09-09
 
 ## Release identity
 
 - Native Kotlin / Jetpack Compose application (no web wrapper)
 - Package: `com.warroompicks.WarRoom`
-- Version code: `3`
-- Version name: `3.1`
+- Version code: `5`
+- Version name: `3.3`
 - Minimum SDK: `26`
 - Target / compile SDK: `36`
 - Release bundle: `app/build/outputs/bundle/release/app-release.aab`
@@ -43,16 +43,20 @@ Last audited: 2026-08-30
   8-point subtotal becoming the certified 11-point score after a three-point prop hit.
 - Android prop picks now display and store the published answer text, matching iOS and
   the autonomous scorer, rather than persisting incompatible `A` / `B` markers.
+- Build 25 parity adds commissioner-selectable 5–10 game CFB cards while preserving
+  five-game NFL cards, and synchronizes newly created dormant football leagues to the
+  current server-authoritative season week before loading the room.
 
 ## Blocking items before upload
 
 1. Google Play currently accepts upload certificate SHA-256
    `43:96:84:F2:48:9D:52:72:6E:56:68:CB:3E:03:15:1C:8E:EE:23:DE:7D:98:83:DD:F3:79:FA:08:3B:D2:71:6D`.
    Its private key is not present in the available workspaces.
-2. The retained upload keystore and the newly signed bundle use SHA-256
+2. The reset upload keystore used by the previously signed bundle has SHA-256
    `9C:00:6A:16:3D:EE:05:27:49:41:CC:AC:74:38:AB:F0:E3:73:64:62:60:FA:E1:7B:36:BA:1D:E3:6E:97:F9:82`.
-   Play accepted the reset request; this key becomes valid on September 1, 2026 at
-   18:47 UTC. Google blocks all bundle and APK uploads until that activation time.
+   Play accepted that reset and the activation time has passed, but the private key is
+   not present in the available workspaces or current environment. The Build 25 parity
+   bundle produced on September 9 is therefore unsigned and cannot be uploaded.
 3. An authenticated end-to-end test against the production Supabase project still requires a
    test account/session. Automated fixture-based CFB/NFL coverage has passed.
 4. The signed bundle has not been uploaded to the closed-testing track. No review, rollout, or

@@ -312,7 +312,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val session = _state.value.session ?: return@launchBusy
         val league = _state.value.league ?: return@launchBusy
         require(league.isCommissioner(session.userId)) { "Only the commissioner can publish the weekly card." }
-        require(games.size == 5) { "Choose exactly five games." }
+        require(WeeklyCardSizePolicy.isValid(league.sport, games.size)) { if (league.sport == Sport.CFB) "Choose between five and ten games." else "Choose exactly five games." }
         require(prop.isNotBlank() && optionA.isNotBlank() && optionB.isNotBlank()) { "Complete the prop question and both answers." }
         api.publishWeekCard(session.accessToken, league, games, prop, optionA, optionB)
         _state.value = _state.value.copy(busy = false, availableOdds = emptyList(), notice = "WEEK ${league.currentWeek} IS LIVE")
