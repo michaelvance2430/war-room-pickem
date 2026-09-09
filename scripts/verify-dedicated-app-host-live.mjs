@@ -37,26 +37,35 @@ async function get(path) {
 
 await resolveHost();
 
-const [home, privacy, support, association] = await Promise.all([
+const [home, privacy, support, terms, community, account, association] = await Promise.all([
   get("/"),
   get("/privacy"),
   get("/support"),
+  get("/terms"),
+  get("/community"),
+  get("/account"),
   get("/.well-known/apple-app-site-association"),
 ]);
 
-const [homeText, privacyText, supportText, associationJson] = await Promise.all([
+const [homeText, privacyText, supportText, termsText, communityText, accountText, associationJson] = await Promise.all([
   home.text(),
   privacy.text(),
   support.text(),
+  terms.text(),
+  community.text(),
+  account.text(),
   association.json(),
 ]);
 
 if (!homeText.includes("War Room")) throw new Error("[app-host-live] app shell identity missing");
 if (!privacyText.includes("Privacy Policy")) throw new Error("[app-host-live] privacy policy missing");
 if (!supportText.includes("Support")) throw new Error("[app-host-live] support page missing");
+if (!termsText.includes("Terms of Use")) throw new Error("[app-host-live] terms page missing");
+if (!communityText.includes("Community Standards")) throw new Error("[app-host-live] community standards missing");
+if (!accountText.includes("Account")) throw new Error("[app-host-live] privacy choices/account page missing");
 
 const appId = associationJson?.applinks?.details?.[0]?.appID;
-if (appId !== "XWW458P3J7.com.warroompicks.app") {
+if (appId !== "XWW458P3J7.com.warroompicks.WarRoom") {
   throw new Error(`[app-host-live] universal-link appID drifted: ${appId || "missing"}`);
 }
 

@@ -24,4 +24,4 @@ assert(compliance.includes("zero tolerance for objectionable content or abusive 
 assert(terms.includes("zero tolerance for objectionable content or abusive users"), "public Terms safety policy is missing");
 assert(tests.includes("loginRequiresCommunityTermsForExistingAndNewAccounts"), "terms gate regression test is missing");
 
-console.log("Build 22 App Review community-safety gate PASS — pre-auth agreement, zero-tolerance policy, report, block, and regression coverage are present");
+console.log("Native iOS App Review community-safety gate PASS — pre-auth agreement, zero-tolerance policy, report, block, and regression coverage are present");

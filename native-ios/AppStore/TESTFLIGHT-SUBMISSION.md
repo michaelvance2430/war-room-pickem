@@ -4,8 +4,8 @@
 
 - App name: War Room Pick'Em
 - Bundle ID: `com.warroompicks.WarRoom`
-- Version: `3.3`
-- Build: `21`
+- Version: `3.4`
+- Build: `26`
 - Platform: iPhone
 - Minimum iOS: 17.0
 - Category: Sports
@@ -15,7 +15,7 @@
 
 ## Beta description
 
-War Room Pick'Em is a private-league football and college-basketball picks app built around weekly cards, confidence points, best bets, live boards, standings, scorecards, postseason brackets, achievements, and league trash talk.
+War Room Pick'Em is a private-league football and college-basketball picks app built around flexible weekly cards, confidence points, best bets, live boards, standings, scorecards, postseason brackets, achievements, and league trash talk. Build 26 adds notification controls in Edit Profile, an App Store update prompt, CFB AP Top 25 and Members' Top 12, standing-position movement, and four-page Dispatch sharing.
 
 ## What to test
 
@@ -27,6 +27,8 @@ War Room Pick'Em is a private-league football and college-basketball picks app b
 6. Open the Locker Room, post a safe message, react, report a message, and block a player.
 7. Open Profile > Privacy & Safety and verify Privacy, Terms, Support, and Delete Account.
 8. Exercise postseason and bracket screens using the supplied league state.
+9. In You > Edit Profile, turn War Room alerts off and on; if iOS previously denied permission, confirm the control opens the app's notification settings.
+10. Open The Dispatch, move through all four pages, and share the four-page image set.
 
 ## Review notes
 
@@ -46,6 +48,7 @@ Data linked to the user and used only for App Functionality:
 - Photos or videos (optional profile photo)
 - Other user content (Locker Room messages)
 - Gameplay content (picks, scores, standings, achievements)
+- Device ID (APNs token and per-install notification identifier)
 
 Tracking: No.
 
@@ -73,3 +76,7 @@ Complete the App Store Connect questionnaire truthfully. User-generated Locker R
 - [ ] Contact name, phone, and email are entered in Beta App Review Information.
 - [ ] Beta feedback email is entered.
 - [ ] All agreements in App Store Connect are active.
+- [ ] App Store Connect privacy answers disclose Device ID as linked to the user, used for App Functionality, and not used for tracking.
+- [ ] Physical iPhone receives a real APNs alert, routes to the intended league/week, and stops receiving alerts after the profile toggle is disabled.
+- [ ] Physical iPhone with Instagram/Facebook installed receives all four Dispatch images from the system share sheet.
+- [ ] `public.app_release_channels` remains disabled until Apple confirms the build is publicly installable.
