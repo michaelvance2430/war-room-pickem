@@ -116,14 +116,14 @@ assert.match(sql, /create or replace function public\.finalize_fieldhouse_postse
 assert.match(sql, /perform private\.certify_league_competitive_season\(v_league_id,v_season_key,v_sport_id\)/);
 assert.match(sql, /cs\.sport_id=v_sport_id and cs\.status='official'/);
 assert.match(competitive, /create table if not exists public\.league_competitive_seasons/);
-assert.match(competitive, /minimum_active_players integer not null default 8/);
+assert.match(competitive, /minimum_active_players integer not null default 4/);
 assert.match(competitive, /required_participation_percent integer not null default 75/);
 assert.match(competitive, /minimum_locked_cards integer not null default 4/);
 assert.match(competitive, /\(\(a\.eligible_cards \* 3 \+ 3\) \/ 4\)::integer/);
 assert.match(competitive, /coalesce\(m\.is_bot,false\) = false/);
 assert.match(competitive, /exists \(\s*select 1 from public\.week_results wr/);
 assert.match(competitive, /create trigger league_trophies_require_official_season/);
-assert.match(competitive, /Demo league: eight active players at 75 percent participation are required for permanent hardware/);
+assert.match(competitive, /Demo league: four active players at 75 percent participation are required for permanent hardware/);
 assert.match(competitive, /perform private\.certify_league_competitive_season\(\s*new\.league_id,\s*new\.season_year,/);
 assert.match(competitive, /Competitive-season sport does not match the league/);
 assert.match(competitive, /grant select on public\.league_competitive_seasons to authenticated/);

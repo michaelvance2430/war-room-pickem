@@ -11,7 +11,7 @@ const fieldhouse = read("native-ios/WarRoom/FieldhouseExperience.swift");
 const lobby = read("native-ios/WarRoom/LobbyView.swift");
 const tests = read("native-ios/WarRoomTests/WarRoomTests.swift");
 
-assert.match(sql, /minimum_active_players integer not null default 8 check \(minimum_active_players = 8\)/);
+assert.match(sql, /minimum_active_players integer not null default 4 check \(minimum_active_players = 4\)/);
 assert.match(sql, /required_participation_percent integer not null default 75 check \(required_participation_percent = 75\)/);
 assert.match(sql, /minimum_locked_cards integer not null default 4 check \(minimum_locked_cards = 4\)/);
 assert.match(sql, /coalesce\(m\.is_bot,false\) = false/);
@@ -21,7 +21,7 @@ assert.match(sql, /m\.league_id = p_league_id and m\.user_id = \(select auth\.ui
 assert.match(sql, /revoke all on function public\.league_competitive_status\(uuid\) from public,anon/);
 assert.match(sql, /grant execute on function public\.league_competitive_status\(uuid\) to authenticated/);
 assert.match(sql, /before insert or update of winner_user_id on public\.league_trophies/);
-assert.match(sql, /Demo league: eight active players at 75 percent participation are required for permanent hardware/);
+assert.match(sql, /Demo league: four active players at 75 percent participation are required for permanent hardware/);
 
 assert.match(api, /rest\/v1\/rpc\/league_competitive_status/);
 assert.match(copy, /DEMO TRACK · NEED \\\(needed\) MORE ACTIVE/);
@@ -43,4 +43,4 @@ assert.match(lobby, /Smaller or inactive rooms remain playable as Demo leagues/)
 assert.match(tests, /competitiveLeagueBannerNeverConfusesMembersWithActivePlayers/);
 assert.match(tests, /competitiveLeagueBannerOnlyPromisesHardwareAfterTheThreshold/);
 
-console.log("Build 22 competitive hardware gate PASS — 8 active humans, 75 percent, four-card floor, and all-sport Standings coverage without Home clutter");
+console.log("Build 22 competitive hardware gate PASS — 4 active humans, 75 percent, four-card floor, and all-sport Standings coverage without Home clutter");
