@@ -2846,7 +2846,7 @@ enum SupabaseAPI {
         }
     }
 
-    static func registerPushDevice(token: String, userId: UUID, deviceToken: String) async throws {
+    static func registerPushDevice(token: String, userId: UUID, deviceToken: String, environment: String) async throws {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/push_device_tokens"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "on_conflict", value: "device_token")]
         var request = authorizedRequest(url: components.url!, token: token)
@@ -2857,12 +2857,44 @@ enum SupabaseAPI {
             "user_id": userId.uuidString.lowercased(),
             "device_token": deviceToken,
             "platform": "ios",
-            "environment": "production",
+            "environment": environment,
             "updated_at": ISO8601DateFormatter().string(from: Date()),
         ])
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let message = (try? JSONDecoder().decode(APIError.self, from: data).message) ?? "This device could not register for alerts."
+            throw RequestError(message: message)
+        }
+    }
+
+    static func syncNotificationPreference(
+        token: String,
+        userId: UUID,
+        installationId: UUID,
+        authorizationStatus: String,
+        preferenceEnabled: Bool,
+        environment: String,
+        appBuild: String
+    ) async throws {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/push_notification_preferences"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "on_conflict", value: "user_id,installation_id")]
+        var request = authorizedRequest(url: components.url!, token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("resolution=merge-duplicates,return=minimal", forHTTPHeaderField: "Prefer")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "user_id": userId.uuidString.lowercased(),
+            "installation_id": installationId.uuidString.lowercased(),
+            "platform": "ios",
+            "environment": environment,
+            "authorization_status": authorizationStatus,
+            "preference_enabled": preferenceEnabled,
+            "app_build": appBuild,
+            "last_seen_at": ISO8601DateFormatter().string(from: Date()),
+        ])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let message = (try? JSONDecoder().decode(APIError.self, from: data).message) ?? "Notification status could not be synchronized."
             throw RequestError(message: message)
         }
     }

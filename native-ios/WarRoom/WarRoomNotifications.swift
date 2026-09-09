@@ -88,6 +88,40 @@ enum WarRoomNotificationCenter {
     static let deviceTokenKey = "warroom.apns.device-token"
     static let pendingDestinationKey = "warroom.notification.pending-route"
     static let preferenceEnabledKey = "warroom.notifications.enabled"
+    static let installationIdKey = "warroom.notifications.installation-id"
+
+    static var pushEnvironment: String {
+        #if DEBUG
+        "development"
+        #else
+        "production"
+        #endif
+    }
+
+    static var installationId: UUID {
+        if let value = UserDefaults.standard.string(forKey: installationIdKey),
+           let id = UUID(uuidString: value) {
+            return id
+        }
+        let id = UUID()
+        UserDefaults.standard.set(id.uuidString.lowercased(), forKey: installationIdKey)
+        return id
+    }
+
+    static var appBuild: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+    }
+
+    static func authorizationStatusName(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: "not_determined"
+        case .denied: "denied"
+        case .authorized: "authorized"
+        case .provisional: "provisional"
+        case .ephemeral: "ephemeral"
+        @unknown default: "unknown"
+        }
+    }
 
     static var preferenceEnabled: Bool {
         preferenceEnabled(in: .standard)

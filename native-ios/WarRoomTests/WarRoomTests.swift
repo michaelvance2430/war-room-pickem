@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import UserNotifications
 @testable import WarRoom
 
 struct WarRoomTests {
@@ -201,6 +202,14 @@ struct WarRoomTests {
         #expect(!WarRoomNotificationCenter.preferenceEnabled(in: defaults))
         defaults.set(true, forKey: WarRoomNotificationCenter.preferenceEnabledKey)
         #expect(WarRoomNotificationCenter.preferenceEnabled(in: defaults))
+    }
+
+    @Test func notificationAuthorizationStatusUsesStableBackendValues() {
+        #expect(WarRoomNotificationCenter.authorizationStatusName(.notDetermined) == "not_determined")
+        #expect(WarRoomNotificationCenter.authorizationStatusName(.denied) == "denied")
+        #expect(WarRoomNotificationCenter.authorizationStatusName(.authorized) == "authorized")
+        #expect(WarRoomNotificationCenter.authorizationStatusName(.provisional) == "provisional")
+        #expect(WarRoomNotificationCenter.authorizationStatusName(.ephemeral) == "ephemeral")
     }
 
     @Test func dispatchAlwaysExposesExactlyFourOrderedPages() {

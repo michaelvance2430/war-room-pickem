@@ -265,7 +265,12 @@ struct ContentView: View {
             Task { await registerPushToken() }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await refreshAppStoreUpdate() } }
+            if phase == .active {
+                Task {
+                    await refreshAppStoreUpdate()
+                    await prepareNotifications()
+                }
+            }
         }
         .sheet(isPresented: $showingPushAnnouncements) { NavigationStack { AnnouncementsView() } }
         .sheet(item: $notificationDispatchTarget) { target in
@@ -368,8 +373,9 @@ struct ContentView: View {
 
     @MainActor private func prepareNotifications() async {
         guard auth.user != nil else { return }
-        guard WarRoomNotificationCenter.preferenceEnabled else { return }
         let status = await WarRoomNotificationCenter.authorizationStatus()
+        await syncNotificationPreference(status: status)
+        guard WarRoomNotificationCenter.preferenceEnabled else { return }
         if status == .authorized || status == .provisional {
             UIApplication.shared.registerForRemoteNotifications()
             await registerPushToken()
@@ -385,7 +391,25 @@ struct ContentView: View {
               let deviceToken = UserDefaults.standard.string(forKey: WarRoomNotificationCenter.deviceTokenKey),
               !deviceToken.isEmpty
         else { return }
-        try? await SupabaseAPI.registerPushDevice(token: token, userId: user.id, deviceToken: deviceToken)
+        try? await SupabaseAPI.registerPushDevice(
+            token: token,
+            userId: user.id,
+            deviceToken: deviceToken,
+            environment: WarRoomNotificationCenter.pushEnvironment
+        )
+    }
+
+    private func syncNotificationPreference(status: UNAuthorizationStatus) async {
+        guard let token = auth.token, let user = auth.user else { return }
+        try? await SupabaseAPI.syncNotificationPreference(
+            token: token,
+            userId: user.id,
+            installationId: WarRoomNotificationCenter.installationId,
+            authorizationStatus: WarRoomNotificationCenter.authorizationStatusName(status),
+            preferenceEnabled: WarRoomNotificationCenter.preferenceEnabled,
+            environment: WarRoomNotificationCenter.pushEnvironment,
+            appBuild: WarRoomNotificationCenter.appBuild
+        )
     }
 
     @MainActor private func refreshAppStoreUpdate() async {
@@ -8903,6 +8927,7 @@ struct NativeProfileView: View {
                 try? await SupabaseAPI.unregisterPushDevice(token: token, userId: user.id, deviceToken: deviceToken)
             }
             await refreshNotificationStatus()
+            await syncProfileNotificationPreference()
             return
         }
 
@@ -8925,13 +8950,33 @@ struct NativeProfileView: View {
             showNotificationSettingsAlert = true
         }
         await refreshNotificationStatus()
+        await syncProfileNotificationPreference()
     }
 
     private func registerProfilePushToken() async {
         guard let token = auth.token, let user = auth.user,
               let deviceToken = UserDefaults.standard.string(forKey: WarRoomNotificationCenter.deviceTokenKey),
               !deviceToken.isEmpty else { return }
-        try? await SupabaseAPI.registerPushDevice(token: token, userId: user.id, deviceToken: deviceToken)
+        try? await SupabaseAPI.registerPushDevice(
+            token: token,
+            userId: user.id,
+            deviceToken: deviceToken,
+            environment: WarRoomNotificationCenter.pushEnvironment
+        )
+    }
+
+    private func syncProfileNotificationPreference() async {
+        guard let token = auth.token, let user = auth.user else { return }
+        let status = await WarRoomNotificationCenter.authorizationStatus()
+        try? await SupabaseAPI.syncNotificationPreference(
+            token: token,
+            userId: user.id,
+            installationId: WarRoomNotificationCenter.installationId,
+            authorizationStatus: WarRoomNotificationCenter.authorizationStatusName(status),
+            preferenceEnabled: WarRoomNotificationCenter.preferenceEnabled,
+            environment: WarRoomNotificationCenter.pushEnvironment,
+            appBuild: WarRoomNotificationCenter.appBuild
+        )
     }
 
     @MainActor
