@@ -1,11 +1,20 @@
 package com.warroompicks.WarRoom.ui.screens
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -20,9 +29,13 @@ import com.warroompicks.WarRoom.ui.components.AchievementArtifact
 import com.warroompicks.WarRoom.ui.components.AchievementDetail
 import com.warroompicks.WarRoom.ui.theme.NflCyan
 import com.warroompicks.WarRoom.ui.theme.WarGreen
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
-fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (String) -> Unit, updateDisplayName: (String) -> Unit, signOut: () -> Unit) {
+fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (String) -> Unit, updateDisplayName: (String) -> Unit, notificationPreferenceEnabled: () -> Boolean, setNotificationsEnabled: (Boolean) -> Unit, signOut: () -> Unit) {
     val league = state.league ?: return
     val session = state.session ?: return
     val standing = state.standings.firstOrNull { it.userId == session.userId }
@@ -31,6 +44,21 @@ fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (Str
     var editName by remember { mutableStateOf(false) }
     var earnedSwagExpanded by remember { mutableStateOf(false) }
     var selectedAchievement by remember { mutableStateOf<com.warroompicks.WarRoom.model.Achievement?>(null) }
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    fun systemAllowsNotifications() = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    var systemAllowed by remember { mutableStateOf(systemAllowsNotifications()) }
+    var notificationsEnabled by remember { mutableStateOf(notificationPreferenceEnabled() && systemAllowed) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        systemAllowed = granted
+        notificationsEnabled = granted
+        if (granted) setNotificationsEnabled(true)
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) { systemAllowed = systemAllowsNotifications(); notificationsEnabled = notificationPreferenceEnabled() && systemAllowed } }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     WarBackdrop(league.sport) {
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
@@ -63,6 +91,21 @@ fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (Str
                 items(state.history.size) { index ->
                     val week = state.history[index]
                     CommandPanel("WEEK ${week.week}", "${week.points} points", "Locked card and certified weekly result.", league.sport)
+                }
+            }
+            item {
+                Surface(color = Color.Black.copy(alpha = .80f), shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) { Text("WAR ROOM ALERTS", color = Color.White, fontWeight = FontWeight.Black); Text(if (notificationsEnabled) "On for card openings, lock warnings, results, and commissioner announcements." else if (!systemAllowed) "Off in Android Settings." else "Off. This device is not registered for push alerts.", color = Color.White.copy(alpha = .62f)) }
+                            Switch(checked = notificationsEnabled, onCheckedChange = { enabled ->
+                                if (!enabled) { notificationsEnabled = false; setNotificationsEnabled(false) }
+                                else if (systemAllowsNotifications()) { notificationsEnabled = true; setNotificationsEnabled(true) }
+                                else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            })
+                        }
+                        if (!systemAllowed) TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) }) { Text("OPEN ANDROID SETTINGS") }
+                    }
                 }
             }
             item {

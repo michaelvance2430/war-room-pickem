@@ -10,6 +10,8 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import com.warroompicks.WarRoom.model.*
 import com.warroompicks.WarRoom.ui.screens.PicksScreen
+import com.warroompicks.WarRoom.ui.screens.StandingsScreen
+import com.warroompicks.WarRoom.ui.screens.YouScreen
 import com.warroompicks.WarRoom.ui.theme.WarRoomTheme
 import org.junit.Rule
 import org.junit.Test
@@ -48,6 +50,23 @@ class AndroidUiSmokeTest {
         render(AppState(restoring = false, session = session, league = league, leagues = listOf(league), cfbPostseasonSlate = CfbPostseasonSlate(2026, bowls, (1..12).map { "Seed $it" })))
         compose.onAllNodesWithText("BOWL MANIA").onFirst().assertIsDisplayed()
         compose.onNodeWithText("MARQUEE 15").assertIsDisplayed()
+    }
+
+    @Test fun cfbStandingsShowSelectedHardwarePollsAndMovement() {
+        val league = league(Sport.CFB, 2, 14).copy(championshipTrophyId = "command_cup")
+        val climber = Standing(userId, "Climber", null, 10.0, 1, null, weeklyPoints = listOf(10))
+        val formerLeader = Standing(UUID.randomUUID(), "Former Leader", null, 9.0, 2, null, weeklyPoints = listOf(0))
+        compose.setContent { WarRoomTheme { StandingsScreen(AppState(restoring = false, session = session, league = league, standings = listOf(climber, formerLeader)), {}, {}) } }
+        compose.onNodeWithText("THE COMMAND CUP").assertIsDisplayed()
+        compose.onNodeWithText("AP TOP 25").assertIsDisplayed()
+        compose.onNodeWithText("MEMBERS’ TOP 12").assertIsDisplayed()
+        compose.onNodeWithText("▲ 1").assertIsDisplayed()
+    }
+
+    @Test fun profileShowsNotificationControl() {
+        val league = league(Sport.CFB, 2, 14)
+        compose.setContent { WarRoomTheme { YouScreen(AppState(restoring = false, session = session, league = league), {}, {}, {}, { true }, {}, {}) } }
+        compose.onNodeWithText("WAR ROOM ALERTS").assertIsDisplayed()
     }
 
     private fun render(state: AppState) = compose.setContent {

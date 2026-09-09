@@ -2,8 +2,11 @@ package com.warroompicks.WarRoom
 
 import com.warroompicks.WarRoom.model.Sport
 import com.warroompicks.WarRoom.model.WeeklyCardSizePolicy
+import com.warroompicks.WarRoom.model.Standing
+import com.warroompicks.WarRoom.model.StandingMovement
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.util.UUID
 
 class Build25ParityTest {
     @Test fun cfbCardsFlexFromFiveThroughTenWhileNflStaysFive() {
@@ -13,5 +16,13 @@ class Build25ParityTest {
         assertEquals(5, WeeklyCardSizePolicy.size(Sport.NFL, 10))
         assert(WeeklyCardSizePolicy.isValid(Sport.CFB, 6))
         assert(!WeeklyCardSizePolicy.isValid(Sport.NFL, 6))
+    }
+
+    @Test fun standingMovementComparesAgainstTotalsBeforeLatestWeek() {
+        val climber = Standing(UUID.randomUUID(), "Climber", null, 10.0, 1, null, weeklyPoints = listOf(10))
+        val formerLeader = Standing(UUID.randomUUID(), "Former Leader", null, 9.0, 2, null, weeklyPoints = listOf(0))
+        val movement = StandingMovement.compute(listOf(climber, formerLeader))
+        assertEquals(1, movement[climber.userId])
+        assertEquals(-1, movement[formerLeader.userId])
     }
 }

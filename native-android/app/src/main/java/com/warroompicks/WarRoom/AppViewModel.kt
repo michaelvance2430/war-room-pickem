@@ -16,6 +16,7 @@ import java.time.LocalDate
 import java.util.UUID
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
+import com.warroompicks.WarRoom.push.NotificationPreference
 
 data class AppState(
     val restoring: Boolean = true,
@@ -41,6 +42,8 @@ data class AppState(
     val cfbPostseasonSlate: CfbPostseasonSlate? = null,
     val cfbPostseasonEntry: CfbPostseasonEntry? = null,
     val cfbPostseasonResults: CfbPostseasonResults = CfbPostseasonResults(emptyMap(), emptyMap()),
+    val cfbPollSnapshot: CfbPollSnapshot? = null,
+    val cfbPollLoading: Boolean = false,
     val favoriteTeam: String? = null,
     val crystalBallTeam: String? = null,
     val error: String? = null,
@@ -176,6 +179,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             refreshLeague()
             delay(15_000)
         }
+    }
+
+    fun loadCfbPolls() = viewModelScope.launch {
+        val session = _state.value.session ?: return@launch
+        val league = _state.value.league ?: return@launch
+        if (league.sport != Sport.CFB) return@launch
+        _state.value = _state.value.copy(cfbPollLoading = true)
+        runCatching { api.cfbPolls(session.accessToken, league.id, league.currentWeek) }
+            .onSuccess { _state.value = _state.value.copy(cfbPollSnapshot = it, cfbPollLoading = false) }
+            .onFailure { _state.value = _state.value.copy(cfbPollLoading = false, error = it.message ?: "CFB polls are unavailable.") }
+    }
+
+    fun fileCfbBallot(rankedTeamIds: List<String>) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        require(league.sport == Sport.CFB) { "Member ballots are only available in CFB rooms." }
+        require(rankedTeamIds.size == 12 && rankedTeamIds.toSet().size == 12) { "Choose 12 unique teams." }
+        val snapshot = api.cfbPolls(session.accessToken, league.id, league.currentWeek, rankedTeamIds)
+        _state.value = _state.value.copy(busy = false, cfbPollSnapshot = snapshot, notice = "MEMBERS’ TOP 12 BALLOT FILED")
     }
 
     fun postMessage(body: String) = launchBusy {
@@ -345,13 +367,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun registerPush(session: UserSession) {
         val app = getApplication<Application>()
-        val prefs = app.getSharedPreferences("war_room_push", Application.MODE_PRIVATE)
+        if (!NotificationPreference.isEnabled(app)) return
         fun upload(value: String) = viewModelScope.launch {
             runCatching { api.registerPushToken(session.accessToken, session.userId, value) }
-                .onSuccess { prefs.edit().remove("pending_fcm_token").apply() }
+                .onSuccess { NotificationPreference.markRegistered(app, value) }
         }
-        prefs.getString("pending_fcm_token", null)?.let(::upload)
+        NotificationPreference.pendingToken(app)?.let(::upload)
         if (FirebaseApp.getApps(app).isNotEmpty()) FirebaseMessaging.getInstance().token.addOnSuccessListener(::upload)
+    }
+
+    fun notificationPreferenceEnabled(): Boolean = NotificationPreference.isEnabled(getApplication())
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        val app = getApplication<Application>()
+        NotificationPreference.setEnabled(app, enabled)
+        if (enabled) {
+            _state.value.session?.let(::registerPush)
+            _state.value = _state.value.copy(notice = "WAR ROOM ALERTS ENABLED")
+            return
+        }
+        val session = _state.value.session
+        val token = NotificationPreference.registeredToken(app) ?: NotificationPreference.pendingToken(app)
+        if (session != null && token != null) viewModelScope.launch { runCatching { api.unregisterPushToken(session.accessToken, session.userId, token) } }
+        NotificationPreference.clearTokens(app)
+        if (FirebaseApp.getApps(app).isNotEmpty()) FirebaseMessaging.getInstance().deleteToken()
+        _state.value = _state.value.copy(notice = "WAR ROOM ALERTS DISABLED")
     }
 
     private suspend fun validSession(session: UserSession): UserSession {

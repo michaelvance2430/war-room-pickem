@@ -14,6 +14,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import com.warroompicks.WarRoom.push.NotificationPreference
 
 class MainActivity : ComponentActivity() {
     private val destination = mutableStateOf<String?>(null)
@@ -28,7 +29,7 @@ class MainActivity : ComponentActivity() {
         recoveryToken.value = intent.recoveryAccessToken()
         enableEdgeToEdge()
         setContent { WarRoomTheme { WarRoomApp(viewModel(), destination.value, notificationLeagueId.value, recoveryToken.value) { recoveryToken.value = null } } }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (NotificationPreference.isEnabled(this) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }

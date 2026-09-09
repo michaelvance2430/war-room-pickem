@@ -117,8 +117,11 @@ fun PicksScreen(
                             }
                             Text(spreadLine(game), color = Muted, fontSize = 11.sp)
                             Text("CONFIDENCE", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black)
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                state.games.indices.map { it + 1 }.forEach { value ->
+                            val confidenceValues = state.games.indices.map { it + 1 }
+                            val confidenceRows = if (confidenceValues.size > 5) confidenceValues.chunked(5) else listOf(confidenceValues)
+                            confidenceRows.forEach { rowValues ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                rowValues.forEach { value ->
                                     val chosenHere = confidence[game.id] == value
                                     val unavailable = value in used && !chosenHere
                                     FilterChip(
@@ -126,7 +129,9 @@ fun PicksScreen(
                                         enabled = !unavailable,
                                         onClick = { confidence = if (chosenHere) confidence - game.id else confidence + (game.id to value) },
                                         label = { Text("$value") },
+                                        modifier = Modifier.weight(1f).height(42.dp),
                                     )
+                                }
                                 }
                             }
                             Row(

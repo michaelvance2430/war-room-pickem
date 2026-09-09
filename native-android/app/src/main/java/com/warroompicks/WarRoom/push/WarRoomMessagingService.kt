@@ -11,10 +11,11 @@ import com.warroompicks.WarRoom.R
 
 class WarRoomMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
-        getSharedPreferences("war_room_push", MODE_PRIVATE).edit().putString("pending_fcm_token", token).apply()
+        if (NotificationPreference.isEnabled(this)) NotificationPreference.savePendingToken(this, token)
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
+        if (!NotificationPreference.isEnabled(this)) return
         val destination = message.data["destination"] ?: "home"
         val leagueId = message.data["league_id"]
         val intent = Intent(this, MainActivity::class.java).putExtra("notification_destination", destination)

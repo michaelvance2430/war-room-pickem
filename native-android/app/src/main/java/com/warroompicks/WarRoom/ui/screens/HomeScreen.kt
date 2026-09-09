@@ -205,7 +205,6 @@ private fun AnnouncementDialog(onDismiss: () -> Unit, onPost: (String, String) -
 @Composable
 private fun CardBuilderPage(sport: Sport, week: Int, odds: List<OddsGame>, roomFavoriteSlugs: List<String>, busy: Boolean, onDismiss: () -> Unit, onPublish: (List<OddsGame>, String, String, String) -> Unit) {
     var selected by remember(odds) { mutableStateOf<Set<String>>(emptySet()) }
-    var cardSize by remember(sport) { mutableIntStateOf(if (sport == Sport.CFB) 10 else 5) }
     var prop by remember { mutableStateOf("") }
     var optionA by remember { mutableStateOf("") }
     var optionB by remember { mutableStateOf("") }
@@ -218,11 +217,17 @@ private fun CardBuilderPage(sport: Sport, week: Int, odds: List<OddsGame>, roomF
             item {
                 Text("COMMISSIONER MODE", color = accent, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
                 Text("Build ${sport.id.uppercase()} Week $week", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
-                Text(if (busy) "Pulling the eligible slate…" else "${selected.size}/$cardSize games selected", color = Color.White.copy(alpha = .72f))
+                Text(if (busy) "Pulling the eligible slate…" else if (sport == Sport.CFB) "Keep the best 5–10 games" else "${selected.size}/5 games selected", color = Color.White.copy(alpha = .72f))
                 if (sport == Sport.CFB) {
-                    Text("WEEKLY CARD SIZE · $cardSize GAMES", color = WarGreen, fontWeight = FontWeight.Black)
-                    Slider(value = cardSize.toFloat(), onValueChange = { value -> cardSize = value.toInt().coerceIn(5, 10); selected = selected.take(cardSize).toSet() }, valueRange = 5f..10f, steps = 4)
                     Text("TOP 10 GOLD  ·  11–25 ORANGE", color = Color.White.copy(alpha = .72f), fontSize = 11.sp, fontWeight = FontWeight.Black)
+                }
+            }
+            stickyHeader {
+                Surface(color = Color(0xF2090B0A), modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(if (sport == Sport.CFB) "CHOOSE 5–10 GAMES" else "CHOOSE 5 GAMES", color = Color.White, fontWeight = FontWeight.Black)
+                        Text("${selected.size} / ${if (sport == Sport.CFB) 10 else 5}", color = if ((sport == Sport.CFB && selected.size in 5..10) || (sport == Sport.NFL && selected.size == 5)) accent else Color.White, fontWeight = FontWeight.Black)
+                    }
                 }
             }
             items(odds) { game ->
@@ -232,7 +237,7 @@ private fun CardBuilderPage(sport: Sport, week: Int, odds: List<OddsGame>, roomF
                     color = Color.Black.copy(alpha = .72f),
                     shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth().clickable {
-                        selected = if (checked) selected - game.id else if (selected.size < cardSize) selected + game.id else selected
+                        selected = if (checked) selected - game.id else if (selected.size < if (sport == Sport.CFB) 10 else 5) selected + game.id else selected
                     },
                 ) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -259,7 +264,7 @@ private fun CardBuilderPage(sport: Sport, week: Int, odds: List<OddsGame>, roomF
                     TextButton(onClick = onDismiss) { Text("BACK") }
                     Button(
                         onClick = { onPublish(odds.filter { it.id in selected }, prop, optionA, optionB) },
-                        enabled = selected.size == cardSize && prop.isNotBlank() && optionA.isNotBlank() && optionB.isNotBlank() && !busy,
+                        enabled = (if (sport == Sport.CFB) selected.size in 5..10 else selected.size == 5) && prop.isNotBlank() && optionA.isNotBlank() && optionB.isNotBlank() && !busy,
                     ) { Text("PUBLISH", fontWeight = FontWeight.Black) }
                 }
             }

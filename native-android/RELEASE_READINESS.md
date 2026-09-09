@@ -11,7 +11,7 @@ Last audited: 2026-09-09
 - Minimum SDK: `26`
 - Target / compile SDK: `36`
 - Release bundle: `app/build/outputs/bundle/release/app-release.aab`
-- Bundle SHA-256: `2f28007f875df7b85740473cc582cfa8c4b16706e202816113e4afc6383fc861`
+- Bundle SHA-256: `14a15595178251910f889680e2d4c4b1ca9f682a9645811a12c92ba3e6137d16`
 
 ## Verification completed
 
@@ -46,6 +46,16 @@ Last audited: 2026-09-09
 - Build 25 parity adds commissioner-selectable 5–10 game CFB cards while preserving
   five-game NFL cards, and synchronizes newly created dormant football leagues to the
   current server-authoritative season week before loading the room.
+- The final CFB card size is derived from the selected games, with a pinned selection
+  counter and two-row confidence controls for larger cards.
+- CFB Standings now includes Room Standings, AP Top 25, and Members' Top 12; room rows
+  show up, down, or unchanged movement and the selected trophy is displayed at the top.
+- Profile now includes a default-on push-notification switch. Opting out unregisters
+  the stored device token and suppresses future registration and display; denied Android
+  permission can be reopened from the app settings link.
+- The expanded Build 25 unit tests pass and the expanded Android UI test suite compiles.
+- The current Build 25 parity bundle is unsigned; the earlier signing verification above
+  describes the prior release artifact and does not establish upload readiness for this one.
 
 ## Blocking items before upload
 

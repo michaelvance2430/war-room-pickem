@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
+import com.warroompicks.WarRoom.push.NotificationPreference
 
 class WarRoomApplication : Application() {
     override fun onCreate() {
@@ -22,12 +23,9 @@ class WarRoomApplication : Application() {
                 .setGcmSenderId(BuildConfig.FIREBASE_SENDER_ID)
                 .build())
         }
-        if (FirebaseApp.getApps(this).isNotEmpty()) {
+        if (NotificationPreference.isEnabled(this) && FirebaseApp.getApps(this).isNotEmpty()) {
             FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-                getSharedPreferences("war_room_push", MODE_PRIVATE)
-                    .edit()
-                    .putString("pending_fcm_token", token)
-                    .apply()
+                NotificationPreference.savePendingToken(this, token)
             }
         }
     }

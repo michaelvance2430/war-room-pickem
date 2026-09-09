@@ -137,7 +137,32 @@ data class Standing(
     val rank: Int,
     val favoriteTeam: String?,
     val avatarUrl: String? = null,
+    val weeklyPoints: List<Int> = emptyList(),
 )
+
+data class CfbApRanking(
+    val id: String, val name: String, val market: String, val rank: Int,
+    val points: Int, val firstPlaceVotes: Int,
+)
+
+data class CfbMemberPollRow(val id: String, val rank: Int, val points: Int, val firstPlaceVotes: Int)
+
+data class CfbPollSnapshot(
+    val season: Int, val pollWeek: Int, val roomWeek: Int, val pollName: String,
+    val rankings: List<CfbApRanking>, val filedCount: Int, val official: Boolean,
+    val revealAt: Instant?, val revealed: Boolean, val ownBallot: List<String>,
+    val memberResults: List<CfbMemberPollRow>,
+)
+
+object StandingMovement {
+    fun compute(rows: List<Standing>): Map<UUID, Int> {
+        if (rows.none { it.weeklyPoints.isNotEmpty() }) return rows.associate { it.userId to 0 }
+        val current = rows.withIndex().associate { it.value.userId to it.index }
+        val previous = rows.sortedWith(compareByDescending<Standing> { it.points - (it.weeklyPoints.lastOrNull() ?: 0) }.thenBy { current[it.userId] ?: 0 })
+            .withIndex().associate { it.value.userId to it.index }
+        return rows.associate { row -> row.userId to ((previous[row.userId] ?: 0) - (current[row.userId] ?: 0)) }
+    }
+}
 
 data class LockerMessage(
     val id: UUID,

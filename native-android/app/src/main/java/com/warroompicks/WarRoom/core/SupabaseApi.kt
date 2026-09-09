@@ -55,6 +55,10 @@ class SupabaseApi {
         )
     }
 
+    suspend fun unregisterPushToken(token: String, userId: UUID, deviceToken: String) {
+        raw("/rest/v1/push_device_tokens?user_id=eq.$userId&device_token=eq.${encode(deviceToken)}", "DELETE", token, null, "return=minimal")
+    }
+
     suspend fun signUp(email: String, password: String, displayName: String): UserSession? {
         val body = JSONObject()
             .put("email", email.trim())
@@ -178,7 +182,7 @@ class SupabaseApi {
     }
 
     suspend fun standings(token: String, league: League): List<Standing> {
-        val select = "user_id,total_points,division,display_name_override,profiles(display_name,avatar_url),is_bot"
+        val select = "user_id,total_points,weekly_points,division,display_name_override,profiles(display_name,avatar_url),is_bot"
         val rows = requestArray("/rest/v1/memberships?select=${encode(select)}&league_id=eq.${league.id}&is_bot=eq.false&order=total_points.desc", token)
         val ids = rows.objects().mapNotNull { it.stringOrNull("user_id") }
         val favorites = if (ids.isEmpty()) emptyMap() else {
@@ -193,8 +197,26 @@ class SupabaseApi {
                 row.stringOrNull("display_name_override") ?: profile?.optString("display_name")?.takeIf(String::isNotBlank) ?: "Player",
                 row.stringOrNull("division"), row.optDouble("total_points"), index + 1,
                 favorites[UUID.fromString(row.getString("user_id"))], profile?.stringOrNull("avatar_url"),
+                row.arrayOrEmpty("weekly_points").let { values -> (0 until values.length()).map { values.optInt(it) } },
             )
         }
+    }
+
+    suspend fun cfbPolls(token: String, leagueId: UUID, week: Int, rankedTeamIds: List<String>? = null): CfbPollSnapshot {
+        val body = JSONObject().put("leagueId", leagueId.toString()).put("week", week)
+        if (rankedTeamIds != null) body.put("action", "save").put("rankedTeamIds", JSONArray(rankedTeamIds))
+        val row = request("/functions/v1/cfb-polls", "POST", token, body)
+        val rankings = row.arrayOrEmpty("rankings").objects().map {
+            CfbApRanking(it.optString("id"), it.optString("name"), it.optString("market"), it.optInt("rank"), it.optInt("points"), it.optInt("fp_votes"))
+        }
+        val results = row.arrayOrEmpty("memberResults").objects().map {
+            CfbMemberPollRow(it.optString("id"), it.optInt("rank"), it.optInt("points"), it.optInt("firstPlaceVotes"))
+        }
+        val own = row.arrayOrEmpty("ownBallot").let { values -> (0 until values.length()).map { values.optString(it) } }
+        return CfbPollSnapshot(
+            row.optInt("season"), row.optInt("pollWeek"), row.optInt("roomWeek"), row.optString("pollName"), rankings,
+            row.optInt("filedCount"), row.optBoolean("official"), instant(row.stringOrNull("revealAt")), row.optBoolean("revealed"), own, results,
+        )
     }
 
     suspend fun currentPick(token: String, league: League, userId: UUID): CurrentPick? {
