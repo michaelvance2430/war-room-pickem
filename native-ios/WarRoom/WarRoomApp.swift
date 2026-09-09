@@ -9,7 +9,17 @@ struct WarRoomApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(auth)
-                .task { await auth.restore() }
+                .task {
+                    await auth.restore()
+
+                    // If iOS still has no notification decision, "Not now" should
+                    // never become "never ask again." Clear the stale primer gate
+                    // so ContentView can offer the notification primer again.
+                    if auth.user != nil,
+                       await WarRoomNotificationCenter.authorizationStatus() == .notDetermined {
+                        UserDefaults.standard.set(false, forKey: "warroom.notifications.primer-seen")
+                    }
+                }
         }
     }
 }
