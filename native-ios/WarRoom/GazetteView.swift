@@ -40,6 +40,8 @@ struct GazetteView: View {
     @State private var loading = true
     @State private var errorMessage: String?
     @State private var discoveryMessage: String?
+    @State private var sharing = false
+    @State private var shareItems: [Any] = []
 
     private var selected: GazetteEditionRow? {
         editions.first { $0.id == selectedId } ?? editions.first
@@ -71,6 +73,7 @@ struct GazetteView: View {
                                     regularSeasonWeeks: membership.leagues.regularSeasonWeeks,
                                     page: $page
                                 )
+                                dispatchShareButton(edition)
                             }
                         }
                         .frame(width: max(0, geometry.size.width - 20))
@@ -88,9 +91,46 @@ struct GazetteView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .onChange(of: selectedId) { _, _ in Task { await recordSelectedSecrets() } }
+        .sheet(isPresented: $sharing) { DispatchActivityView(items: shareItems) }
         .alert("THE PAPER NOTICED", isPresented: Binding(get: { discoveryMessage != nil }, set: { if !$0 { discoveryMessage = nil } })) {
             Button("FILE IT") { discoveryMessage = nil }
         } message: { Text(discoveryMessage ?? "") }
+    }
+
+    private func dispatchShareButton(_ edition: GazetteEditionRow) -> some View {
+        Button {
+            shareItems = renderedDispatchPages(edition)
+            sharing = !shareItems.isEmpty
+        } label: {
+            Label("SHARE ALL 4 PAGES", systemImage: "square.and.arrow.up.fill")
+                .font(.headline.weight(.black))
+                .frame(maxWidth: .infinity)
+                .padding(15)
+                .foregroundStyle(.black)
+                .background(isNFL ? Color.cyan : Color.yellow, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("dispatch.share")
+    }
+
+    @MainActor private func renderedDispatchPages(_ edition: GazetteEditionRow) -> [Any] {
+        let images = DispatchPageCatalog.names.indices.compactMap { pageIndex -> UIImage? in
+            let renderer = ImageRenderer(content:
+                GazettePaperView(
+                    edition: edition,
+                    leagueId: membership.leagueId,
+                    sportId: membership.leagues.sportId,
+                    regularSeasonWeeks: membership.leagues.regularSeasonWeeks,
+                    page: .constant(pageIndex)
+                )
+                .frame(width: 390)
+                .fixedSize(horizontal: false, vertical: true)
+            )
+            renderer.scale = 3
+            return renderer.uiImage
+        }
+        return images.map { $0 as Any }
+            + ["The War Room Dispatch · \(edition.weekLabel) · \(membership.leagues.name)" as Any]
     }
 
     private var editionPicker: some View {
