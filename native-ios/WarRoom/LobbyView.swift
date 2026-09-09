@@ -29,6 +29,53 @@ struct LobbyRoom: Decodable, Identifiable, Sendable {
     }
 }
 
+struct LobbySportRoomSection: Identifiable {
+    let id: String
+    let title: String
+    let rooms: [LobbyRoom]
+}
+
+enum LobbySportRoomGrouping {
+    private static let preferredOrder = ["cfb", "nfl", "ncaam", "ncaaw", "nhl"]
+
+    static func sections(for rooms: [LobbyRoom]) -> [LobbySportRoomSection] {
+        let grouped = Dictionary(grouping: rooms) { normalizedSportId($0.sportId) }
+        return grouped.keys.sorted { lhs, rhs in
+            let leftIndex = preferredOrder.firstIndex(of: lhs) ?? preferredOrder.count
+            let rightIndex = preferredOrder.firstIndex(of: rhs) ?? preferredOrder.count
+            return leftIndex == rightIndex ? lhs < rhs : leftIndex < rightIndex
+        }.map { sportId in
+            LobbySportRoomSection(
+                id: sportId,
+                title: title(for: sportId),
+                rooms: (grouped[sportId] ?? []).sorted {
+                    $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                }
+            )
+        }
+    }
+
+    private static func normalizedSportId(_ sportId: String) -> String {
+        switch sportId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "ncaaf", "ncaafb": return "cfb"
+        case "mens", "men", "mens_fieldhouse": return "ncaam"
+        case "womens", "women", "womens_fieldhouse": return "ncaaw"
+        default: return sportId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }
+    }
+
+    private static func title(for sportId: String) -> String {
+        switch sportId {
+        case "cfb": return "COLLEGE FOOTBALL"
+        case "nfl": return "NFL"
+        case "ncaam": return "MEN'S FIELDHOUSE"
+        case "ncaaw": return "WOMEN'S FIELDHOUSE"
+        case "nhl": return "NHL"
+        default: return sportId.uppercased()
+        }
+    }
+}
+
 struct LobbyPlayerLeader: Decodable, Identifiable, Sendable {
     let userId: UUID?
     let gameHandle: String
@@ -255,6 +302,7 @@ struct LobbyView: View {
     @State private var busyRoom: UUID?
     @State private var notice: String?
     @State private var expansionSport = "football"
+    @State private var collapsedSportSections: Set<String> = []
 
     private var publicRooms: [LobbyRoom] { rooms.filter { $0.accessMode == "public" } }
     private var privateRooms: [LobbyRoom] { rooms.filter { $0.accessMode == "private" } }
@@ -483,10 +531,65 @@ struct LobbyView: View {
             if selectedRooms.isEmpty {
                 Text("No \(title) rooms are broadcasting yet.").font(.footnote).foregroundStyle(.secondary).padding(.vertical, 18).frame(maxWidth: .infinity)
             } else {
-                ForEach(selectedRooms) { room in roomCard(room) }
+                ForEach(LobbySportRoomGrouping.sections(for: selectedRooms)) { section in
+                    sportSectionHeader(section)
+                    if !collapsedSportSections.contains(section.id) {
+                        ForEach(section.rooms) { room in roomCard(room) }
+                    }
+                }
             }
         }.padding(13).background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 22))
             .overlay(RoundedRectangle(cornerRadius: 22).stroke(.white.opacity(0.10)))
+    }
+
+    private func sportSectionHeader(_ section: LobbySportRoomSection) -> some View {
+        let color = sportSectionColor(section.id)
+        let collapsed = collapsedSportSections.contains(section.id)
+        return Button {
+            withAnimation(.snappy) {
+                if collapsed { collapsedSportSections.remove(section.id) }
+                else { collapsedSportSections.insert(section.id) }
+            }
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: sportSectionIcon(section.id))
+                Text(section.title)
+                Spacer()
+                Text("\(section.rooms.count) \(section.rooms.count == 1 ? "ROOM" : "ROOMS")")
+                    .foregroundStyle(.white.opacity(0.42))
+                Image(systemName: collapsed ? "chevron.right" : "chevron.down")
+                    .font(.caption.weight(.black))
+            }
+            .font(.system(size: 10, weight: .black)).tracking(1.1)
+            .foregroundStyle(color)
+            .padding(.horizontal, 11).padding(.vertical, 10)
+            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
+            .overlay(RoundedRectangle(cornerRadius: 11).stroke(color.opacity(0.40)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(section.title), \(section.rooms.count) \(section.rooms.count == 1 ? "room" : "rooms")")
+        .accessibilityHint(collapsed ? "Expands this sport" : "Collapses this sport")
+        .padding(.top, 5)
+    }
+
+    private func sportSectionColor(_ sportId: String) -> Color {
+        switch sportId {
+        case "cfb": return .green
+        case "nfl": return .cyan
+        case "ncaam": return .orange
+        case "ncaaw": return .pink
+        case "nhl": return .blue
+        default: return .white
+        }
+    }
+
+    private func sportSectionIcon(_ sportId: String) -> String {
+        switch sportId {
+        case "cfb", "nfl": return "football.fill"
+        case "ncaam", "ncaaw": return "basketball.fill"
+        case "nhl": return "hockey.puck.fill"
+        default: return "sportscourt.fill"
+        }
     }
 
     private func roomCard(_ room: LobbyRoom) -> some View {

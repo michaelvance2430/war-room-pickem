@@ -22,6 +22,25 @@ struct WarRoomTests {
         #expect(LeagueCreationDefaults.maxMembers == 100)
     }
 
+    @Test func lobbyRoomsAreSeparatedIntoStableSportSections() {
+        func room(_ name: String, _ sportId: String) -> LobbyRoom {
+            LobbyRoom(
+                id: UUID(), name: name, sportId: sportId, accessMode: "public",
+                humanCount: 2, maxHumanMembers: 100, seatsLeft: 98, isFull: false,
+                isMember: false, requestStatus: nil, requestCount: nil, denialReason: nil
+            )
+        }
+        let sections = LobbySportRoomGrouping.sections(for: [
+            room("Women First", "ncaaw"), room("Sunday Pros", "nfl"),
+            room("Zebra", "cfb"), room("Alpha", "ncaafb"), room("Frozen", "nhl"),
+            room("Men First", "ncaam")
+        ])
+
+        #expect(sections.map(\.id) == ["cfb", "nfl", "ncaam", "ncaaw", "nhl"])
+        #expect(sections.map(\.title) == ["COLLEGE FOOTBALL", "NFL", "MEN'S FIELDHOUSE", "WOMEN'S FIELDHOUSE", "NHL"])
+        #expect(sections[0].rooms.map(\.name) == ["Alpha", "Zebra"])
+    }
+
     @Test func lateCreatedFootballLeaguesOpenOnTheCalendarWeek() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = SeasonCardBuildGate.eastern
