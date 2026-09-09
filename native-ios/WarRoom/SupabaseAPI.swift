@@ -2867,6 +2867,22 @@ enum SupabaseAPI {
         }
     }
 
+    static func unregisterPushDevice(token: String, userId: UUID, deviceToken: String) async throws {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/push_device_tokens"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())"),
+            URLQueryItem(name: "device_token", value: "eq.\(deviceToken)"),
+        ]
+        var request = authorizedRequest(url: components.url!, token: token)
+        request.httpMethod = "DELETE"
+        request.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let message = (try? JSONDecoder().decode(APIError.self, from: data).message) ?? "This device could not disable alerts."
+            throw RequestError(message: message)
+        }
+    }
+
     private static func send<T: Decodable>(_ request: URLRequest, as: T.Type) async throws -> T {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {

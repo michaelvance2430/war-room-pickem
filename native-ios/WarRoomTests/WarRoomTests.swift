@@ -191,6 +191,18 @@ struct WarRoomTests {
         #expect(try JSONDecoder().decode(WarRoomNotificationRoute.self, from: JSONEncoder().encode(selectionSunday)) == selectionSunday)
     }
 
+    @Test func notificationPreferencePreservesExistingUsersAndExplicitOptOut() throws {
+        let suite = "warroom-tests-notifications-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        #expect(WarRoomNotificationCenter.preferenceEnabled(in: defaults))
+        defaults.set(false, forKey: WarRoomNotificationCenter.preferenceEnabledKey)
+        #expect(!WarRoomNotificationCenter.preferenceEnabled(in: defaults))
+        defaults.set(true, forKey: WarRoomNotificationCenter.preferenceEnabledKey)
+        #expect(WarRoomNotificationCenter.preferenceEnabled(in: defaults))
+    }
+
     @Test func dispatchAlwaysExposesExactlyFourOrderedPages() {
         #expect(DispatchPageCatalog.names == ["FRONT", "SPORTS", "RIVALRIES", "BACK"])
     }

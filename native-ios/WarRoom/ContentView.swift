@@ -368,6 +368,7 @@ struct ContentView: View {
 
     @MainActor private func prepareNotifications() async {
         guard auth.user != nil else { return }
+        guard WarRoomNotificationCenter.preferenceEnabled else { return }
         let status = await WarRoomNotificationCenter.authorizationStatus()
         if status == .authorized || status == .provisional {
             UIApplication.shared.registerForRemoteNotifications()
@@ -378,6 +379,7 @@ struct ContentView: View {
     }
 
     private func registerPushToken() async {
+        guard WarRoomNotificationCenter.preferenceEnabled else { return }
         guard let token = auth.token,
               let user = auth.user,
               let deviceToken = UserDefaults.standard.string(forKey: WarRoomNotificationCenter.deviceTokenKey),
@@ -8625,6 +8627,7 @@ struct TrophyEvidenceView: View {
 
 struct NativeProfileView: View {
     @EnvironmentObject private var auth: AuthStore
+    @Environment(\.scenePhase) private var scenePhase
     @State private var displayName = ""
     @State private var originalName = ""
     @State private var loading = true
@@ -8643,6 +8646,10 @@ struct NativeProfileView: View {
     @State private var savingBirthday = false
     @State private var confirmingBirthday = false
     @State private var favoriteTeamId: String?
+    @State private var notificationsEnabled = false
+    @State private var notificationAuthorizationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var updatingNotifications = false
+    @State private var showNotificationSettingsAlert = false
     private var isFieldhousePreview: Bool {
         ProcessInfo.processInfo.arguments.contains("--fieldhouse-preview")
     }
@@ -8657,6 +8664,16 @@ struct NativeProfileView: View {
     private var cleanName: String {
         displayName.trimmingCharacters(in: .whitespacesAndNewlines)
             .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    private var notificationDetail: String {
+        if notificationsEnabled {
+            return "On for card openings, lock warnings, results, and commissioner announcements."
+        }
+        if notificationAuthorizationStatus == .denied {
+            return "Off in iPhone Settings. Turn this on to jump directly to Apple’s notification controls."
+        }
+        return "Off. War Room will not schedule reminders or keep this device registered for push alerts."
     }
 
     var body: some View {
@@ -8750,6 +8767,26 @@ struct NativeProfileView: View {
                     }
                 }
                 .listRowBackground(Color.black.opacity(0.80))
+                Section("NOTIFICATIONS") {
+                    Toggle(isOn: Binding(
+                        get: { notificationsEnabled },
+                        set: { enabled in Task { await changeNotifications(enabled: enabled) } }
+                    )) {
+                        Label("War Room alerts", systemImage: notificationsEnabled ? "bell.badge.fill" : "bell.slash.fill")
+                            .font(.headline.weight(.black))
+                    }
+                    .tint(identity.isNFL ? .blue : .green)
+                    .disabled(updatingNotifications)
+
+                    Text(notificationDetail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if updatingNotifications {
+                        ProgressView("Updating notification status…")
+                    }
+                }
+                .listRowBackground(Color.black.opacity(0.80))
                 Section("ACTIVE CONSTRUCTION ORDERS") {
                     NavigationLink {
                         ProfileTitlePickerView(
@@ -8787,6 +8824,9 @@ struct NativeProfileView: View {
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
         .task { await load() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await refreshNotificationStatus() } }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .warRoomProfilePhotoChanged)) { _ in
             Task { await load() }
         }
@@ -8796,9 +8836,16 @@ struct NativeProfileView: View {
         } message: {
             Text("Only the month and day are stored. This cannot be changed from the app after you confirm it.")
         }
+        .alert("Notifications are off in iPhone Settings", isPresented: $showNotificationSettingsAlert) {
+            Button("Not now", role: .cancel) {}
+            Button("OPEN SETTINGS") { openNotificationSettings() }
+        } message: {
+            Text("Apple will not let an app reverse a previous denial. Open Settings, tap Notifications, and turn on Allow Notifications for War Room Pick’Em.")
+        }
     }
 
     private func load() async {
+        await refreshNotificationStatus()
         guard let token = auth.token, let user = auth.user else {
             if isFieldhousePreview {
                 displayName = "Riley V."
@@ -8834,6 +8881,63 @@ struct NativeProfileView: View {
             errorMessage = error.localizedDescription
         }
         loading = false
+    }
+
+    @MainActor
+    private func refreshNotificationStatus() async {
+        notificationAuthorizationStatus = await WarRoomNotificationCenter.authorizationStatus()
+        notificationsEnabled = WarRoomNotificationCenter.preferenceEnabled
+            && (notificationAuthorizationStatus == .authorized || notificationAuthorizationStatus == .provisional)
+    }
+
+    @MainActor
+    private func changeNotifications(enabled: Bool) async {
+        guard !updatingNotifications else { return }
+        updatingNotifications = true
+        defer { updatingNotifications = false }
+
+        if !enabled {
+            let deviceToken = UserDefaults.standard.string(forKey: WarRoomNotificationCenter.deviceTokenKey)
+            WarRoomNotificationCenter.disable()
+            if let token = auth.token, let user = auth.user, let deviceToken, !deviceToken.isEmpty {
+                try? await SupabaseAPI.unregisterPushDevice(token: token, userId: user.id, deviceToken: deviceToken)
+            }
+            await refreshNotificationStatus()
+            return
+        }
+
+        let status = await WarRoomNotificationCenter.authorizationStatus()
+        switch status {
+        case .notDetermined:
+            if await WarRoomNotificationCenter.requestAuthorization() {
+                await registerProfilePushToken()
+            }
+        case .authorized, .provisional:
+            WarRoomNotificationCenter.enableRegistration()
+            await registerProfilePushToken()
+        case .denied:
+            WarRoomNotificationCenter.setPreferenceEnabled(true)
+            showNotificationSettingsAlert = true
+        case .ephemeral:
+            WarRoomNotificationCenter.enableRegistration()
+            await registerProfilePushToken()
+        @unknown default:
+            showNotificationSettingsAlert = true
+        }
+        await refreshNotificationStatus()
+    }
+
+    private func registerProfilePushToken() async {
+        guard let token = auth.token, let user = auth.user,
+              let deviceToken = UserDefaults.standard.string(forKey: WarRoomNotificationCenter.deviceTokenKey),
+              !deviceToken.isEmpty else { return }
+        try? await SupabaseAPI.registerPushDevice(token: token, userId: user.id, deviceToken: deviceToken)
+    }
+
+    @MainActor
+    private func openNotificationSettings() {
+        guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 
     private var currentRank: CareerRank {

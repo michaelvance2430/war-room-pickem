@@ -87,6 +87,21 @@ enum WarRoomNotificationCenter {
     private static let center = UNUserNotificationCenter.current()
     static let deviceTokenKey = "warroom.apns.device-token"
     static let pendingDestinationKey = "warroom.notification.pending-route"
+    static let preferenceEnabledKey = "warroom.notifications.enabled"
+
+    static var preferenceEnabled: Bool {
+        preferenceEnabled(in: .standard)
+    }
+
+    static func preferenceEnabled(in defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: preferenceEnabledKey) == nil
+            ? true
+            : defaults.bool(forKey: preferenceEnabledKey)
+    }
+
+    static func setPreferenceEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: preferenceEnabledKey)
+    }
 
     static func savePendingRoute(_ route: WarRoomNotificationRoute) {
         guard let data = try? JSONEncoder().encode(route) else { return }
@@ -112,11 +127,27 @@ enum WarRoomNotificationCenter {
     static func requestAuthorization() async -> Bool {
         do {
             let authorized = try await center.requestAuthorization(options: [.alert, .badge, .sound])
-            if authorized { UIApplication.shared.registerForRemoteNotifications() }
+            if authorized {
+                setPreferenceEnabled(true)
+                UIApplication.shared.registerForRemoteNotifications()
+            }
             return authorized
         } catch {
             return false
         }
+    }
+
+    @MainActor
+    static func disable() {
+        setPreferenceEnabled(false)
+        center.removeAllPendingNotificationRequests()
+        UIApplication.shared.unregisterForRemoteNotifications()
+    }
+
+    @MainActor
+    static func enableRegistration() {
+        setPreferenceEnabled(true)
+        UIApplication.shared.registerForRemoteNotifications()
     }
 
     static func sync(
@@ -126,6 +157,7 @@ enum WarRoomNotificationCenter {
         card: WeekCard?,
         announcements: [Announcement]
     ) async {
+        guard preferenceEnabled else { return }
         let settings = await center.notificationSettings()
         let authorization = settings.authorizationStatus
         guard authorization == .authorized || authorization == .provisional else { return }
