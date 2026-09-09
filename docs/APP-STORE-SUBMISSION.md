@@ -110,6 +110,7 @@ Guideline 1.2 resubmission evidence:
 - Confirm Account → Delete account is visible and complete a disposable non-commissioner deletion before submission.
 - Capture current iPhone screenshots after the signed device build is final.
 - Recheck every privacy answer if analytics, crash reporting, notifications, payments, or advertising are added.
+- Keep `public.app_release_channels.enabled` off until Apple confirms the new build is publicly installable. After release, set `recommended_build` and `release_version`, then verify that the immediately previous production build shows the gray update prompt and that Update Now opens the correct App Store page. Use `minimum_build` only for an approved mandatory update.
 
 ## Engineering certification
 
