@@ -261,7 +261,7 @@ struct NflScoreboardStrip: View {
             Text(value).font(.system(size: 21, weight: .black, design: .rounded)).monospacedDigit().minimumScaleFactor(0.65)
             Text(label).font(.system(size: 7, weight: .black)).tracking(1.1).foregroundStyle(.cyan)
         }
-        .frame(maxWidth: .infinity).padding(.vertical, 11).background(.black.opacity(0.88))
+        .frame(maxWidth: .infinity).padding(.vertical, 11).background(.black.opacity(0.68))
     }
 }
 
@@ -288,7 +288,7 @@ struct NflPrimaryActionCard: View {
             Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(urgent ? .red : .cyan)
         }
         .padding(urgent ? 18 : 14)
-        .background(urgent ? Color.red.opacity(pulse ? 0.98 : 0.68) : Color.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 8))
+        .background(urgent ? Color.red.opacity(pulse ? 0.98 : 0.68) : Color.black.opacity(0.66), in: RoundedRectangle(cornerRadius: 8))
         .overlay(alignment: .leading) { Rectangle().fill(urgent ? .white : .blue).frame(width: urgent ? 8 : 4).padding(.vertical, 8) }
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(urgent ? Color.white.opacity(pulse ? 1 : 0.48) : Color.blue.opacity(0.55), lineWidth: urgent ? (pulse ? 5 : 2) : 1))
         .shadow(color: urgent ? .red.opacity(pulse ? 0.9 : 0.4) : .clear, radius: urgent ? (pulse ? 30 : 14) : 0, y: urgent ? 8 : 0)

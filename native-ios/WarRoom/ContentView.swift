@@ -2048,7 +2048,7 @@ struct StandingsView: View {
                                     Text(identity.standingsDetail).font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(.white.opacity(0.5))
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading).padding(22)
-                                .background(LinearGradient(colors: [.black.opacity(0.80), identity.accent.opacity(0.13)], startPoint: .leading, endPoint: .trailing), in: UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 25, bottomTrailingRadius: 4, topTrailingRadius: 25))
+                                .background(LinearGradient(colors: [.black.opacity(0.64), identity.accent.opacity(0.11)], startPoint: .leading, endPoint: .trailing), in: UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 25, bottomTrailingRadius: 4, topTrailingRadius: 25))
                                 .overlay(alignment: .leading) { Rectangle().fill(identity.accent).frame(width: 4).padding(.vertical, 14) }
                                 .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 25, bottomTrailingRadius: 4, topTrailingRadius: 25).stroke(identity.accent.opacity(0.48)))
 
@@ -3695,7 +3695,7 @@ private struct CompactHomeRow: View {
             Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(accent)
         }
         .padding(.horizontal, 14).padding(.vertical, embedded ? 10 : 12)
-        .background(embedded ? Color.clear : Color.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 14))
+        .background(embedded ? Color.clear : Color.black.opacity(0.64), in: RoundedRectangle(cornerRadius: 14))
         .overlay {
             if !embedded {
                 RoundedRectangle(cornerRadius: 14).stroke(accent.opacity(0.42))
@@ -4873,7 +4873,15 @@ private struct ChampionshipTrophyPickerView: View {
     private var cardRadius: CGFloat { identity.isNFL ? 7 : (identity.isFieldhouse ? 14 : 20) }
 
     private var designs: [TrophyDesign] {
-        championshipTrophyDesigns(for: membership.leagues.sportId)
+        var sportDesigns = championshipTrophyDesigns(for: membership.leagues.sportId)
+        if membership.leagues.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "all jokes aside" {
+            sportDesigns.insert(allJokesAsideTrophyDesign, at: 0)
+        }
+        guard let sealedId = membership.leagues.championshipTrophyId,
+              !sportDesigns.contains(where: { $0.id == sealedId }),
+              let sealedDesign = championshipTrophyDesign(id: sealedId, sportId: membership.leagues.sportId)
+        else { return sportDesigns }
+        return [sealedDesign] + sportDesigns
     }
 
     private var heroDesign: TrophyDesign {
@@ -4979,6 +4987,13 @@ private struct TrophyDesign: Identifiable {
     let line: String
 }
 
+private let allJokesAsideTrophyDesign = TrophyDesign(
+    id: "all_jokes_aside",
+    name: "All Jokes Aside",
+    image: "AllJokesAsideTrophyArtifact",
+    line: "Four arms, two beers, one football, and absolutely no adult supervision."
+)
+
 private func championshipTrophyDesigns(for sportId: String) -> [TrophyDesign] {
     let identity = SportIdentity(sportId)
     if identity.isNFL {
@@ -5007,13 +5022,23 @@ private func championshipTrophyDesigns(for sportId: String) -> [TrophyDesign] {
     ]
 }
 
+private func championshipTrophyDesign(id: String, sportId: String) -> TrophyDesign? {
+    if id == allJokesAsideTrophyDesign.id { return allJokesAsideTrophyDesign }
+    if let sportDesign = championshipTrophyDesigns(for: sportId).first(where: { $0.id == id }) {
+        return sportDesign
+    }
+    // Existing rooms keep the exact hardware they originally sealed, even if
+    // that trophy predates the sport-specific catalog.
+    return championshipTrophyDesigns(for: "cfb").first(where: { $0.id == id })
+}
+
 private struct ChampionshipHardwareCard: View {
     let trophyId: String?
     let sportId: String
     private var identity: SportIdentity { SportIdentity(sportId) }
     private var trophy: TrophyDesign? {
         guard let trophyId else { return nil }
-        return championshipTrophyDesigns(for: sportId).first { $0.id == trophyId }
+        return championshipTrophyDesign(id: trophyId, sportId: sportId)
     }
 
     var body: some View {
@@ -5052,7 +5077,7 @@ private struct ChampionshipHardwareCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 18))
+        .background(.black.opacity(0.64), in: RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 18))
         .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 18).stroke(identity.accent.opacity(0.42), lineWidth: 1.5))
         .accessibilityElement(children: .combine)
     }
@@ -5647,6 +5672,27 @@ private struct AutomaticPropPreset: Identifiable {
     var week: Int? = nil
 }
 
+enum AutomaticPropCopyPolicy {
+    static func resolved(_ source: String, cardSize: Int, sportId: String) -> String {
+        guard sportId.lowercased() == "cfb", cardSize != 5 else { return source }
+        let highTotal = cardSize * 56 + 1
+        let lowTotal = cardSize * 40
+        return source
+            .replacingOccurrences(of: "Five-game", with: "\(cardSize)-game", options: .caseInsensitive)
+            .replacingOccurrences(of: "all five games", with: "all \(cardSize) games", options: .caseInsensitive)
+            .replacingOccurrences(of: "the five games", with: "the \(cardSize) games", options: .caseInsensitive)
+            .replacingOccurrences(of: "the 5 games", with: "the \(cardSize) games", options: .caseInsensitive)
+            .replacingOccurrences(of: "of 5 games", with: "of \(cardSize) games", options: .caseInsensitive)
+            .replacingOccurrences(of: "all five", with: "all \(cardSize)", options: .caseInsensitive)
+            .replacingOccurrences(of: "five combined", with: "\(cardSize) combined", options: .caseInsensitive)
+            .replacingOccurrences(of: "281", with: "\(highTotal)")
+            .replacingOccurrences(of: "280", with: "\(highTotal - 1)")
+            .replacingOccurrences(of: "201", with: "\(lowTotal + 1)")
+            .replacingOccurrences(of: "200", with: "\(lowTotal)")
+            .replacingOccurrences(of: "5–0", with: "\(cardSize)–0")
+    }
+}
+
 private let automaticFootballProps: [AutomaticPropPreset] = [
     .init(id: "close7", label: "3+ games decided by 7 or fewer", question: "Will at least 3 of the 5 games be decided by 7 or fewer points?", yes: "Yes — at least 3", no: "No — 2 or fewer"),
     .init(id: "close3", label: "3+ games decided by 3 or fewer", question: "Will at least 3 of the 5 games be decided by 3 or fewer points?", yes: "Yes — at least 3", no: "No — 2 or fewer"),
@@ -5874,7 +5920,7 @@ struct CommissionerCardBuilderView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Choose a prop", selection: $selectedPropId) {
                     ForEach(availableAutomaticProps) { preset in
-                        Text(preset.label).tag(preset.id)
+                        Text(cardSizedCopy(preset.label)).tag(preset.id)
                     }
                 }
                 .pickerStyle(.navigationLink)
@@ -6042,14 +6088,7 @@ struct CommissionerCardBuilderView: View {
     }
 
     private func cardSizedCopy(_ source: String) -> String {
-        guard !identity.isNFL, targetCardSize != 5 else { return source }
-        return source
-            .replacingOccurrences(of: "all five games", with: "all \(targetCardSize) games", options: .caseInsensitive)
-            .replacingOccurrences(of: "the five games", with: "the \(targetCardSize) games", options: .caseInsensitive)
-            .replacingOccurrences(of: "the 5 games", with: "the \(targetCardSize) games", options: .caseInsensitive)
-            .replacingOccurrences(of: "of 5 games", with: "of \(targetCardSize) games", options: .caseInsensitive)
-            .replacingOccurrences(of: "all five", with: "all \(targetCardSize)", options: .caseInsensitive)
-            .replacingOccurrences(of: "5–0", with: "\(targetCardSize)–0")
+        AutomaticPropCopyPolicy.resolved(source, cardSize: targetCardSize, sportId: identity.sportId)
     }
 
     private func pullOdds() async {
@@ -6199,7 +6238,7 @@ private struct StatusCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(emergency ? 26 : (featured ? 22 : 18))
         .background(
-            LinearGradient(colors: emergency ? [Color.red.opacity(0.96), Color(red: 0.35, green: 0, blue: 0), .black.opacity(0.9)] : [.black.opacity(featured ? 0.72 : 0.76), accent.opacity(featured ? 0.20 : 0.10)], startPoint: .leading, endPoint: .trailing),
+            LinearGradient(colors: emergency ? [Color.red.opacity(0.96), Color(red: 0.35, green: 0, blue: 0), .black.opacity(0.9)] : [.black.opacity(featured ? 0.58 : 0.64), accent.opacity(featured ? 0.17 : 0.08)], startPoint: .leading, endPoint: .trailing),
             in: UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 22, bottomTrailingRadius: 4, topTrailingRadius: 22)
         )
         .overlay(alignment: .leading) { Rectangle().fill(emergency ? .white : accent).frame(width: emergency ? 7 : (featured ? 4 : 2)).padding(.vertical, emergency ? 8 : 12) }
@@ -8032,6 +8071,7 @@ func trophyArtifactName(for trophy: ProfileTrophy) -> String? {
 
 func trophyArtifactName(trophyDesignId: String?, trophyType: String) -> String? {
     switch trophyDesignId ?? trophyType {
+    case "all_jokes_aside": return "AllJokesAsideTrophyArtifact"
     case "command_cup", "championship": return "ChampionshipArtifact"
     case "nfc_championship": return "NfcChampionshipArtifact"
     case "afc_championship": return "AfcChampionshipArtifact"

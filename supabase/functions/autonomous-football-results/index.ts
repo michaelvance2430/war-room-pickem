@@ -30,7 +30,16 @@ const homeDog=(game:Final)=>game.favorite==="away";
 const awayDog=(game:Final)=>game.favorite==="home";
 const numericHeader=(value:string|null)=>value==null||value===""?null:Number(value);
 const sportForCard=(card:CardRow)=>{const relation=Array.isArray(card.leagues)?card.leagues[0]:card.leagues;const sport=String(relation?.sport_id||"cfb").toLowerCase();return ["ncaam","ncaaw"].includes(sport)?sport:(sport==="nfl"?"nfl":"cfb");};
-const cardSize=(card:CardRow)=>card.card_kind==="conference_championship"?4:(["ncaam","ncaaw"].includes(sportForCard(card))?10:5);
+const cardSize=(card:CardRow)=>{
+  if(card.card_kind==="conference_championship")return 4;
+  const sport=sportForCard(card);
+  if(["ncaam","ncaaw"].includes(sport))return 10;
+  if(sport==="cfb"){
+    const selected=card.card_games?.length??0;
+    return selected>=5&&selected<=10?selected:-1;
+  }
+  return 5;
+};
 const providerSportKey=(sport:string)=>sport==="nfl"?"americanfootball_nfl":sport==="ncaam"?"basketball_ncaab":sport==="ncaaw"?"basketball_wncaab":"americanfootball_ncaaf";
 
 export function isScheduleEligible(card:CardRow,now=Date.now()):boolean{
@@ -53,7 +62,7 @@ export function scoreRefreshPlan(cards:CardRow[],now=Date.now()):{minAgeSeconds:
 }
 
 export function settleAutomaticProp(question:string,finals:Final[]):boolean|null{
-  const q=norm(question);if(![5,10].includes(finals.length))return null;
+  const q=norm(question);if(finals.length<5||finals.length>10)return null;
   if(q.includes("any team score 90 or more"))return finals.some((g)=>g.homeScore>=90||g.awayScore>=90);
   if(q.includes("any game finish within 3 points"))return finals.some((g)=>margin(g)<=3);
   if(q.includes("any underdog win outright"))return finals.some((g)=>(homeDog(g)&&homeWon(g))||(awayDog(g)&&awayWon(g)));
@@ -71,19 +80,21 @@ export function settleAutomaticProp(question:string,finals:Final[]):boolean|null
   if(q.includes("combined score of 56 or more"))return finals.some((g)=>total(g)>=56);
   if(q.includes("combined score of 40 or fewer"))return finals.some((g)=>total(g)<=40);
   if(q.includes("highest combined final score")&&q.includes("61 or more"))return Math.max(...finals.map(total))>=61;
-  if(q.includes("sum of")&&q.includes("five")&&q.includes("combined final scores")&&q.includes("281 or more"))return finals.reduce((sum,g)=>sum+total(g),0)>=281;
+  const highSum=q.match(/sum of all (?:five|\d+) combined final scores be (\d+) or more/);
+  if(highSum)return finals.reduce((sum,g)=>sum+total(g),0)>=Number(highSum[1]);
   if(q.includes("decided by 21 or more"))return finals.some((g)=>margin(g)>=21);
   if(q.includes("finish with 9 or fewer"))return finals.some((g)=>g.homeScore<=9||g.awayScore<=9);
   if(q.includes("finish with 46 or more"))return finals.some((g)=>g.homeScore>=46||g.awayScore>=46);
   if((q.includes("both teams scoring at least 25")||q.includes("both home and away scoring 25 or more")))return finals.some((g)=>g.homeScore>=25&&g.awayScore>=25);
-  if(q.includes("favorite cover all five"))return finals.every(fav);
-  if(q.includes("every underdog cover all five"))return finals.every(dog);
+  if(q.includes("favorite cover all"))return finals.every(fav);
+  if(q.includes("every underdog cover all"))return finals.every(dog);
   if(q.includes("exactly 0 points"))return finals.some((g)=>g.homeScore===0||g.awayScore===0);
   if(q.includes("score 50 or more"))return finals.some((g)=>g.homeScore>=50||g.awayScore>=50);
   if(q.includes("equal home and away scores"))return finals.some((g)=>g.homeScore===g.awayScore);
-  if(q.includes("sum of")&&q.includes("five combined final scores")&&q.includes("200 or fewer"))return finals.reduce((sum,g)=>sum+total(g),0)<=200;
-  if(q.includes("home team win all five"))return finals.every(homeWon);
-  if(q.includes("away team win all five"))return finals.every(awayWon);
+  const lowSum=q.match(/sum of all (?:five|\d+) combined final scores be (\d+) or fewer/);
+  if(lowSum)return finals.reduce((sum,g)=>sum+total(g),0)<=Number(lowSum[1]);
+  if(q.includes("home team win all"))return finals.every(homeWon);
+  if(q.includes("away team win all"))return finals.every(awayWon);
   if(q.includes("combined score of 71 or more"))return finals.some((g)=>total(g)>=71);
   if(q.includes("finish with 56 or more"))return finals.some((g)=>g.homeScore>=56||g.awayScore>=56);
   if(q.includes("decided by 35 or more"))return finals.some((g)=>margin(g)>=35);

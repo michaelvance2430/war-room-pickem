@@ -27,7 +27,13 @@ enum DispatchPresentationPolicy {
 }
 
 enum DispatchPageCatalog {
-    static let names = ["FRONT", "SPORTS", "RIVALRIES", "BACK"]
+    static let names = ["FRONT", "SPORTS", "RIVALRIES", "PROMOTION"]
+}
+
+struct DispatchPromotionStatus: Identifiable {
+    let id: UUID
+    let name: String
+    let progress: CareerRankProgress
 }
 
 struct GazetteView: View {
@@ -42,6 +48,7 @@ struct GazetteView: View {
     @State private var discoveryMessage: String?
     @State private var sharing = false
     @State private var shareItems: [Any] = []
+    @State private var promotionStatuses: [DispatchPromotionStatus] = []
 
     private var selected: GazetteEditionRow? {
         editions.first { $0.id == selectedId } ?? editions.first
@@ -63,18 +70,15 @@ struct GazetteView: View {
                     ScrollView {
                         VStack(spacing: 12) {
                             editionPicker
-                            if membership.leagues.mode == "foundry" && membership.leagues.sportId.lowercased() == "cfb" && edition.weekNumber == 1 {
-                                CinematicDispatchConceptView(page: $page)
-                            } else {
-                                GazettePaperView(
-                                    edition: edition,
-                                    leagueId: membership.leagueId,
-                                    sportId: membership.leagues.sportId,
-                                    regularSeasonWeeks: membership.leagues.regularSeasonWeeks,
-                                    page: $page
-                                )
-                                dispatchShareButton(edition)
-                            }
+                            GazettePaperView(
+                                edition: edition,
+                                leagueId: membership.leagueId,
+                                sportId: membership.leagues.sportId,
+                                regularSeasonWeeks: membership.leagues.regularSeasonWeeks,
+                                promotionStatuses: promotionStatuses,
+                                page: $page
+                            )
+                            dispatchShareButton(edition)
                         }
                         .frame(width: max(0, geometry.size.width - 20))
                         .padding(.horizontal, 10).padding(.bottom, 28)
@@ -121,6 +125,7 @@ struct GazetteView: View {
                     leagueId: membership.leagueId,
                     sportId: membership.leagues.sportId,
                     regularSeasonWeeks: membership.leagues.regularSeasonWeeks,
+                    promotionStatuses: promotionStatuses,
                     page: .constant(pageIndex)
                 )
                 .frame(width: 390)
@@ -154,12 +159,48 @@ struct GazetteView: View {
     private func load() async {
         guard let token = auth.token else { return }
         do {
-            editions = try await SupabaseAPI.gazetteEditions(token: token, leagueId: membership.leagueId)
+            async let loadedEditions = SupabaseAPI.gazetteEditions(token: token, leagueId: membership.leagueId)
+            async let loadedStandings = SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
+            editions = try await loadedEditions
+            let standings = (try? await loadedStandings) ?? []
+            promotionStatuses = await promotionStatusRows(token: token, standings: standings)
             selectedId = editions.first(where: { $0.weekNumber == initialWeek })?.id ?? editions.first?.id
             errorMessage = nil
             await recordSelectedSecrets()
         } catch { errorMessage = error.localizedDescription }
         loading = false
+    }
+
+    private func promotionStatusRows(token: String, standings: [Standing]) async -> [DispatchPromotionStatus] {
+        var achievementsByUser: [UUID: [ProfileAchievement]] = [:]
+        await withTaskGroup(of: (UUID, [ProfileAchievement]).self) { group in
+            for player in standings where !player.isBot {
+                group.addTask {
+                    (player.userId, (try? await SupabaseAPI.profileAchievements(token: token, userId: player.userId)) ?? [])
+                }
+            }
+            for await (userId, achievements) in group { achievementsByUser[userId] = achievements }
+        }
+        return standings.filter { !$0.isBot }.map { player in
+            let achievements = achievementsByUser[player.userId] ?? []
+            let creatorPoints = AppIdentity.isCreator(player.userId) && !achievements.contains(where: { $0.code == "the_commissioner" || $0.code == "the_creator" })
+                ? PromotionPoints.points(for: "the_creator") : 0
+            let points = PromotionPoints.total(for: achievements) + creatorPoints
+            let progress = CareerRanks.resolve(
+                points: points,
+                seasons: player.weeksPlayed / 10,
+                sports: 1,
+                minimumRankId: LegacyCareerRecords.minimumRankFloor(for: player.userId, liveFloor: player.profiles?.careerRankFloor)
+            )
+            return DispatchPromotionStatus(id: player.userId, name: player.name, progress: progress)
+        }
+        .sorted {
+            if $0.progress.current.promotionPoints != $1.progress.current.promotionPoints {
+                return $0.progress.current.promotionPoints > $1.progress.current.promotionPoints
+            }
+            if $0.progress.points != $1.progress.points { return $0.progress.points > $1.progress.points }
+            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
     }
 
     private func recordSelectedSecrets() async {
@@ -235,6 +276,7 @@ private struct GazettePaperView: View {
     let leagueId: UUID
     let sportId: String
     let regularSeasonWeeks: Int
+    let promotionStatuses: [DispatchPromotionStatus]
     @Binding var page: Int
     private let pageNames = DispatchPageCatalog.names
     private var payload: GazettePayload { edition.payload }
@@ -346,6 +388,7 @@ private struct GazettePaperView: View {
     }
 
     private var pageTitle: String {
+        if page == 3 { return "PROMOTION STATUS" }
         if page == 0, payload.chaosDetonation?.names?.isEmpty == false {
             return "THE \(weaponName) OPTION"
         }
@@ -366,6 +409,7 @@ private struct GazettePaperView: View {
     private var blastRadius: Int { max(0, crownPoints - shamePoints) }
 
     private var pageArtwork: String {
+        if page == 3 { return "ProfileShrine" }
         if page == 0, payload.chaosDetonation?.names?.isEmpty == false { return weaponArtwork }
         if page == 0, let announcement = phaseAnnouncement { return announcement.artwork }
         let rotations = [
@@ -395,7 +439,10 @@ private struct GazettePaperView: View {
     private var weaponGlyph: String { identity.isNFL ? "⌖" : ((identity.isFieldhouse || sportId.lowercased() == "nhl") ? "🔥" : "☢") }
 
     private var pageArtworkCaption: String {
-        [
+        if page == 3 {
+            return "PERSONNEL FILES UPDATED. NEW AUTHORITY ISSUED WITHOUT EVIDENCE IT WAS A GOOD IDEA."
+        }
+        return [
             "DISPATCH PHOTOGRAPHERS ENTERED THE BLAST ZONE AFTER THE CROWN WAS SECURED.",
             "FORENSIC REVIEW OF THE WEEK'S DAMAGE. SOME DIGNITY COULD NOT BE RECOVERED.",
             "SURVEILLANCE IMAGE FROM THE BEEF DESK. DIPLOMATS WERE NOT CONSULTED.",
@@ -410,7 +457,7 @@ private struct GazettePaperView: View {
             else { frontPage }
         case 1: sportsPage
         case 2: rivalriesPage
-        default: backPage
+        default: promotionPage
         }
     }
 
@@ -549,44 +596,48 @@ private struct GazettePaperView: View {
         }
     }
 
-    private var backPage: some View {
+    private var promotionPage: some View {
         VStack(alignment: .leading, spacing: 15) {
-            GazetteBanner(text: "PERSONNEL ORDERS · SEIZED PROPERTY · TERRIBLE OPPORTUNITIES")
-            if let chaos = payload.chaosDetonation {
-                GazetteBrief(kicker: "BUTTON PUSHED", story: chaos, color: .red)
-                if let names = chaos.names, !names.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("\(weaponName) ROLL CALL").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.red)
-                        ForEach(names, id: \.self) { name in
-                            Text("\(weaponGlyph) \(name.uppercased())").font(.headline.weight(.black))
-                        }
-                    }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red.opacity(0.7)))
-                }
-            }
+            GazetteBanner(text: "PERSONNEL ORDERS · AUTHORITY INCREASED · JUDGMENT UNCHANGED")
             if let orders = payload.promotionOrders, !orders.isEmpty {
-                Text("PROMOTION ORDERS").font(.headline.weight(.black))
+                Text("NEW ORDERS FILED THIS WEEK").font(.headline.weight(.black)).foregroundStyle(dispatchAccent)
                 ForEach(Array(orders.enumerated()), id: \.offset) { _, order in
-                    Text("★ \(order.name ?? "PLAYER") · \(order.from ?? "RANK") → \(order.to ?? "RANK")\n\(order.deck ?? "Orders received.")")
-                        .font(.system(.caption, design: .serif)).fontWeight(.bold)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("★ \(order.name ?? "PLAYER") · \(order.from ?? "RANK") → \(order.to ?? "RANK")")
+                            .font(.subheadline.weight(.black))
+                        Text(order.deck ?? promotionRemark(for: order.to ?? ""))
+                            .font(.system(.caption, design: .serif)).fontWeight(.bold).foregroundStyle(.white.opacity(0.72))
+                    }
+                    .padding(11).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(dispatchAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(dispatchAccent.opacity(0.65)))
                 }
             }
-            Text("BLACK MARKET / CLASSIFIEDS").font(.headline.weight(.black)).foregroundStyle(.red)
-            ForEach(Array((payload.classifieds ?? ["WANTED: accountability. Last seen before kickoff."]).enumerated()), id: \.offset) { _, item in
-                Text("• \(item)").font(.system(.caption, design: .serif))
+            Text("CURRENT ROOM ROSTER").font(.headline.weight(.black)).foregroundStyle(.red)
+            if promotionStatuses.isEmpty {
+                Text("Personnel records are unavailable. The clerk has been reassigned to a role with fewer buttons.")
+                    .font(.system(.caption, design: .serif)).fontWeight(.bold)
+            } else {
+                ForEach(promotionStatuses) { status in
+                    HStack(alignment: .top, spacing: 10) {
+                        RankInsigniaView(rank: status.progress.current, size: 42)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("\(status.name.uppercased()) · \(status.progress.current.abbreviation)")
+                                .font(.subheadline.weight(.black))
+                            Text("\(status.progress.points) PP · \(status.progress.next.map { "\(status.progress.pointsToNext) TO \($0.abbreviation)" } ?? "MAXIMUM RANK")")
+                                .font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(dispatchAccent)
+                            Text(promotionRemark(for: status.progress.current.abbreviation))
+                                .font(.system(.caption2, design: .serif)).fontWeight(.semibold).foregroundStyle(.white.opacity(0.62))
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(10).background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 8))
+                }
             }
-            Text("EDITOR'S NOTICE").font(.headline.weight(.black)).foregroundStyle(dispatchAccent)
-            Text([
-                "No apologies were requested, offered, or legally advisable during the production of this edition.",
-                "This newspaper accepts tips, screenshots, and allegations with strong comedic upside.",
-                "Corrections will be printed when the guilty parties become less guilty. Do not wait up.",
-                "All subjects were given a chance to comment. Their excuses were funnier than our copy.",
-                "The Dispatch regrets nothing and has retained counsel anyway.",
-                "Next week's dignity forecast remains dangerously low."
-            ][storySeed])
+            Text("BOARD FINDING").font(.headline.weight(.black)).foregroundStyle(dispatchAccent)
+            Text(promotionStatuses.contains { $0.progress.current.id != "rank_pfc" }
+                 ? "Several members now outrank their decision-making. The chain of command has been notified and chosen denial."
+                 : "No promotions were authorized. The board found enthusiasm, potential, and no legally defensible reason to add a stripe.")
                 .font(.system(.caption, design: .serif)).fontWeight(.bold)
             Text((payload.printedLine ?? edition.createdAt).uppercased()).font(.system(size: 7, weight: .bold)).tracking(0.7).foregroundStyle(ink.opacity(0.55))
             HStack {
@@ -594,6 +645,22 @@ private struct GazettePaperView: View {
                 Text(String(EasterEggEngine.gazetteSecretLetter(week: edition.weekNumber)))
                     .font(.system(size: 7, weight: .black, design: .monospaced)).foregroundStyle(ink.opacity(0.18))
             }
+        }
+    }
+
+    private func promotionRemark(for abbreviation: String) -> String {
+        switch abbreviation.uppercased() {
+        case "CPL": return "Now officially responsible for people who were not listening anyway."
+        case "SGT": return "Issued a clipboard, a louder voice, and accountability for choices made by adults."
+        case "SSG": return "Promoted into the sacred middle layer where every failure is somehow theirs."
+        case "SFC": return "Senior enough to know better; experienced enough to write the counseling statement."
+        case "MSG": return "Meetings now begin when they arrive and end when everyone stops making excuses."
+        case "1SG": return "The room has acquired a formation, a safety brief, and a 0430 accountability problem."
+        case "SGM", "CSM": return "Strategic guidance delivered at maximum volume from a suspiciously clean desk."
+        case "2LT", "1LT": return "Fresh authority has arrived with a map, a plan, and dangerous confidence in both."
+        case "CPT", "MAJ", "LTC", "COL": return "Promoted to the level where every email is urgent and every meeting creates two more meetings."
+        case "BG", "MG", "LTG", "GEN", "★★★★★": return "The rank is now mostly stars, conference rooms, and plausible deniability."
+        default: return "Still technically junior personnel. The confidence, unfortunately, is already command-grade."
         }
     }
 }
