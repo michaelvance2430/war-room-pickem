@@ -2,7 +2,7 @@
 
 **Prepared:** September 6, 2026
 **Bundle ID:** `com.warroompicks.WarRoom`
-**Version:** 3.4 (Build 26)
+**Version:** 3.4 (Build 27)
 **Release model:** Free 1.0; no purchases, ads, cash prizes, or wagering
 
 ## Store URLs
@@ -111,14 +111,14 @@ Guideline 1.2 resubmission evidence:
 - Confirm Account → Delete account is visible and complete a disposable non-commissioner deletion before submission.
 - Capture current iPhone screenshots after the signed device build is final.
 - Recheck every privacy answer if analytics, crash reporting, notifications, payments, or advertising are added.
-- For Build 26, disclose Identifiers · Device ID as linked to the user and used for App Functionality because notification tokens and per-install identifiers are stored off-device. Keep tracking set to No.
+- For Build 27, disclose Identifiers · Device ID as linked to the user and used for App Functionality because notification tokens and per-install identifiers are stored off-device. Keep tracking set to No.
 - Keep `public.app_release_channels.enabled` off until Apple confirms the new build is publicly installable. After release, set `recommended_build` and `release_version`, then verify that the immediately previous production build shows the gray update prompt and that Update Now opens the correct App Store page. Use `minimum_build` only for an approved mandatory update.
 
 ## Engineering certification
 
 - On August 18, 2026, Xcode produced a historical signed Release device archive for the prior app target with Apple Team `XWW458P3J7`.
 - The archive exported successfully with App Store Connect distribution signing, `get-task-allow = false`, and the dedicated `app.war-room-picks.com` associated domain.
-- That historical export was version `1.0`, build `1`, minimum iOS `15.0`, and does not certify the current native Build 26 target.
+- That historical export was version `1.0`, build `1`, minimum iOS `15.0`, and does not certify the current native Build 27 target.
 - Repeat the archive and export after the final production checkpoint; a successful historical export does not replace the final upload validation.
 
 ## TestFlight acceptance run

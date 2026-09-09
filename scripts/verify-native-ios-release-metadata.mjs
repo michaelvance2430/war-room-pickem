@@ -11,7 +11,7 @@ const buildNumbers = [...project.matchAll(/CURRENT_PROJECT_VERSION = ([^;]+);/g)
 const marketingVersions = [...project.matchAll(/MARKETING_VERSION = ([^;]+);/g)].map((match) => match[1]);
 
 assert.equal(buildNumbers.length, 6, "Expected Build number on app, unit-test, and UI-test Debug/Release configurations");
-assert.deepEqual(new Set(buildNumbers), new Set(["26"]), "Every native target configuration must be stamped Build 26");
+assert.deepEqual(new Set(buildNumbers), new Set(["27"]), "Every native target configuration must be stamped Build 27");
 assert.equal(marketingVersions.length, 6, "Expected marketing version on app, unit-test, and UI-test Debug/Release configurations");
 assert.deepEqual(new Set(marketingVersions), new Set(["3.4"]), "Every native target configuration must be stamped Version 3.4");
 
@@ -28,4 +28,4 @@ assert.match(privacy, /NSPrivacyAccessedAPICategoryUserDefaults/);
 assert.match(privacy, /NSPrivacyCollectedDataTypeDeviceID/, "notification device identifiers must be disclosed");
 assert.ok(existsSync(new URL("../native-ios/WarRoom/Assets.xcassets/AppIcon.appiconset", import.meta.url)));
 
-console.log("Native iOS release metadata PASS - Version 3.4, Build 26, bundle identity, signing team, push/deep-link entitlements, privacy manifest, encryption declaration, and app icon are present");
+console.log("Native iOS release metadata PASS - Version 3.4, Build 27, bundle identity, signing team, push/deep-link entitlements, privacy manifest, encryption declaration, and app icon are present");
