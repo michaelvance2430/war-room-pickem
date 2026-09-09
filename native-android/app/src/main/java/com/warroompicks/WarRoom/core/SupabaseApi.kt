@@ -265,6 +265,17 @@ class SupabaseApi {
         return rows.optJSONObject(0)?.stringOrNull("team_name")
     }
 
+    suspend fun crystalBallLockAt(token: String, league: League): Instant? {
+        val openingWeek = if (league.sport == Sport.NFL) 1 else 0
+        val select = "lock_time,card_games(start_time)"
+        val rows = requestArray("/rest/v1/week_cards?select=${encode(select)}&league_id=eq.${league.id}&week_number=eq.$openingWeek&limit=1", token)
+        val row = rows.optJSONObject(0) ?: return null
+        return row.arrayOrEmpty("card_games").objects()
+            .mapNotNull { instant(it.stringOrNull("start_time")) }
+            .minOrNull()
+            ?: instant(row.stringOrNull("lock_time"))
+    }
+
     suspend fun saveCrystalBall(token: String, leagueId: UUID, userId: UUID, team: String) {
         request(
             "/rest/v1/crystal_ball_picks?on_conflict=league_id,user_id", "POST", token,

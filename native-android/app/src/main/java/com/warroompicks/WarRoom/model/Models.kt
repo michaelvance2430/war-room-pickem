@@ -164,6 +164,10 @@ object StandingMovement {
     }
 }
 
+object CrystalBallWindow {
+    fun isOpen(lockAt: Instant?, now: Instant = Instant.now()): Boolean = lockAt == null || now.isBefore(lockAt)
+}
+
 data class LockerMessage(
     val id: UUID,
     val userId: UUID,

@@ -3,6 +3,7 @@ package com.warroompicks.WarRoom
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.warroompicks.WarRoom.core.SecureSessionStore
 import com.warroompicks.WarRoom.core.SupabaseApi
 import com.warroompicks.WarRoom.model.*
@@ -17,6 +18,7 @@ import java.util.UUID
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import com.warroompicks.WarRoom.push.NotificationPreference
+import com.warroompicks.WarRoom.model.CrystalBallWindow
 
 data class AppState(
     val restoring: Boolean = true,
@@ -46,6 +48,7 @@ data class AppState(
     val cfbPollLoading: Boolean = false,
     val favoriteTeam: String? = null,
     val crystalBallTeam: String? = null,
+    val crystalBallLockAt: Instant? = null,
     val error: String? = null,
     val notice: String? = null,
 )
@@ -53,7 +56,7 @@ data class AppState(
 private data class LeagueSnapshot(
     val card: Pair<WeekCard, List<CardGame>>?, val games: List<CardGame>, val pick: CurrentPick?,
     val certifiedWeekResult: CertifiedWeekResult?,
-    val favorite: String?, val crystal: String?, val standings: List<Standing>,
+    val favorite: String?, val crystal: String?, val crystalLockAt: Instant?, val standings: List<Standing>,
     val messages: List<LockerMessage>, val announcements: List<Announcement>,
     val history: List<HistoryWeek>, val trophies: List<Trophy>, val achievements: List<Achievement>,
     val nflSlate: NflPostseasonSlate?, val nflEntry: NflPostseasonEntry?,
@@ -145,6 +148,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 certifiedWeekResult = runCatching { api.certifiedWeekResult(session.accessToken, league) }.getOrNull(),
                 favorite = runCatching { api.favoriteTeam(session.accessToken, session.userId, league.sport) }.getOrNull(),
                 crystal = runCatching { api.crystalBall(session.accessToken, league.id, session.userId) }.getOrNull(),
+                crystalLockAt = runCatching { api.crystalBallLockAt(session.accessToken, league) }.getOrNull(),
                 standings = runCatching { api.standings(session.accessToken, league) }.getOrDefault(state.standings),
                 messages = runCatching { api.lockerMessages(session.accessToken, league.id) }.getOrDefault(state.messages),
                 announcements = runCatching { api.announcements(session.accessToken, league.id) }.getOrDefault(state.announcements),
@@ -163,7 +167,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = _state.value.copy(
                 card = loaded.card?.first, games = loaded.games, currentPick = loaded.pick,
                 certifiedWeekResult = loaded.certifiedWeekResult,
-                favoriteTeam = loaded.favorite, crystalBallTeam = loaded.crystal,
+                favoriteTeam = loaded.favorite, crystalBallTeam = loaded.crystal, crystalBallLockAt = loaded.crystalLockAt,
                 standings = loaded.standings, messages = loaded.messages,
                 announcements = loaded.announcements, error = null,
                 history = loaded.history, trophies = loaded.trophies, achievements = loaded.achievements,
@@ -219,6 +223,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun saveCrystalBall(team: String) = launchBusy {
         val session = _state.value.session ?: return@launchBusy
         val league = _state.value.league ?: return@launchBusy
+        require(CrystalBallWindow.isOpen(_state.value.crystalBallLockAt)) { "The opening kickoff has passed. The prophecy is sealed." }
         api.saveCrystalBall(session.accessToken, league.id, session.userId, team)
         _state.value = _state.value.copy(busy = false, crystalBallTeam = team, notice = "CRYSTAL BALL LOCKED · $team")
     }
@@ -405,6 +410,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun showError(error: Throwable) {
+        Log.e("WarRoom", "Command failed", error)
         _state.value = _state.value.copy(busy = false, error = error.message ?: "The War Room could not complete that command.")
     }
 

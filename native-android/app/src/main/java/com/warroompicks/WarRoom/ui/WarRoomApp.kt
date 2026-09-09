@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warroompicks.WarRoom.AppViewModel
 import com.warroompicks.WarRoom.model.Sport
+import com.warroompicks.WarRoom.model.CrystalBallWindow
 import com.warroompicks.WarRoom.ui.screens.*
 import com.warroompicks.WarRoom.ui.theme.NflCyan
 import com.warroompicks.WarRoom.ui.theme.WarGreen
@@ -111,11 +112,12 @@ fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null,
                 viewModel.clearMessage()
             }
             LaunchedEffect(state.league?.id) { viewModel.refreshLive() }
-            if ((state.favoriteTeam == null || state.crystalBallTeam == null) && !state.busy) {
+            val needsOpenCrystalBall = state.crystalBallTeam == null && CrystalBallWindow.isOpen(state.crystalBallLockAt)
+            if ((state.favoriteTeam == null || needsOpenCrystalBall) && !state.busy) {
                 IdentitySetupDialog(
                     sport = sport,
                     needsFavorite = state.favoriteTeam == null,
-                    needsCrystal = state.crystalBallTeam == null,
+                    needsCrystal = needsOpenCrystalBall,
                     saveFavorite = viewModel::saveFavorite,
                     saveCrystal = viewModel::saveCrystalBall,
                     dismissAllowed = false,

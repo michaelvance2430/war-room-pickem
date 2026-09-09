@@ -71,7 +71,15 @@ fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (Str
             item { CommandPanel("CALL SIGN", standing?.displayName ?: session.email.substringBefore('@'), "Your account name follows you across every sport. Tap to edit.", league.sport, onClick = { editName = true }) }
             item { CommandPanel("CAMPAIGN RECORD", "${standing?.points?.toInt() ?: 0} career points", "Current rank: ${standing?.rank ?: "—"} · Historical weekly scorecards remain on file.", league.sport) }
             item { CommandPanel("TEAM ALLEGIANCE", state.favoriteTeam ?: "Choose favorite team", "Editable at any time. Your favorite appears on commissioner boards.", league.sport, onClick = { editFavorite = true }) }
-            item { CommandPanel("CRYSTAL BALL", state.crystalBallTeam ?: "Preseason champion pick", "Required once at the start of this campaign and displayed on your profile.", league.sport) }
+            item {
+                val crystalOpen = com.warroompicks.WarRoom.model.CrystalBallWindow.isOpen(state.crystalBallLockAt)
+                CommandPanel(
+                    "CRYSTAL BALL",
+                    state.crystalBallTeam ?: if (crystalOpen) "Preseason champion pick" else "Closed · No pick filed",
+                    if (crystalOpen) "Required once at the start of this campaign and displayed on your profile." else "The opening kickoff has passed. This campaign's prophecy is sealed.",
+                    league.sport,
+                )
+            }
             item { CommandPanel("EARNED SCHWAG · ${state.trophies.size + state.achievements.size}", if (earnedSwagExpanded) "Close the cabinet" else "Open the cabinet", "Cheevos, championships, conference titles, Crystal Ball and Toilet Bowl evidence.", league.sport, onClick = { earnedSwagExpanded = !earnedSwagExpanded }) }
             if (earnedSwagExpanded && state.achievements.isNotEmpty()) {
                 item { Text("CHEEVO PERSONNEL RECORDS", color = accent, fontWeight = FontWeight.Black) }
