@@ -2,6 +2,12 @@ import Testing
 @testable import WarRoom
 
 struct AppStoreUpdateTests {
+    @Test func newerBuildTriggersUpdateWithinSameVersion() {
+        #expect(AppStoreUpdatePolicy.isNewer(build: 27, than: 26))
+        #expect(!AppStoreUpdatePolicy.isNewer(build: 26, than: 26))
+        #expect(!AppStoreUpdatePolicy.isNewer(build: 25, than: 26))
+    }
+
     @Test func newerSemanticVersionTriggersUpdate() {
         #expect(AppStoreUpdatePolicy.isNewer(storeVersion: "3.4", than: "3.3"))
         #expect(AppStoreUpdatePolicy.isNewer(storeVersion: "4.0.0", than: "3.99.99"))
