@@ -430,6 +430,8 @@ private struct PicksView: View {
     @State private var editingSubmittedCard = false
     @State private var tacticalNukesUsed = 0
     @State private var confirmingRegularSeasonWeapon = false
+    @State private var showingCrystalBallRequired = false
+    @State private var showingCrystalBall = false
     @State private var strikePresentation: StrikePresentation?
     @State private var boardPicks: [BoardPick] = []
     @State private var boardScores: [UUID: SyncedFootballScore] = [:]
@@ -592,6 +594,24 @@ private struct PicksView: View {
                     await loadBoard(card: card)
                 }
             }
+            .alert("Choose your Crystal Ball", isPresented: $showingCrystalBallRequired) {
+                Button("Choose Crystal Ball") { showingCrystalBall = true }
+                Button("Not now", role: .cancel) {}
+            } message: {
+                Text("You must choose your Crystal Ball before you can save any picks.")
+            }
+            .sheet(isPresented: $showingCrystalBall) {
+                if let league {
+                    NavigationStack {
+                        CrystalBallView(membership: league)
+                            .toolbar {
+                                ToolbarItem(placement: .confirmationAction) {
+                                    Button("Back to Picks") { showingCrystalBall = false }
+                                }
+                            }
+                    }
+                }
+            }
             .alert(regularSeasonWeaponConfirmationTitle, isPresented: $confirmingRegularSeasonWeapon) {
                 Button("KEEP CONTROL", role: .cancel) {}
                 Button(regularSeasonWeaponAuthorizationLabel, role: .destructive) {
@@ -728,12 +748,27 @@ private struct PicksView: View {
             : "Ready to lock it in. Regret can wait until Saturday."
     }
 
+    private func requireCrystalBall(token: String, league: LeagueMembership) async throws -> Bool {
+        guard let user = auth.user else { return false }
+        let existing = try await SupabaseAPI.crystalBallPick(token: token, leagueId: league.leagueId, userId: user.id)
+        guard let existing, !existing.teamName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            saveNotice = nil
+            showingCrystalBallRequired = true
+            return false
+        }
+        return true
+    }
+
     private func save(card: WeekCard) async {
         guard let token = auth.token, let league, let bestBetGameId, let propChoice,
               isComplete(card: card) else { return }
         saving = true
         saveErrorMessage = nil
         do {
+            guard try await requireCrystalBall(token: token, league: league) else {
+                saving = false
+                return
+            }
             let submissions = card.cardGames.compactMap { game -> PickSubmission? in
                 guard let value = draft[game.id], let side = value.side, let confidence = value.confidence else { return nil }
                 return PickSubmission(gameId: game.id, side: side, confidence: confidence)
@@ -785,6 +820,10 @@ private struct PicksView: View {
         saving = true
         saveErrorMessage = nil
         do {
+            guard try await requireCrystalBall(token: token, league: league) else {
+                saving = false
+                return
+            }
             _ = try await SupabaseAPI.saveWeekPicks(
                 token: token,
                 leagueId: league.leagueId,
@@ -4303,6 +4342,7 @@ private struct CrystalBallView: View {
     @State private var team = ""
     @State private var saving = false
     @State private var loading = true
+    @State private var loadFailed = false
     @State private var savedTeam: String?
     @State private var editing = false
     @State private var teamSearch = ""
@@ -4326,7 +4366,7 @@ private struct CrystalBallView: View {
                             Label("RECEIPT SECURED", systemImage: "checkmark.seal.fill")
                                 .font(.caption.weight(.black)).tracking(1).foregroundStyle(isNFL ? .cyan : .green)
                         }
-                        CrystalBallDeadlineView(lockAt: lockAt, sportId: membership.leagues.sportId)
+                        crystalBallDeadline
                         if canChange {
                             Button {
                                 editing = true
@@ -4351,15 +4391,15 @@ private struct CrystalBallView: View {
                 } else {
                     VStack(spacing: 18) {
                     VStack(spacing: 7) {
-                        Text(isNFL ? "SUPER BOWL FUTURES DESK" : "PRESEASON INTELLIGENCE DIVISION").font(.system(size: 9, weight: .black)).tracking(2).foregroundStyle(isNFL ? .cyan : .green)
+                        Text(isNFL ? "SUPER BOWL FUTURES DESK" : "SEASON INTELLIGENCE DIVISION").font(.system(size: 9, weight: .black)).tracking(2).foregroundStyle(isNFL ? .cyan : .green)
                         Text("THE CRYSTAL BALL").font(.system(size: 34, weight: .black)).fontWidth(.condensed)
-                        Text(isNFL ? "CALL THE SUPER BOWL CHAMPION BEFORE WEEK 1 KICKS OFF." : "CALL THE NATIONAL CHAMPION BEFORE THE RECEIPTS EXIST.")
+                        Text(isNFL ? "CALL THE SUPER BOWL CHAMPION." : "CALL THE NATIONAL CHAMPION.")
                             .font(.caption.weight(.black)).tracking(0.8).foregroundStyle(.white.opacity(0.58)).multilineTextAlignment(.center)
                     }
 
                     crystalBallArtifact.frame(maxWidth: 330, maxHeight: 330)
 
-                    CrystalBallDeadlineView(lockAt: lockAt, sportId: membership.leagues.sportId)
+                    crystalBallDeadline
 
                     VStack(alignment: .leading, spacing: 10) {
                         Text(savedTeam == nil ? "YOUR PROPHECY" : "REVISE PROPHECY")
@@ -4403,12 +4443,27 @@ private struct CrystalBallView: View {
             let openingWeek = membership.leagues.sportId.lowercased() == "nfl" ? 1 : 0
             async let loadedPick = SupabaseAPI.crystalBallPick(token: token, leagueId: membership.leagueId, userId: user.id)
             async let loadedCard = SupabaseAPI.weekCard(token: token, leagueId: membership.leagueId, weekNumber: openingWeek)
-            let existing = (try? await loadedPick)?.teamName
-            let card = try? await loadedCard
-            team = existing ?? ""
-            savedTeam = existing
-            lockAt = card?.cardGames.compactMap { footballKickoffDate($0.startTime) }.min() ?? footballKickoffDate(card?.lockTime)
+            do {
+                let existing = try await loadedPick
+                let card = try await loadedCard
+                team = existing?.teamName ?? ""
+                savedTeam = existing?.teamName
+                lockAt = card?.cardGames.compactMap { footballKickoffDate($0.startTime) }.min() ?? footballKickoffDate(card?.lockTime)
+                loadFailed = false
+            } catch {
+                loadFailed = true
+                errorMessage = "Could not load your Crystal Ball. Reopen this screen to try again."
+            }
             loading = false
+        }
+    }
+
+    @ViewBuilder private var crystalBallDeadline: some View {
+        if savedTeam == nil, let lockAt, Date() >= lockAt {
+            Text("Your first Crystal Ball pick is still available. Once saved, it cannot be changed.")
+                .font(.footnote.weight(.semibold)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        } else {
+            CrystalBallDeadlineView(lockAt: lockAt, sportId: membership.leagues.sportId)
         }
     }
 
@@ -4431,7 +4486,7 @@ private struct CrystalBallView: View {
                 .shadow(color: .green.opacity(0.38), radius: 26)
         }
     }
-    private var canChange: Bool { lockAt.map { Date() < $0 } ?? true }
+    private var canChange: Bool { !loadFailed && (savedTeam == nil || (lockAt.map { Date() < $0 } ?? true)) }
 
     private func save() async {
         guard let token = auth.token, let user = auth.user else { return }
