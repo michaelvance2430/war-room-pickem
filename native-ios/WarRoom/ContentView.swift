@@ -3051,6 +3051,8 @@ struct HomeView: View {
                             }.buttonStyle(WarRoomCardButtonStyle())
                         }
 
+                        MyLeaguesSection(accent: isNFL ? .cyan : .green)
+
                         if sportPoolPoll != nil || isCommissioner {
                             NavigationLink { SportPoolView(membership: membership) } label: {
                                 CompactHomeRow(
@@ -4710,7 +4712,7 @@ struct CommissionerScoreWeekView: View {
     }
 }
 
-private func normalizedFootballTeam(_ value: String) -> String {
+func normalizedFootballTeam(_ value: String) -> String {
     value.lowercased().unicodeScalars.map { CharacterSet.alphanumerics.contains($0) ? Character(String($0)) : " " }
         .reduce(into: "") { $0.append($1) }
         .split(separator: " ").joined(separator: " ")

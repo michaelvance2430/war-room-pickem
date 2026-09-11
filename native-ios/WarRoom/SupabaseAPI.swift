@@ -1519,6 +1519,17 @@ enum SupabaseAPI {
         return try await send(request, as: CfbPollSnapshot.self)
     }
 
+    static func myLeaguesWeekResult(token: String, leagueId: UUID, week: Int) async throws -> CertifiedWeekResult? {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/week_results"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,week_number,prop_result,scored_at,game_results(card_game_id,winner,away_score,home_score)"),
+            URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
+            URLQueryItem(name: "week_number", value: "eq.\(week)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [CertifiedWeekResult].self).first
+    }
+
     static func regularSeasonScorecards(token: String, leagueId: UUID, userId: UUID) async throws -> [RegularSeasonScorecard] {
         var pickComponents = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/picks"), resolvingAgainstBaseURL: false)!
         pickComponents.queryItems = [

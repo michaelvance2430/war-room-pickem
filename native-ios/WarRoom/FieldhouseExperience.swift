@@ -2935,6 +2935,7 @@ private struct FieldhouseHomePage: View {
             if let certifiedWindow = state.lastCertifiedWindow, let certifiedPoints = state.lastCertifiedPoints {
                 FieldhouseAction(kicker: "LAST CERTIFIED SCORECARD", title: "Week \(certifiedWindow) · \(certifiedPoints) points", detail: "Permanent weekly receipt.", icon: "clipboard.fill")
             }
+            MyLeaguesSection(accent: accent)
             moreFromWarRoom
             fieldReports
             roomOperations
