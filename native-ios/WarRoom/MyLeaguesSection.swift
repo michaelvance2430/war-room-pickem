@@ -166,7 +166,9 @@ struct MyLeaguesSection: View {
         .background(.black.opacity(0.9), in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.35)))
         .sheet(item: $selected) { membership in
-            StandingsView(leagueOverride: membership).environmentObject(auth)
+            StandingsView(leagueOverride: membership, onBack: { selected = nil })
+                .environmentObject(auth)
+                .presentationDragIndicator(.visible)
         }
         .task(id: auth.user?.id) {
             guard previewRows == nil else { return }
