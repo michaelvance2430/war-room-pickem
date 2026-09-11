@@ -2087,6 +2087,7 @@ struct StandingsView: View {
     @State private var latestTrophyByUser: [UUID: ProfileTrophy] = [:]
     @State private var careerRankByUser: [UUID: CareerRankProgress] = [:]
     @State private var postseasonScoreByUser: [UUID: CfbPostseasonScore] = [:]
+    @State private var achievementPointsByUser: [UUID: Int] = [:]
     @State private var selectedProfileUserId: UUID?
     @State private var selectedTrophy: ProfileTrophy?
     @State private var sportId = "cfb"
@@ -2191,7 +2192,8 @@ struct StandingsView: View {
 
                                 ForEach(Array(displayStandings.enumerated()), id: \.element.id) { index, standing in
                                     StandingRankCard(
-                                        rank: index + 1,
+                                        rank: displayedRank(for: standing)?.position ?? index + 1,
+                                        rankLabel: displayedRank(for: standing)?.label,
                                         standing: standing,
                                         sportId: sportId,
                                         trophy: latestTrophyByUser[standing.userId],
@@ -2292,14 +2294,18 @@ struct StandingsView: View {
         return standings.filter { conferenceLabel(for: $0.division) == activeConference }
     }
 
+    private var displayedTotals: [UUID: Int] {
+        LeagueStandingsRanking.totals(filteredStandings,
+            postseason: postseasonScoreByUser.mapValues(\.postseasonTotal),
+            projections: liveProjectionActive ? liveProjectionByUser : nil)
+    }
+
     private var displayStandings: [Standing] {
-        let rows = filteredStandings
-        guard liveProjectionActive else { return rows }
-        return rows.sorted {
-            let left = liveProjectionByUser[$0.userId] ?? $0.totalPoints
-            let right = liveProjectionByUser[$1.userId] ?? $1.totalPoints
-            return left == right ? $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending : left > right
-        }
+        LeagueStandingsRanking.ordered(filteredStandings, totals: displayedTotals, achievementPoints: achievementPointsByUser)
+    }
+
+    private func displayedRank(for standing: Standing) -> LeagueStandingsRanking.Rank? {
+        LeagueStandingsRanking.rank(userID: standing.userId, totals: displayedTotals, achievementPoints: achievementPointsByUser)
     }
 
     private var rankMovementByUser: [UUID: Int] {
@@ -2375,24 +2381,16 @@ struct StandingsView: View {
                     group.addTask { (player.userId, (try? await SupabaseAPI.profileAchievements(token: token, userId: player.userId)) ?? []) }
                 }
                 for await (userId, achievements) in group {
-                    let creatorPoints = AppIdentity.isCreator(userId) && !achievements.contains(where: { $0.code == "the_commissioner" || $0.code == "the_creator" }) ? PromotionPoints.points(for: "the_creator") : 0
                     let player = standings.first { $0.userId == userId }
-                    let cheevoPoints = PromotionPoints.total(for: achievements) + creatorPoints
+                    let cheevoPoints = LeagueStandingsRanking.achievementPoints(achievements, userID: userId)
                     cheevoPointsByUser[userId] = cheevoPoints
                     ranks[userId] = CareerRanks.resolve(points: cheevoPoints, seasons: (player?.weeksPlayed ?? 0) / 10, sports: 1, minimumRankId: LegacyCareerRecords.minimumRankFloor(for: userId, liveFloor: player?.profiles?.careerRankFloor))
                 }
             }
-            standings.sort { left, right in
-                let leftTotal = left.totalPoints + postseasonScoreByUser[left.userId, default: CfbPostseasonScore(userId: left.userId, bowlScore: nil, cfpScore: nil, postseasonTotal: 0)].postseasonTotal
-                let rightTotal = right.totalPoints + postseasonScoreByUser[right.userId, default: CfbPostseasonScore(userId: right.userId, bowlScore: nil, cfpScore: nil, postseasonTotal: 0)].postseasonTotal
-                if leftTotal != rightTotal { return leftTotal > rightTotal }
-                let leftCheevoPoints = cheevoPointsByUser[left.userId, default: 0]
-                let rightCheevoPoints = cheevoPointsByUser[right.userId, default: 0]
-                if leftCheevoPoints != rightCheevoPoints { return leftCheevoPoints > rightCheevoPoints }
-                let nameOrder = left.name.localizedCaseInsensitiveCompare(right.name)
-                if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
-                return left.userId.uuidString < right.userId.uuidString
-            }
+            achievementPointsByUser = cheevoPointsByUser
+            standings = LeagueStandingsRanking.ordered(standings,
+                totals: LeagueStandingsRanking.totals(standings, postseason: postseasonScoreByUser.mapValues(\.postseasonTotal)),
+                achievementPoints: cheevoPointsByUser)
             careerRankByUser = ranks
             await refreshLiveProjection()
             errorMessage = nil
@@ -2405,33 +2403,12 @@ struct StandingsView: View {
         guard let token = auth.token, let membership = activeMembership else { return }
         do {
             guard let card = try await SupabaseAPI.weekCard(token: token, leagueId: membership.leagueId, weekNumber: membership.leagues.currentWeek),
-                  card.cardGames.contains(where: { $0.startTime.flatMap { ISO8601DateFormatter().date(from: $0) }.map { $0 <= Date() } == true })
+                  MyLeaguesScoring.hasStarted(card: card)
             else { liveProjectionActive = false; liveProjectionStale = false; return }
             async let feed = SupabaseAPI.footballScores(token: token, leagueId: membership.leagueId, sportId: membership.leagues.sportId, weekNumber: card.weekNumber)
             async let board = SupabaseAPI.weekBoard(token: token, leagueId: membership.leagueId, weekNumber: membership.leagues.currentWeek)
             let (scores, picks) = try await (feed, board)
-            let eventsByGame = Dictionary(uniqueKeysWithValues: card.cardGames.compactMap { game in
-                scores.events.first(where: { scoreEvent($0, matches: game) }).map { (game.id, $0) }
-            })
-            var projections: [UUID: Int] = [:]
-            for standing in standings {
-                guard let player = picks.first(where: { $0.userId == standing.userId }), player.totalPoints == nil else {
-                    projections[standing.userId] = standing.totalPoints
-                    continue
-                }
-                var liveWeek = 0
-                for selected in player.pickGames {
-                    guard let game = card.cardGames.first(where: { $0.id == selected.cardGameId }),
-                          let event = eventsByGame[game.id],
-                          let home = scoreValue(team: event.homeTeam, in: event),
-                          let away = scoreValue(team: event.awayTeam, in: event),
-                          let leader = projectedATSWinner(game: game, homeScore: home, awayScore: away),
-                          leader == selected.side else { continue }
-                    liveWeek += selected.confidence * (selected.isBestBet ? 2 : 1)
-                }
-                projections[standing.userId] = standing.totalPoints + liveWeek
-            }
-            liveProjectionByUser = projections
+            liveProjectionByUser = LeagueStandingsRanking.projectedTotals(card: card, standings: standings, picks: picks, events: scores.events)
             liveProjectionActive = true
             liveProjectionStale = scores.stale == true
         } catch {
@@ -2440,22 +2417,7 @@ struct StandingsView: View {
         }
     }
 
-    private func scoreEvent(_ event: FootballScoreEvent, matches game: CardGame) -> Bool {
-        normalizedFootballTeam(event.homeTeam) == normalizedFootballTeam(game.homeTeam)
-            && normalizedFootballTeam(event.awayTeam) == normalizedFootballTeam(game.awayTeam)
-    }
 
-    private func scoreValue(team: String, in event: FootballScoreEvent) -> Int? {
-        Int(event.scores.first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(team) })?.score ?? "")
-    }
-
-    private func projectedATSWinner(game: CardGame, homeScore: Int, awayScore: Int) -> String? {
-        let favorite = game.favorite == "away" ? "away" : "home"
-        let margin = favorite == "away" ? Double(awayScore - homeScore) : Double(homeScore - awayScore)
-        let line = abs(game.spread)
-        guard abs(margin - line) >= 0.000_1 else { return nil }
-        return margin > line ? favorite : (favorite == "home" ? "away" : "home")
-    }
 }
 
 private struct StandingMovementBadge: View {
@@ -2479,6 +2441,7 @@ private struct StandingMovementBadge: View {
 
 private struct StandingRankCard: View {
     let rank: Int
+    var rankLabel: String? = nil
     let standing: Standing
     let sportId: String
     let trophy: ProfileTrophy?
@@ -2517,7 +2480,7 @@ private struct StandingRankCard: View {
                         Circle().fill(medal.opacity(0.14))
                         Circle().stroke(medal.opacity(0.75), lineWidth: 1.5)
                     }
-                    Text("\(rank)").font(rank == 1 ? .title.weight(.black) : .headline.weight(.black)).monospacedDigit().foregroundStyle(medal)
+                    Text(rankLabel ?? "\(rank)").font(rank == 1 ? .title.weight(.black) : .headline.weight(.black)).monospacedDigit().foregroundStyle(medal)
                 }
                 .frame(width: 37, height: rank == 1 ? 48 : 42)
                 StandingMovementBadge(change: rankMovement)

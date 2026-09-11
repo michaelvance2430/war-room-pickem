@@ -3,6 +3,7 @@ import SwiftUI
 struct MyLeagueSnapshot: Identifiable, Sendable {
     let membership: LeagueMembership
     var rank = "—"
+    var rankIsLive = false
     var points = "—"
     var progress = "—"
     var note: String? = nil
@@ -11,11 +12,9 @@ struct MyLeagueSnapshot: Identifiable, Sendable {
 }
 
 enum MyLeaguesScoring {
-    static func rank(userID: UUID, totals: [UUID: Int]) -> String {
-        guard let own = totals[userID] else { return "—" }
-        let position = totals.values.filter { $0 > own }.count + 1
-        let tied = totals.values.filter { $0 == own }.count > 1
-        return "\(tied ? "T-" : "")\(position) / \(totals.count)"
+    static func rank(userID: UUID, totals: [UUID: Int], achievementPoints: [UUID: Int] = [:]) -> String {
+        guard let rank = LeagueStandingsRanking.rank(userID: userID, totals: totals, achievementPoints: achievementPoints) else { return "—" }
+        return "\(rank.label) / \(totals.count)"
     }
 
     static func hasStarted(card: WeekCard, now: Date = Date()) -> Bool {
@@ -66,37 +65,56 @@ enum MyLeaguesScoring {
 }
 
 enum MyLeaguesService {
-    static func load(_ membership: LeagueMembership, token: String, userID: UUID) async -> MyLeagueSnapshot {
+    static func load(_ membership: LeagueMembership, token: String, userID: UUID, ranking: LeagueRankingContext) async -> MyLeagueSnapshot {
         var row = MyLeagueSnapshot(membership: membership)
         do {
             async let standings = SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
             async let card = SupabaseAPI.weekCard(token: token, leagueId: membership.leagueId, weekNumber: membership.leagues.currentWeek)
             async let pick = SupabaseAPI.playerPick(token: token, leagueId: membership.leagueId, userId: userID, weekNumber: membership.leagues.currentWeek)
             async let result = SupabaseAPI.myLeaguesWeekResult(token: token, leagueId: membership.leagueId, week: membership.leagues.currentWeek)
-            let (players, activeCard, ownPick, official) = try await (standings, card, pick, result)
-            row.rank = MyLeaguesScoring.rank(userID: userID, totals: Dictionary(players.map { ($0.userId, $0.totalPoints) }, uniquingKeysWith: { first, _ in first }))
+            async let postseason: [CfbPostseasonScore] = membership.leagues.sportId.lowercased() == "cfb" && membership.leagues.currentWeek >= membership.leagues.regularSeasonWeeks + 2
+                ? SupabaseAPI.cfbPostseasonScoreboard(token: token, leagueId: membership.leagueId, seasonKey: Calendar.current.component(.year, from: Date())) : []
+            let (players, activeCard, ownPick, official, postseasonRows) = try await (standings, card, pick, result, postseason)
+            var projections: [UUID: Int]?
+            var events: [FootballScoreEvent] = []
+            var feedUnavailable = false
+            var feedStale = false
+            if let activeCard, MyLeaguesScoring.hasStarted(card: activeCard) {
+                do {
+                    async let feed = SupabaseAPI.footballScores(token: token, leagueId: membership.leagueId, sportId: membership.leagues.sportId, weekNumber: activeCard.weekNumber)
+                    async let board = SupabaseAPI.weekBoard(token: token, leagueId: membership.leagueId, weekNumber: activeCard.weekNumber)
+                    let (scores, picks) = try await (feed, board)
+                    events = scores.events
+                    feedStale = scores.stale == true
+                    projections = LeagueStandingsRanking.projectedTotals(card: activeCard, standings: players, picks: picks, events: events)
+                    row.rankIsLive = true
+                } catch { feedUnavailable = true }
+            }
+            if !feedUnavailable {
+                let totals = LeagueStandingsRanking.totals(players,
+                    postseason: Dictionary(postseasonRows.map { ($0.userId, $0.postseasonTotal) }, uniquingKeysWith: { first, _ in first }), projections: projections)
+                // Only players tied with this player can affect their tiebreak rank.
+                let tiedPlayers = players.filter { totals[$0.userId] == totals[userID] }
+                var achievementPoints: [UUID: Int] = [:]
+                if tiedPlayers.count > 1 {
+                    for player in tiedPlayers {
+                        achievementPoints[player.userId] = try await ranking.points(token: token, userID: player.userId)
+                    }
+                }
+                row.rank = MyLeaguesScoring.rank(userID: userID, totals: totals, achievementPoints: achievementPoints)
+            }
             guard let activeCard else {
                 row.points = "TBD"
                 row.note = "Card not posted"
                 return row
             }
-            var events: [FootballScoreEvent] = []
-            var feedUnavailable = false
-            if MyLeaguesScoring.hasStarted(card: activeCard) && official == nil {
-                do {
-                    let feed = try await SupabaseAPI.footballScores(token: token, leagueId: membership.leagueId, sportId: membership.leagues.sportId, weekNumber: activeCard.weekNumber)
-                    events = feed.events
-                    feedUnavailable = feed.stale == true
-                } catch { feedUnavailable = true }
-            }
             let winners = MyLeaguesScoring.resolvedWinners(card: activeCard, result: official, events: events)
             row.points = MyLeaguesScoring.points(card: activeCard, pick: ownPick, result: official, winners: winners)
             row.progress = "\(winners.count) / \(activeCard.cardGames.count)"
-            if feedUnavailable {
-                // Never turn an unavailable score feed into a claim that no games have scored.
+            if feedUnavailable || feedStale {
                 row.points = "—"
                 row.progress = "—"
-                row.note = "Scores unavailable · retrying"
+                row.note = feedStale ? "Score feed stale · last projected rank" : "Scores unavailable · retrying"
             } else if ownPick == nil || ownPick?.isLocked == false {
                 row.note = MyLeaguesScoring.hasStarted(card: activeCard) ? "No locked picks" : "Picks needed"
             } else if official == nil && !winners.isEmpty {
@@ -157,13 +175,14 @@ struct MyLeaguesSection: View {
                     else { Text(error ?? "No active leagues to show. Turn hidden leagues back on in Edit Profile.").font(.caption).foregroundStyle(.secondary).padding() }
                 }
                 ForEach(sports, id: \.self) { sport in
+                    let sportAccent = SportIdentity(sport).accent
                     HStack {
                         Text(sport).font(.subheadline.weight(.black)).tracking(1)
                         Spacer()
                         Text("\(displayedRows.filter { LeagueTrackerGrouping.sport($0.membership.leagues.sportId) == sport }.count)")
                             .font(.caption.weight(.bold))
-                    }.foregroundStyle(accent).padding(.horizontal, 16).padding(.vertical, 10)
-                        .background(accent.opacity(0.1)).accessibilityAddTraits(.isHeader)
+                    }.foregroundStyle(sportAccent).padding(.horizontal, 16).padding(.vertical, 10)
+                        .background(sportAccent.opacity(0.1)).accessibilityAddTraits(.isHeader)
                     ForEach(displayedRows.filter { LeagueTrackerGrouping.sport($0.membership.leagues.sportId) == sport }) { row in
                         Rectangle().fill(.white.opacity(0.09)).frame(height: 1)
                         Button { selected = row.membership } label: { leagueRow(row) }
@@ -185,7 +204,7 @@ struct MyLeaguesSection: View {
                 }
                 if let message = tracker.error { Text(message).font(.caption).foregroundStyle(.orange).padding(16) }
                 HStack {
-                    Text("Official rank · points from scored games")
+                    Text("Ranks match Standings · T = tied after tiebreaker")
                         .font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
                     Spacer(minLength: 4)
                     if previewRows == nil {
@@ -231,18 +250,19 @@ struct MyLeaguesSection: View {
     }
 
     private func leagueRow(_ row: MyLeagueSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let sportAccent = SportIdentity(row.membership.leagues.sportId).accent
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(row.membership.leagues.name).font(.subheadline.weight(.bold)).foregroundStyle(.white).fixedSize(horizontal: false, vertical: true)
                     Text("\(row.membership.leagues.sportId.uppercased()) · WEEK \(row.membership.leagues.currentWeek)")
-                        .font(.system(size: 10, weight: .bold)).tracking(0.8).foregroundStyle(accent)
+                        .font(.system(size: 10, weight: .bold)).tracking(0.8).foregroundStyle(sportAccent)
                 }
                 Spacer(minLength: 4)
                 Image(systemName: "chevron.right").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.35))
             }
             HStack(alignment: .top, spacing: 8) {
-                metric("OVERALL RANK", row.rank)
+                metric(row.rankIsLive ? "LIVE RANK" : "OVERALL RANK", row.rank)
                 metric("WEEK POINTS", row.points)
                 metric("GAMES SCORED", row.progress)
             }
@@ -268,12 +288,13 @@ struct MyLeaguesSection: View {
             try await tracker.load(token: token, userID: userID)
             let memberships = try await loadedMemberships.filter { tracker.settings[$0.leagueId]?.isVisible == true }
             var next: [MyLeagueSnapshot] = []
+            let ranking = LeagueRankingContext()
             // Bound concurrent requests for players with many rooms.
             for start in stride(from: 0, to: memberships.count, by: 3) {
                 let batch = Array(memberships[start..<min(start + 3, memberships.count)])
                 let loaded = await withTaskGroup(of: MyLeagueSnapshot.self) { group in
                     for membership in batch {
-                        group.addTask { await MyLeaguesService.load(membership, token: token, userID: userID) }
+                        group.addTask { await MyLeaguesService.load(membership, token: token, userID: userID, ranking: ranking) }
                     }
                     var results: [MyLeagueSnapshot] = []
                     for await result in group { results.append(result) }

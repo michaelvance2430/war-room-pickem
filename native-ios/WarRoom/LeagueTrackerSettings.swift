@@ -104,7 +104,7 @@ struct LeagueTrackerSettingsView: View {
                 }
             }
             ForEach(sports, id: \.self) { sport in
-                Section(sport) {
+                Section {
                     ForEach(LeagueTrackerGrouping.sorted(memberships.filter { LeagueTrackerGrouping.sport($0.leagues.sportId) == sport })) { membership in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(membership.leagues.name).font(.headline)
@@ -119,12 +119,15 @@ struct LeagueTrackerSettingsView: View {
                                         Task { await tracker.setHidden(!visible, leagueID: membership.leagueId, token: token, userID: userID) }
                                     }
                                 ))
+                                .tint(SportIdentity(sport).accent)
                                 .disabled(tracker.settings[membership.leagueId] == nil || tracker.saving.contains(membership.leagueId))
                                 .accessibilityLabel("Show \(membership.leagues.name) in tracker")
                                 .accessibilityIdentifier("tracker-visibility-\(membership.leagueId)")
                             }
                         }.padding(.vertical, 5)
                     }
+                } header: {
+                    Text(sport).foregroundStyle(SportIdentity(sport).accent)
                 }
             }
             if !loading && memberships.isEmpty && loadError == nil {
