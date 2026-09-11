@@ -5,7 +5,7 @@
 - App name: War Room Pick'Em
 - Bundle ID: `com.warroompicks.WarRoom`
 - Version: `3.5`
-- Build: `29`
+- Build: `30`
 - Platform: iPhone
 - Minimum iOS: 17.0
 - Category: Sports
@@ -15,9 +15,12 @@
 
 ## Beta description
 
-War Room Pick'Em is a private-league football and college-basketball picks app built around flexible weekly cards, confidence points, best bets, live boards, standings, scorecards, postseason brackets, achievements, and league trash talk. Build 29 adds a sport-grouped My Leagues tracker beneath the Home scorecard, account-saved league visibility controls in Edit Profile, automatic removal of completed seasons, a guided practice card, clearer pick and Best Bet steps, named Members’ Top 12 ballots, and seasonal Home presentation.
+War Room Pick'Em is a private-league football and college-basketball picks app built around flexible weekly cards, confidence points, best bets, live boards, standings, scorecards, postseason brackets, achievements, and league trash talk. Build 30 includes a sport-grouped My Leagues tracker beneath the Home scorecard, account-saved league visibility controls in Edit Profile, automatic removal of completed seasons, a guided practice card, clearer pick and Best Bet steps, named Members’ Top 12 ballots, and seasonal Home presentation.
 
-## Build 29 focus
+## Build 30 focus
+
+- Compare My Leagues with Standings: both use live projected totals and the same achievement-point tiebreaker. T means tied after the tiebreaker. Saturday Situation Room was verified at seventh with 23 points in both views.
+- Sport sections use their matching CFB, NFL, NCAAM, and NCAAW colors.
 
 - On Home, compare all leagues grouped by CFB, NFL, NCAAM, and NCAAW. Check overall rank, current-week points/TBD, and scored-game counts.
 - Collapse and reopen My Leagues. Hide a league with “Don’t show this league,” then restore it using the Edit Profile link → League Tracker. Preferences follow your account.
