@@ -6,7 +6,8 @@ enum PromotionPoints {
     }
 
     static func total(for achievements: [ProfileAchievement]) -> Int {
-        achievements.reduce(0) { $0 + points(for: $1.code) }
+        // Career unlocks count once even when multiple rooms hold receipts.
+        Set(achievements.map(\.code)).reduce(0) { $0 + points(for: $1) }
     }
 
     private static let pointsByCode: [String: Int] = Dictionary(uniqueKeysWithValues: raw.split(separator: "\n").compactMap { line in

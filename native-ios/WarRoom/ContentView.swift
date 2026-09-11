@@ -2169,6 +2169,10 @@ private struct PublicPlayerProfileView: View {
         favoriteTeam = try? await loadedFavoriteTeam
         leagueStandings = await loadedStandings
         loading = false
+        if let viewer {
+            // Only opening this screen records a visit; background rank lookups do not.
+            try? await SupabaseAPI.recordProfileVisit(token: token, viewerId: viewer.id, viewedUserId: standing.userId)
+        }
     }
 }
 

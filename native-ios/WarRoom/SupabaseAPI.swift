@@ -1678,6 +1678,20 @@ enum SupabaseAPI {
         }
     }
 
+    static func recordProfileVisit(token: String, viewerId: UUID, viewedUserId: UUID) async throws {
+        guard let receipt = ProfileVisitReceipt(viewerId: viewerId, viewedUserId: viewedUserId) else { return }
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/profile_visits"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("resolution=ignore-duplicates,return=minimal", forHTTPHeaderField: "Prefer")
+        request.httpBody = try JSONEncoder().encode(receipt)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let message = (try? JSONDecoder().decode(APIError.self, from: data).message) ?? "The profile visit could not be saved."
+            throw RequestError(message: message)
+        }
+    }
+
     static func profileAchievements(token: String, userId: UUID) async throws -> [ProfileAchievement] {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/achievements"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
