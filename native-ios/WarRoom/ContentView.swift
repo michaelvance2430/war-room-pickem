@@ -2800,6 +2800,11 @@ private struct PublicPlayerProfileView: View {
         leagueStandings = await loadedStandings
         weeklyHonorCounts = WeeklyHonorCounts.resolve(editions: await loadedEditions, playerName: standing.name)
         loading = false
+        if let viewer {
+            // Only the actual profile screen records a visit. Background ranking
+            // lookups must never grant Profile Peeker.
+            try? await SupabaseAPI.recordProfileVisit(token: token, viewerId: viewer.id, viewedUserId: standing.userId)
+        }
     }
 }
 
