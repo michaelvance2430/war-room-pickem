@@ -118,9 +118,14 @@ struct MyLeaguesSection: View {
     @State private var loading = false
     @State private var error: String?
     @State private var selected: LeagueMembership?
+    @State private var showingEditProfile = false
+    @ObservedObject private var tracker = LeagueTrackerStore.shared
     let accent: Color
     var previewRows: [MyLeagueSnapshot]? = nil
-    private var displayedRows: [MyLeagueSnapshot] { previewRows ?? rows }
+    private var displayedRows: [MyLeagueSnapshot] {
+        previewRows ?? rows.filter { tracker.settings[$0.id]?.isVisible == true }
+    }
+    private var sports: [String] { LeagueTrackerGrouping.orderedSports(displayedRows.map { $0.membership.leagues.sportId }) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -141,15 +146,44 @@ struct MyLeaguesSection: View {
             .accessibilityValue(expanded ? "Expanded" : "Collapsed")
             .accessibilityHint(expanded ? "Collapse league summaries" : "Expand league summaries")
             if expanded {
+                Button { showingEditProfile = true } label: {
+                    (Text("To adjust which leagues appear here, go to ")
+                     + Text("Edit Profile").bold().underline() + Text("."))
+                        .font(.caption).foregroundStyle(.white.opacity(0.75))
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.bottom, 14)
+                }.buttonStyle(.plain).accessibilityIdentifier("tracker-edit-profile")
                 if displayedRows.isEmpty {
                     if loading { ProgressView("Loading your leagues…").padding() }
-                    else { Text(error ?? "Your leagues will appear here.").font(.caption).foregroundStyle(.secondary).padding() }
+                    else { Text(error ?? "No active leagues to show. Turn hidden leagues back on in Edit Profile.").font(.caption).foregroundStyle(.secondary).padding() }
                 }
-                ForEach(displayedRows) { row in
-                    Rectangle().fill(.white.opacity(0.09)).frame(height: 1)
-                    Button { selected = row.membership } label: { leagueRow(row) }
+                ForEach(sports, id: \.self) { sport in
+                    HStack {
+                        Text(sport).font(.subheadline.weight(.black)).tracking(1)
+                        Spacer()
+                        Text("\(displayedRows.filter { LeagueTrackerGrouping.sport($0.membership.leagues.sportId) == sport }.count)")
+                            .font(.caption.weight(.bold))
+                    }.foregroundStyle(accent).padding(.horizontal, 16).padding(.vertical, 10)
+                        .background(accent.opacity(0.1)).accessibilityAddTraits(.isHeader)
+                    ForEach(displayedRows.filter { LeagueTrackerGrouping.sport($0.membership.leagues.sportId) == sport }) { row in
+                        Rectangle().fill(.white.opacity(0.09)).frame(height: 1)
+                        Button { selected = row.membership } label: { leagueRow(row) }
+                            .buttonStyle(.plain)
+                        Button {
+                            guard let token = auth.token, let userID = auth.user?.id else { return }
+                            Task { await tracker.setHidden(true, leagueID: row.id, token: token, userID: userID) }
+                        } label: {
+                            Label("Don’t show this league", systemImage: "square")
+                                .font(.caption).foregroundStyle(.white.opacity(0.65))
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .padding(.horizontal, 16)
+                        }
                         .buttonStyle(.plain)
+                        .disabled(tracker.saving.contains(row.id))
+                        .accessibilityLabel("Don’t show \(row.membership.leagues.name) in tracker")
+                        .accessibilityIdentifier("tracker-hide-\(row.id)")
+                    }
                 }
+                if let message = tracker.error { Text(message).font(.caption).foregroundStyle(.orange).padding(16) }
                 HStack {
                     Text("Official rank · points from scored games")
                         .font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
@@ -169,6 +203,16 @@ struct MyLeaguesSection: View {
             StandingsView(leagueOverride: membership, onBack: { selected = nil })
                 .environmentObject(auth)
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingEditProfile, onDismiss: { Task { await refresh() } }) {
+            NavigationStack {
+                NativeProfileView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { showingEditProfile = false }
+                        }
+                    }
+            }.environmentObject(auth).presentationDragIndicator(.visible)
         }
         .task(id: auth.user?.id) {
             guard previewRows == nil else { return }
@@ -220,7 +264,9 @@ struct MyLeaguesSection: View {
         loading = true
         defer { loading = false }
         do {
-            let memberships = try await SupabaseAPI.leagueMemberships(token: token, userId: userID)
+            async let loadedMemberships = SupabaseAPI.leagueMemberships(token: token, userId: userID)
+            try await tracker.load(token: token, userID: userID)
+            let memberships = try await loadedMemberships.filter { tracker.settings[$0.leagueId]?.isVisible == true }
             var next: [MyLeagueSnapshot] = []
             // Bound concurrent requests for players with many rooms.
             for start in stride(from: 0, to: memberships.count, by: 3) {

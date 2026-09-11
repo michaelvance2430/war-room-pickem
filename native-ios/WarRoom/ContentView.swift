@@ -8855,6 +8855,16 @@ struct NativeProfileView: View {
                     }
                 }
                 .listRowBackground(Color.black.opacity(0.80))
+                Section("MY LEAGUES") {
+                    NavigationLink {
+                        LeagueTrackerSettingsView()
+                    } label: {
+                        Label("League Tracker", systemImage: "list.bullet.rectangle")
+                    }
+                    Text("Hide inactive leagues or turn hidden leagues back on.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .listRowBackground(Color.black.opacity(0.80))
                 Section("ACTIVE CONSTRUCTION ORDERS") {
                     NavigationLink {
                         ProfileTitlePickerView(

@@ -44,4 +44,19 @@ struct MyLeaguesTests {
         let result = CertifiedWeekResult(id: UUID(), weekNumber: 3, propResult: nil, scoredAt: "2026-09-12T20:00:00Z", gameResults: [CertifiedGameResult(cardGameId: gameID, winner: "away", awayScore: nil, homeScore: nil), CertifiedGameResult(cardGameId: gameID, winner: "away", awayScore: nil, homeScore: nil), CertifiedGameResult(cardGameId: UUID(), winner: "home", awayScore: nil, homeScore: nil)])
         #expect(MyLeaguesScoring.resolvedWinners(card: card(), result: result, events: []).count == 1)
     }
+    @Test func sportsHaveStableOrderWithoutMixingBasketballLeagues() {
+        #expect(LeagueTrackerGrouping.orderedSports(["nfl", "CFB", "ncaaw", "cfb", "ncaam", "golf"]) == ["CFB", "NFL", "NCAAM", "NCAAW", "GOLF"])
+    }
+    @Test func hiddenLeaguesCanReturnButCompletedSeasonsCannotBeForcedOn() throws {
+        let id = UUID()
+        var active = LeagueTrackerSetting(leagueId: id, hidden: true, seasonEnded: false)
+        #expect(!active.isVisible)
+        active.hidden = false
+        #expect(active.isVisible)
+        let completed = LeagueTrackerSetting(leagueId: id, hidden: false, seasonEnded: true)
+        #expect(!completed.isVisible)
+        let json = "{\"league_id\":\"\(id)\",\"hidden\":false,\"season_ended\":true}"
+        #expect(try JSONDecoder().decode(LeagueTrackerSetting.self, from: Data(json.utf8)) == completed)
+    }
+
 }

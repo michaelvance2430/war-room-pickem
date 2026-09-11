@@ -1519,6 +1519,27 @@ enum SupabaseAPI {
         return try await send(request, as: CfbPollSnapshot.self)
     }
 
+    static func leagueTrackerSettings(token: String) async throws -> [LeagueTrackerSetting] {
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/get_my_league_tracker_settings"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data("{}".utf8)
+        return try await send(request, as: [LeagueTrackerSetting].self)
+    }
+
+    static func setLeagueTrackerHidden(token: String, userID: UUID, leagueID: UUID, hidden: Bool) async throws {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/league_tracker_preferences"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "on_conflict", value: "user_id,league_id")]
+        var request = authorizedRequest(url: components.url!, token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("resolution=merge-duplicates,return=representation", forHTTPHeaderField: "Prefer")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["user_id": userID.uuidString.lowercased(), "league_id": leagueID.uuidString.lowercased(), "hidden": hidden])
+        struct SavedTrackerPreference: Decodable { let hidden: Bool }
+        let saved = try await send(request, as: [SavedTrackerPreference].self)
+        guard saved.first?.hidden == hidden else { throw RequestError(message: "League visibility was not saved.") }
+    }
+
     static func myLeaguesWeekResult(token: String, leagueId: UUID, week: Int) async throws -> CertifiedWeekResult? {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/week_results"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
