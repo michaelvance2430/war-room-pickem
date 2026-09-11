@@ -85,7 +85,6 @@ struct SafetyAndSupportView: View {
     @State private var showingDeleteConfirmation = false
     @State private var deleting = false
     @State private var deletionError: String?
-    @State private var deletionPassword = ""
 
     var body: some View {
         List {
@@ -102,15 +101,13 @@ struct SafetyAndSupportView: View {
 
             Section("Account") {
                 Text("Deleting your account removes your login and personal profile information. Completed league results remain as anonymized historical records so past standings do not change.")
-                SecureField("Confirm your password", text: $deletionPassword)
-                    .textContentType(.password)
                 if let deletionError {
                     Text(deletionError).foregroundStyle(.red)
                 }
                 Button("Delete Account", role: .destructive) {
                     showingDeleteConfirmation = true
                 }
-                .disabled(deleting || deletionPassword.isEmpty)
+                .disabled(deleting)
             }
         }
         .navigationTitle("Privacy & Safety")
@@ -132,8 +129,7 @@ struct SafetyAndSupportView: View {
         deleting = true
         deletionError = nil
         do {
-            try await auth.deleteAccount(password: deletionPassword)
-            deletionPassword = ""
+            try await auth.deleteAccount()
         } catch {
             deletionError = error.localizedDescription
         }

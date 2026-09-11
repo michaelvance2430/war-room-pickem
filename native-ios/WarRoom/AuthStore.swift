@@ -73,9 +73,9 @@ final class AuthStore: ObservableObject {
         clearSession()
     }
 
-    func deleteAccount(password: String) async throws {
+    func deleteAccount() async throws {
         guard let token else { throw AccountDeletionError.missingSession }
-        try await SupabaseAPI.deleteAccount(token: token, password: password)
+        try await SupabaseAPI.deleteAccount(token: token)
         clearSession()
     }
 

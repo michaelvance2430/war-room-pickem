@@ -4549,15 +4549,7 @@ private struct FieldhousePicksPage: View {
             Button {
                 state.bestBetGame = isBestBet ? nil : index
             } label: {
-                Label(
-                    isBestBet ? "BEST BET ARMED · ×2" : "MARK AS BEST BET · ×2",
-                    systemImage: isBestBet ? "star.fill" : "star"
-                )
-                .font(.caption.weight(.black))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .foregroundStyle(isBestBet ? .black : .white)
-                .background(isBestBet ? Color.green : Color.red, in: RoundedRectangle(cornerRadius: 11))
+                BestBetActionLabel(isSelected: isBestBet, accent: accent)
             }
             .buttonStyle(.plain)
             .disabled(state.picksLocked || !state.canEditPicks(at: now))

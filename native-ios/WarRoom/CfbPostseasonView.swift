@@ -55,13 +55,10 @@ struct CfbPostseasonTiebreakPreviewView: View {
                                     Text("CONFIDENCE").font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.55))
                                     Spacer()
                                     ForEach(1...games.count, id: \.self) { value in confidenceButton(value, gameId: game.id) }
-                                    Button { bestBetGame = bestBetGame == game.id ? nil : game.id } label: {
-                                        Label("BEST BET", systemImage: bestBetGame == game.id ? "star.fill" : "star")
-                                            .font(.system(size: 8, weight: .black)).padding(.horizontal, 8).frame(height: 30)
-                                            .foregroundStyle(bestBetGame == game.id ? .black : .yellow)
-                                            .background(bestBetGame == game.id ? Color.yellow : Color.yellow.opacity(0.09), in: Capsule())
-                                    }.buttonStyle(.plain)
                                 }
+                                Button { bestBetGame = bestBetGame == game.id ? nil : game.id } label: {
+                                    BestBetActionLabel(isSelected: bestBetGame == game.id, accent: .yellow)
+                                }.buttonStyle(.plain)
                                 HStack {
                                     Label("TOTAL SCORE", systemImage: "sum").font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.55))
                                     Spacer()

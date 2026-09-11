@@ -225,6 +225,10 @@ struct CfbPollsPreviewView: View {
             if liveSnapshot?.revealed == false {
                 Text("ROOM RANKINGS STAY SEALED UNTIL THE CARD LOCKS.").font(.caption.weight(.black)).foregroundStyle(.yellow).pollPanel(color: .yellow)
             } else {
+                if let snapshot = liveSnapshot, !snapshot.official {
+                    Label("UNOFFICIAL · \(snapshot.filedCount) OF 4 REQUIRED BALLOTS", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption.weight(.black)).foregroundStyle(.orange).pollPanel(color: .orange)
+                }
                 VStack(spacing: 0) {
                     ForEach(results) { row in
                         memberRow(row)
@@ -235,7 +239,7 @@ struct CfbPollsPreviewView: View {
                     Label(revealBallots ? "HIDE INDIVIDUAL BALLOTS" : "OPEN INDIVIDUAL BALLOTS", systemImage: "person.3.fill")
                         .font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 13)
                 }.buttonStyle(.bordered).tint(.green)
-                if revealBallots && liveContext == nil { individualBallots }
+                if revealBallots { individualBallots }
                 }
             ballotBuilder
             if let liveError { Label(liveError, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.red) }
@@ -323,12 +327,18 @@ struct CfbPollsPreviewView: View {
     }
 
     private var individualBallots: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        let ballots: [(name: String, teams: [String])] = liveSnapshot.map {
+            $0.revealedBallots.map { ($0.voterName, $0.rankedTeamIds) }
+        } ?? Self.ballots.prefix(4).map { ($0.voterID, $0.rankedTeamIDs) }
+        return VStack(alignment: .leading, spacing: 9) {
             Text("THE RECEIPTS").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.green)
-            ForEach(Array(Self.ballots.prefix(4)), id: \.voterID) { ballot in
+            ForEach(Array(ballots.enumerated()), id: \.offset) { _, ballot in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(ballot.voterID.uppercased()).font(.caption.weight(.black))
-                    Text(ballot.rankedTeamIDs.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "  ·  "))
+                    Text(ballot.name.uppercased()).font(.caption.weight(.black))
+                    Text(ballot.teams.enumerated().map { index, teamID in
+                        let teamName = displayTeams.first { $0.id == teamID }?.name ?? teamID
+                        return "\(index + 1). \(teamName)"
+                    }.joined(separator: "  ·  "))
                         .font(.system(size: 9, weight: .bold)).foregroundStyle(.white.opacity(0.52))
                 }
             }

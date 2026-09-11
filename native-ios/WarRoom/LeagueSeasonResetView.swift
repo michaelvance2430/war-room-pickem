@@ -9,6 +9,12 @@ private enum LeagueDivision: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+private struct DeputyChange: Identifiable {
+    let standing: Standing
+    let appoint: Bool
+    var id: UUID { standing.userId }
+}
+
 struct LeagueManagementView: View {
     @EnvironmentObject private var auth: AuthStore
     let membership: LeagueMembership
@@ -23,6 +29,7 @@ struct LeagueManagementView: View {
     @State private var savingCapacity = false
     @State private var capacitySummary: String?
     @State private var error: String?
+    @State private var deputyChange: DeputyChange?
 
     init(membership: LeagueMembership) {
         self.membership = membership
@@ -103,6 +110,23 @@ struct LeagueManagementView: View {
             Button("BALANCE \(groupNoun)") { Task { await autoBalance() } }
         } message: {
             Text("This evenly redistributes all players across four groups. Existing assignments are preserved whenever the final group sizes allow it. You can still move anyone manually afterward.")
+        }
+        .alert(deputyChange?.appoint == true ? "Appoint deputy?" : "Remove deputy?", isPresented: Binding(
+            get: { deputyChange != nil },
+            set: { if !$0 { deputyChange = nil } }
+        )) {
+            Button("CANCEL", role: .cancel) { deputyChange = nil }
+            Button(deputyChange?.appoint == true ? "APPOINT DEPUTY" : "REMOVE DEPUTY", role: deputyChange?.appoint == true ? nil : .destructive) {
+                guard let change = deputyChange else { return }
+                deputyChange = nil
+                Task { await setDeputy(change.standing, appointed: change.appoint) }
+            }
+        } message: {
+            if let change = deputyChange {
+                Text(change.appoint
+                     ? "\(change.standing.name) will be able to build cards, score weeks, and help keep picks on schedule. They cannot appoint other deputies or take ownership of the league."
+                     : "\(change.standing.name) will immediately lose deputy league-operation access.")
+            }
         }
     }
 
@@ -193,7 +217,12 @@ struct LeagueManagementView: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(standing.name).font(.subheadline.weight(.black)).foregroundStyle(.white).lineLimit(1)
-                Text(standing.isBot ? "FOUNDRY PLAYER" : "ROSTERED PLAYER").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.38))
+                HStack(spacing: 5) {
+                    Text(standing.isBot ? "FOUNDRY PLAYER" : "ROSTERED PLAYER")
+                    if standing.isDeputy {
+                        Label("DEPUTY", systemImage: "star.fill").foregroundStyle(accent)
+                    }
+                }.font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.48))
             }
             Spacer(minLength: 8)
             if savingMembershipId == standing.id {
@@ -219,6 +248,19 @@ struct LeagueManagementView: View {
                     .foregroundStyle(accent).padding(.horizontal, 10).padding(.vertical, 8)
                     .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(accent.opacity(0.38)))
+                }
+                if !standing.isBot, standing.userId != auth.user?.id {
+                    Button {
+                        deputyChange = DeputyChange(standing: standing, appoint: !standing.isDeputy)
+                    } label: {
+                        Image(systemName: standing.isDeputy ? "star.slash.fill" : "star.badge.plus")
+                            .font(.subheadline.weight(.black)).foregroundStyle(standing.isDeputy ? .orange : accent)
+                            .frame(width: 34, height: 34)
+                            .background((standing.isDeputy ? Color.orange : accent).opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke((standing.isDeputy ? Color.orange : accent).opacity(0.38)))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(standing.isDeputy ? "Remove \(standing.name) as deputy" : "Appoint \(standing.name) as deputy")
                 }
             }
         }
@@ -303,6 +345,17 @@ struct LeagueManagementView: View {
         defer { savingMembershipId = nil }
         do {
             try await SupabaseAPI.updateMemberDivision(token: token, leagueId: membership.leagueId, membershipId: standing.id, division: division.rawValue)
+            standings = try await SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
+        } catch { self.error = error.localizedDescription }
+    }
+
+    @MainActor private func setDeputy(_ standing: Standing, appointed: Bool) async {
+        guard let token = auth.token else { return }
+        savingMembershipId = standing.id
+        error = nil
+        defer { savingMembershipId = nil }
+        do {
+            _ = try await SupabaseAPI.setMemberDeputy(token: token, leagueId: membership.leagueId, userId: standing.userId, isDeputy: appointed)
             standings = try await SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
         } catch { self.error = error.localizedDescription }
     }

@@ -306,12 +306,19 @@ struct WarRoomTests {
     }
 
     @Test func leagueAutoBalanceIsEvenAndMinimizesMoves() {
-        let players = (0..<11).map { index in
-            LeagueDivisionBalanceCandidate(
-                membershipId: UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", index + 1))!,
+        var players: [LeagueDivisionBalanceCandidate] = []
+        for index in 0..<11 {
+            let division: String
+            if index < 4 { division = "North" }
+            else if index < 7 { division = "South" }
+            else if index < 9 { division = "East" }
+            else { division = "West" }
+            let identifier = String(format: "00000000-0000-0000-0000-%012d", index + 1)
+            players.append(LeagueDivisionBalanceCandidate(
+                membershipId: UUID(uuidString: identifier)!,
                 name: "Player \(index + 1)",
-                currentDivision: index < 4 ? "North" : (index < 7 ? "South" : (index < 9 ? "East" : "West"))
-            )
+                currentDivision: division
+            ))
         }
         let assignments = LeagueDivisionBalancer.assignments(for: players)
         let counts = Dictionary(grouping: assignments.values, by: { $0 }).mapValues(\.count)

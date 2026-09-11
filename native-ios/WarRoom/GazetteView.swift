@@ -49,6 +49,7 @@ struct GazetteView: View {
     @State private var sharing = false
     @State private var shareItems: [Any] = []
     @State private var promotionStatuses: [DispatchPromotionStatus] = []
+    @State private var memberPoll: CfbPollSnapshot?
 
     private var selected: GazetteEditionRow? {
         editions.first { $0.id == selectedId } ?? editions.first
@@ -76,6 +77,7 @@ struct GazetteView: View {
                                 sportId: membership.leagues.sportId,
                                 regularSeasonWeeks: membership.leagues.regularSeasonWeeks,
                                 promotionStatuses: promotionStatuses,
+                                memberPoll: memberPoll,
                                 page: $page
                             )
                             dispatchShareButton(edition)
@@ -94,7 +96,7 @@ struct GazetteView: View {
         .navigationTitle("The Dispatch")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
-        .onChange(of: selectedId) { _, _ in Task { await recordSelectedSecrets() } }
+        .onChange(of: selectedId) { _, _ in Task { await loadSelectedWeekExtras() } }
         .sheet(isPresented: $sharing) { DispatchActivityView(items: shareItems) }
         .alert("THE PAPER NOTICED", isPresented: Binding(get: { discoveryMessage != nil }, set: { if !$0 { discoveryMessage = nil } })) {
             Button("FILE IT") { discoveryMessage = nil }
@@ -126,6 +128,7 @@ struct GazetteView: View {
                     sportId: membership.leagues.sportId,
                     regularSeasonWeeks: membership.leagues.regularSeasonWeeks,
                     promotionStatuses: promotionStatuses,
+                    memberPoll: memberPoll,
                     page: .constant(pageIndex)
                 )
                 .frame(width: 390)
@@ -166,9 +169,20 @@ struct GazetteView: View {
             promotionStatuses = await promotionStatusRows(token: token, standings: standings)
             selectedId = editions.first(where: { $0.weekNumber == initialWeek })?.id ?? editions.first?.id
             errorMessage = nil
-            await recordSelectedSecrets()
+            await loadSelectedWeekExtras()
         } catch { errorMessage = error.localizedDescription }
         loading = false
+    }
+
+    private func loadSelectedWeekExtras() async {
+        await recordSelectedSecrets()
+        guard membership.leagues.sportId.lowercased() == "cfb",
+              let token = auth.token,
+              let week = selected?.weekNumber else {
+            memberPoll = nil
+            return
+        }
+        memberPoll = try? await SupabaseAPI.cfbPolls(token: token, leagueId: membership.leagueId, week: week)
     }
 
     private func promotionStatusRows(token: String, standings: [Standing]) async -> [DispatchPromotionStatus] {
@@ -277,6 +291,7 @@ private struct GazettePaperView: View {
     let sportId: String
     let regularSeasonWeeks: Int
     let promotionStatuses: [DispatchPromotionStatus]
+    let memberPoll: CfbPollSnapshot?
     @Binding var page: Int
     private let pageNames = DispatchPageCatalog.names
     private var payload: GazettePayload { edition.payload }
@@ -559,6 +574,26 @@ private struct GazettePaperView: View {
     private var sportsPage: some View {
         VStack(alignment: .leading, spacing: 14) {
             GazetteBanner(text: "THE NUMBERS HAVE BEEN CHECKED. FEELINGS HAVE NOT.")
+            if let poll = memberPoll, poll.revealed, !poll.memberResults.isEmpty {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(poll.official ? "MEMBERS’ TOP 12 · OFFICIAL" : "MEMBERS’ TOP 12 · UNOFFICIAL · \(poll.filedCount) OF 4")
+                        .font(.caption.weight(.black)).tracking(1.2).foregroundStyle(poll.official ? .green : .orange)
+                    ForEach(Array(poll.memberResults.prefix(12))) { row in
+                        HStack(spacing: 8) {
+                            Text("\(row.rank)").font(.caption.weight(.black)).foregroundStyle(.yellow).frame(width: 18)
+                            Text(row.id.uppercased()).font(.caption.weight(.black))
+                            Spacer()
+                            Text("\(row.points) PTS").font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.58))
+                            if row.firstPlaceVotes > 0 {
+                                Text("\(row.firstPlaceVotes) #1").font(.system(size: 8, weight: .black)).foregroundStyle(.yellow)
+                            }
+                        }
+                    }
+                }
+                .padding(11)
+                .background(Color.green.opacity(0.09), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke((poll.official ? Color.green : Color.orange).opacity(0.65)))
+            }
             Text("OFFICIAL CASUALTY REPORT").font(.caption.weight(.black)).tracking(1.5).foregroundStyle(.red)
             Text("\(shameName) POSTED \(shamePoints) AND TRIGGERED A CONGRESSIONAL INQUIRY")
                 .font(.system(size: 27, weight: .black)).fontWidth(.condensed)

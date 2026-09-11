@@ -657,6 +657,8 @@ private struct PicksView: View {
     @State private var editingSubmittedCard = false
     @State private var tacticalNukesUsed = 0
     @State private var confirmingRegularSeasonWeapon = false
+    @State private var showingCrystalBallRequired = false
+    @State private var showingCrystalBall = false
     @State private var strikePresentation: StrikePresentation?
     @State private var boardPicks: [BoardPick] = []
     @State private var boardScores: [UUID: SyncedFootballScore] = [:]
@@ -710,6 +712,7 @@ private struct PicksView: View {
                                         ready: isComplete(card: card)
                                     )
                                 }
+                                PickFlowCoach(message: nextCommand(card: card), complete: isComplete(card: card), isNFL: league?.leagues.sportId.lowercased() == "nfl")
                                 PickOrderAlert()
                                 if league?.leagues.sportId.lowercased() == "nfl" {
                                     NflSundayOperationsPanel(week: card.weekNumber)
@@ -818,6 +821,24 @@ private struct PicksView: View {
                     try? await Task.sleep(for: .seconds(15))
                     guard let card, !canEdit(card: card) else { continue }
                     await loadBoard(card: card)
+                }
+            }
+            .alert("Choose your Crystal Ball", isPresented: $showingCrystalBallRequired) {
+                Button("Choose Crystal Ball") { showingCrystalBall = true }
+                Button("Not now", role: .cancel) {}
+            } message: {
+                Text("You must choose your Crystal Ball before you can save any picks.")
+            }
+            .sheet(isPresented: $showingCrystalBall) {
+                if let league {
+                    NavigationStack {
+                        CrystalBallView(membership: league)
+                            .toolbar {
+                                ToolbarItem(placement: .confirmationAction) {
+                                    Button("Back to Picks") { showingCrystalBall = false }
+                                }
+                            }
+                    }
                 }
             }
             .alert(regularSeasonWeaponConfirmationTitle, isPresented: $confirmingRegularSeasonWeapon) {
@@ -954,12 +975,27 @@ private struct PicksView: View {
             : "Ready to lock it in. Regret can wait until Saturday."
     }
 
+    private func requireCrystalBall(token: String, league: LeagueMembership) async throws -> Bool {
+        guard let user = auth.user else { return false }
+        let existing = try await SupabaseAPI.crystalBallPick(token: token, leagueId: league.leagueId, userId: user.id)
+        guard let existing, !existing.teamName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            saveNotice = nil
+            showingCrystalBallRequired = true
+            return false
+        }
+        return true
+    }
+
     private func save(card: WeekCard) async {
         guard let token = auth.token, let league, let bestBetGameId, let propChoice,
               isComplete(card: card) else { return }
         saving = true
         saveErrorMessage = nil
         do {
+            guard try await requireCrystalBall(token: token, league: league) else {
+                saving = false
+                return
+            }
             let submissions = card.cardGames.compactMap { game -> PickSubmission? in
                 guard let value = draft[game.id], let side = value.side, let confidence = value.confidence else { return nil }
                 return PickSubmission(gameId: game.id, side: side, confidence: confidence)
@@ -1016,6 +1052,10 @@ private struct PicksView: View {
         saving = true
         saveErrorMessage = nil
         do {
+            guard try await requireCrystalBall(token: token, league: league) else {
+                saving = false
+                return
+            }
             _ = try await SupabaseAPI.saveWeekPicks(
                 token: token,
                 leagueId: league.leagueId,
@@ -1750,6 +1790,9 @@ private struct EditableGamePickRow: View {
                 sideButton(game.awayTeam, side: "away")
                 sideButton(game.homeTeam, side: "home")
             }
+            Label(rowNextStep, systemImage: draft.side == nil ? "1.circle.fill" : (draft.confidence == nil ? "2.circle.fill" : "checkmark.circle.fill"))
+                .font(.caption2.weight(.black))
+                .foregroundStyle(draft.side == nil || draft.confidence == nil ? wagerAccent : accent)
             VStack(alignment: .leading, spacing: 8) {
                 Text("CONFIDENCE").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.secondary)
                 if confidenceOptions.count > 5 {
@@ -1772,11 +1815,11 @@ private struct EditableGamePickRow: View {
                 }
             }
             Button { onBestBet() } label: {
-                Label(isBestBet ? "BEST BET ARMED" : "ARM AS BEST BET", systemImage: isBestBet ? "star.fill" : "star")
-                    .font(.caption.weight(.black)).frame(maxWidth: .infinity)
-                    .padding(.vertical, 5)
+                BestBetActionLabel(isSelected: isBestBet, accent: wagerAccent)
             }
-            .buttonStyle(.bordered).tint(isBestBet ? wagerAccent : .secondary)
+            .buttonStyle(.plain)
+            .disabled(draft.side == nil || draft.confidence == nil)
+            .opacity(draft.side == nil || draft.confidence == nil ? 0.38 : 1)
         }
         .padding(17)
         .background(.black.opacity(0.75), in: UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: cornerRadius, bottomTrailingRadius: 4, topTrailingRadius: cornerRadius))
@@ -1807,7 +1850,7 @@ private struct EditableGamePickRow: View {
                 .background(chosen ? selection : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(.plain)
-        .disabled(!available)
+        .disabled(!available || draft.side == nil)
         .accessibilityLabel(chosen ? "Clear confidence \(confidence)" : "Set confidence \(confidence)")
     }
 
@@ -1815,10 +1858,56 @@ private struct EditableGamePickRow: View {
         let favoriteName = game.favorite == "away" ? game.awayTeam : game.homeTeam
         return favoriteSpreadLabel(favorite: favoriteName, spread: game.spread)
     }
+    private var rowNextStep: String {
+        if draft.side == nil { return "STEP 1 · PICK A TEAM" }
+        if draft.confidence == nil { return "STEP 2 · ASSIGN CONFIDENCE" }
+        return isBestBet ? "READY · BEST BET = 2× POINTS" : "READY · OPTIONAL BEST BET"
+    }
     private func rankedTeamLabel(_ name: String, rank: Int?, font: Font) -> some View {
         Text(rank.map { "#\($0) \(name)" } ?? name)
             .font(font)
             .foregroundStyle(RankedTeamTier(rank: rank).color)
+    }
+}
+
+private struct PickFlowCoach: View {
+    let message: String
+    let complete: Bool
+    let isNFL: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: complete ? "checkmark.seal.fill" : "location.fill")
+                .font(.title3.weight(.black))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(complete ? "CARD READY" : "YOUR NEXT STEP")
+                    .font(.caption2.weight(.black)).tracking(1.2)
+                Text(message).font(.footnote.weight(.bold)).foregroundStyle(.white)
+            }
+            Spacer()
+        }
+        .foregroundStyle(complete ? (isNFL ? Color.cyan : Color.green) : Color.yellow)
+        .padding(13).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke((complete ? (isNFL ? Color.cyan : Color.green) : Color.yellow).opacity(0.45)))
+        .animation(.easeInOut(duration: 0.18), value: message)
+    }
+}
+
+struct BestBetActionLabel: View {
+    let isSelected: Bool
+    let accent: Color
+
+    var body: some View {
+        Label("BEST BET = 2× POINTS", systemImage: isSelected ? "star.fill" : "star")
+            .font(.caption.weight(.black))
+            .tracking(0.5)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 48)
+            .foregroundStyle(isSelected ? .black : accent)
+            .background(isSelected ? accent : accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
+            .overlay(RoundedRectangle(cornerRadius: 11).stroke(accent.opacity(isSelected ? 1 : 0.55), lineWidth: 1.25))
+            .shadow(color: isSelected ? accent.opacity(0.28) : .clear, radius: 7)
+            .contentShape(RoundedRectangle(cornerRadius: 11))
     }
 }
 
@@ -2448,6 +2537,9 @@ private struct StandingRankCard: View {
                         Text(displayName)
                             .font(rank == 1 ? .title3.weight(.black) : .headline.weight(.black))
                             .lineLimit(2).minimumScaleFactor(0.82)
+                        if let supporterNumber = standing.profiles?.foundingSupporterNumber {
+                            PatreonSupporterStamp(number: supporterNumber, compact: true)
+                        }
                         HStack(spacing: 5) {
                             Circle().fill(isRecentlySeen ? (identity.isNFL ? Color.cyan : Color.green) : Color.white.opacity(0.28)).frame(width: 6, height: 6)
                             Text("\(standing.weeksPlayed) WKS · \(lastSeenLabel)")
@@ -2571,6 +2663,7 @@ private struct PublicPlayerProfileView: View {
     @State private var leagueStandings: [Standing] = []
     @State private var selectedAchievement: ProfileAchievement?
     @State private var selectedTrophy: ProfileTrophy?
+    @State private var weeklyHonorCounts = WeeklyHonorCounts.empty
     @State private var loading = true
     @State private var earnedSwagExpanded = false
     private var identity: SportIdentity { SportIdentity(sportId) }
@@ -2586,6 +2679,9 @@ private struct PublicPlayerProfileView: View {
                         ProfileAvatar(urlString: standing.profiles?.avatarURL, name: standing.name, size: 110, borderId: standing.profiles?.equippedBorderId, accent: identity.isNFL ? .cyan : .green)
                         ProfileRankPlacard(progress: profileRankProgress, isOwner: auth.user?.id == standing.userId, sportId: sportId)
                         Text(standing.name).font(.system(size: 32, weight: .black)).fontWidth(.condensed)
+                        if let supporterNumber = standing.profiles?.foundingSupporterNumber {
+                            PatreonSupporterStamp(number: supporterNumber)
+                        }
                         Text("\(conferenceLabel) · PUBLIC RECORD")
                             .font(.system(size: 9, weight: .black)).tracking(1.4).foregroundStyle(identity.isNFL ? .red : .green)
                     }
@@ -2610,6 +2706,7 @@ private struct PublicPlayerProfileView: View {
                         perfectWeeks: standing.perfectWeeks,
                         bestBetHits: standing.bestBetHits, bestBetTotal: standing.bestBetTotal,
                         propHits: standing.propHits, propTotal: standing.propTotal,
+                        crownCount: weeklyHonorCounts.crowns, shameCount: weeklyHonorCounts.shames,
                         sportId: sportId
                     )
                     ProfileRivalryCard(player: standing, standings: leagueStandings, sportId: sportId)
@@ -2716,20 +2813,29 @@ private struct PublicPlayerProfileView: View {
         guard let token = auth.token else { return }
         let viewer = auth.user
         let preferredLeagueId = auth.selectedLeagueId
+        let activeLeague: LeagueMembership?
+        if let viewer {
+            activeLeague = try? await SupabaseAPI.activeLeague(token: token, userId: viewer.id, preferredLeagueId: preferredLeagueId)
+        } else {
+            activeLeague = nil
+        }
         async let loadedAchievements = SupabaseAPI.profileAchievements(token: token, userId: standing.userId)
         async let loadedTrophies = SupabaseAPI.profileTrophies(token: token, userId: standing.userId)
         async let loadedFavoriteTeam = SupabaseAPI.favoriteTeam(token: token, userId: standing.userId, sportId: sportId)
         async let loadedStandings: [Standing] = {
             if let leagueStandingsOverride { return leagueStandingsOverride }
-            guard let viewer,
-                  let active = try? await SupabaseAPI.activeLeague(token: token, userId: viewer.id, preferredLeagueId: preferredLeagueId)
-            else { return [] }
-            return (try? await SupabaseAPI.standings(token: token, leagueId: active.leagueId)) ?? []
+            guard let activeLeague else { return [] }
+            return (try? await SupabaseAPI.standings(token: token, leagueId: activeLeague.leagueId)) ?? []
+        }()
+        async let loadedEditions: [GazetteEditionRow] = {
+            guard let activeLeague else { return [] }
+            return (try? await SupabaseAPI.gazetteEditions(token: token, leagueId: activeLeague.leagueId)) ?? []
         }()
         achievements = (try? await loadedAchievements) ?? []
         trophies = (try? await loadedTrophies) ?? []
         favoriteTeam = try? await loadedFavoriteTeam
         leagueStandings = await loadedStandings
+        weeklyHonorCounts = WeeklyHonorCounts.resolve(editions: await loadedEditions, playerName: standing.name)
         loading = false
     }
 }
@@ -2775,6 +2881,7 @@ struct HomeView: View {
     @EnvironmentObject private var auth: AuthStore
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("warroom.practice-card.completed") private var practiceCardCompleted = false
     let leagueOverride: LeagueMembership?
     let onOpenPicks: () -> Void
     let onOpenStandings: () -> Void
@@ -2795,6 +2902,7 @@ struct HomeView: View {
     @State private var homeScores: [UUID: SyncedFootballScore] = [:]
     @State private var homeScoreStatus: String?
     @State private var regularScorecards: [RegularSeasonScorecard] = []
+    @State private var latestWeeklyHonors: GazetteEditionRow?
     @State private var seasonCloseout: LeagueSeasonCloseout?
     @State private var leagueTrophies: [ProfileTrophy] = []
     @State private var nextSeasonWindow: SportSeasonWindow?
@@ -2802,6 +2910,7 @@ struct HomeView: View {
     @State private var regularScorecardToShowID: String?
     @State private var showingNewDispatch = false
     @State private var competitiveStatus: CompetitiveLeagueStatus?
+    @State private var cfbPollSnapshot: CfbPollSnapshot?
     @State private var loading = true
     @State private var loadError: String?
     @State private var clock = Date()
@@ -2818,7 +2927,9 @@ struct HomeView: View {
 
     var body: some View {
         ZStack {
-            if let membership, membership.leagues.sportId.lowercased() == "cfb", membership.leagues.currentWeek == 13 {
+            if let seasonal = SeasonalSkin.active(on: clock) {
+                SeasonalWarRoomBackdrop(skin: seasonal)
+            } else if let membership, membership.leagues.sportId.lowercased() == "cfb", membership.leagues.currentWeek == 13 {
                 CfbRivalryWeekBackdrop()
             } else if let membership, membership.leagues.sportId.lowercased() == "nfl" {
                 NflHomeBackdrop(phase: NflSeasonPhase.phase(week: membership.leagues.currentWeek))
@@ -2850,6 +2961,7 @@ struct HomeView: View {
                         let visibleSubmittedUserIds = submittedUserIds.union(ownSubmittedUserIds)
                         let visibleSubmissionCount = visibleSubmittedUserIds.count
                         let firstKickoff = card?.cardGames.compactMap { footballKickoffDate($0.startTime) }.min()
+                        let missionKickoff = firstKickoff ?? footballWeekMissionKickoff(sportId: membership.leagues.sportId, week: membership.leagues.currentWeek)
                         let kickoffStarted = firstKickoff.map { clock >= $0 } ?? false
                         if isCommissioner, !pendingJoinRequests.isEmpty {
                             NavigationLink { LeagueManagementView(membership: membership) } label: {
@@ -2864,7 +2976,7 @@ struct HomeView: View {
                                 week: membership.leagues.currentWeek,
                                 dateRange: footballWeekDateRangeLabel(sportId: membership.leagues.sportId, week: membership.leagues.currentWeek),
                                 commissioner: isCommissioner,
-                                kickoff: firstKickoff
+                                kickoff: missionKickoff
                             )
                         } else {
                             HomeCommandHeader(
@@ -2873,7 +2985,7 @@ struct HomeView: View {
                                 week: membership.leagues.currentWeek,
                                 dateRange: footballWeekDateRangeLabel(sportId: membership.leagues.sportId, week: membership.leagues.currentWeek),
                                 commissioner: isCommissioner,
-                                kickoff: firstKickoff
+                                kickoff: missionKickoff
                             )
                         }
                         HStack(spacing: 10) {
@@ -2902,6 +3014,37 @@ struct HomeView: View {
                                 )
                             }
                             .buttonStyle(WarRoomCardButtonStyle())
+                        }
+                        if let userId = auth.user?.id,
+                           standings.first(where: { $0.userId == userId })?.weeksPlayed == 0 {
+                            if !practiceCardCompleted {
+                                NavigationLink { PracticeCardView(onComplete: onOpenPicks) } label: {
+                                    StatusCard(
+                                        kicker: "YOUR NEXT STEP · 60-SECOND WALKTHROUGH",
+                                        title: "Run a Practice Card",
+                                        detail: "Pick three games, assign confidence once each, and mark a Best Bet. Nothing counts until you enter the live room.",
+                                        icon: "figure.run.circle.fill",
+                                        featured: true,
+                                        accent: .yellow,
+                                        actionLabel: "START PRACTICE"
+                                    )
+                                }.buttonStyle(WarRoomCardButtonStyle())
+                            } else if card != nil, pick == nil {
+                                Button(action: onOpenPicks) {
+                                    StatusCard(
+                                        kicker: "YOUR NEXT STEP · PRACTICE COMPLETE",
+                                        title: "Make Your Live Picks",
+                                        detail: "Same flow. Real games. This one goes on the permanent receipt.",
+                                        icon: "checkmark.seal.fill",
+                                        featured: true,
+                                        accent: isNFL ? .cyan : .green,
+                                        actionLabel: "OPEN LIVE CARD"
+                                    )
+                                }.buttonStyle(WarRoomCardButtonStyle())
+                            }
+                        }
+                        if let honors = weeklyHonorsPresentation {
+                            WeeklyHonorsHomeDisplay(presentation: honors, isNFL: isNFL)
                         }
                         if let reigningChampion {
                             ReigningChampionHomeCard(presentation: reigningChampion, nextSeasonWindow: nextSeasonWindow)
@@ -3095,6 +3238,12 @@ struct HomeView: View {
                                     }
                                     .buttonStyle(WarRoomCardButtonStyle())
 
+                                    Divider().overlay(moreAccent.opacity(0.18)).padding(.horizontal, 14)
+                                    NavigationLink { PracticeCardView(onComplete: onOpenPicks) } label: {
+                                        CompactHomeRow(kicker: "TRAINING ROOM", title: practiceCardCompleted ? "Replay the Practice Card" : "Learn the Weekly Card", icon: "figure.run.circle.fill", accent: .yellow, embedded: true)
+                                    }
+                                    .buttonStyle(WarRoomCardButtonStyle())
+
                                     if AppIdentity.isCreator(auth.user?.id) {
                                         Divider().overlay(moreAccent.opacity(0.18)).padding(.horizontal, 14)
                                         NavigationLink { FoundryView(preferredSportId: membership.leagues.sportId) } label: {
@@ -3109,6 +3258,12 @@ struct HomeView: View {
                         }
                         if isNFL { NflBroadcastSectionLabel(title: "POSTGAME SHOW", detail: "FINAL THIRTEEN · DISPATCH · LAST WORD") }
                         else { HomeSectionLabel(title: "FIELD REPORTS", detail: "PROPAGANDA, RUMORS, OCCASIONAL FACTS") }
+                        NavigationLink { LeagueTrophyRoomView(membership: membership) } label: {
+                            StatusCard(kicker: "LEGACY · YEAR AFTER YEAR", title: "The Trophy Room", detail: "Champions, conference crowns, Toilet Bowl, Nerd Award, and permanent league receipts.", icon: "trophy.fill", accent: .yellow)
+                        }.buttonStyle(WarRoomCardButtonStyle())
+                        if !isNFL, let poll = cfbPollSnapshot, poll.revealed {
+                            memberPollHomeLink(poll: poll, membership: membership)
+                        }
                         let postseasonIsOpen = membership.leagues.sportId.lowercased() == "nfl"
                             ? membership.leagues.currentWeek >= 19
                             : membership.leagues.currentWeek > membership.leagues.regularSeasonWeeks
@@ -3304,10 +3459,16 @@ struct HomeView: View {
             submittedUserIds = try await loadedSubmissions
             sportPoolPoll = try? await loadedSportPool
             competitiveStatus = try? await loadedCompetitiveStatus
+            cfbPollSnapshot = active.leagues.sportId.lowercased() == "cfb"
+                ? try? await SupabaseAPI.cfbPolls(token: token, leagueId: active.leagueId, week: active.leagues.currentWeek)
+                : nil
             seasonCloseout = await loadedCloseout
             leagueTrophies = (await loadedLeagueTrophies) ?? []
             nextSeasonWindow = await loadedNextSeasonWindow
             let dispatches = (try? await loadedDispatches) ?? []
+            latestWeeklyHonors = dispatches.first { edition in
+                edition.payload.crown?.names?.isEmpty == false || edition.payload.shame?.names?.isEmpty == false
+            }
             regularScorecards = (try? await SupabaseAPI.regularSeasonScorecards(token: token, leagueId: active.leagueId, userId: user.id)) ?? []
             if active.leagues.sportId.lowercased() == "cfb" {
                 let scorecards = try? await SupabaseAPI.postseasonScorecards(
@@ -3359,12 +3520,48 @@ struct HomeView: View {
         loading = false
     }
 
+    private func memberPollHomeLink(poll: CfbPollSnapshot, membership: LeagueMembership) -> some View {
+        let context = auth.token.map {
+            CfbPollLiveContext(token: $0, leagueID: membership.leagueId, week: membership.leagues.currentWeek)
+        }
+        let title = poll.memberResults.first.map { "#1 \($0.id)" } ?? "The room poll is posted"
+        let detail = poll.official
+            ? "\(poll.filedCount) ballots counted. Open the rankings, first-place votes, and every member’s ballot."
+            : "The rankings are visible, but they do not become official until four members file ballots."
+        return NavigationLink {
+            CfbPollsPreviewView(embeddedTab: .members, liveContext: context)
+        } label: {
+            StatusCard(
+                kicker: poll.official ? "LEAGUE TOP 12 · OFFICIAL" : "LEAGUE TOP 12 · UNOFFICIAL · \(poll.filedCount) OF 4",
+                title: title,
+                detail: detail,
+                icon: "list.number",
+                accent: poll.official ? .green : .orange
+            )
+        }
+        .buttonStyle(WarRoomCardButtonStyle())
+    }
+
     private var unreadRegularScorecard: RegularSeasonScorecard? {
         regularScorecards.first(where: isUnread)
     }
 
     private var reigningChampion: ReigningChampionPresentation? {
         ReigningChampionPolicy.presentation(closeout: seasonCloseout, trophies: leagueTrophies)
+    }
+
+    private var weeklyHonorsPresentation: WeeklyHonorsPresentation? {
+        guard let edition = latestWeeklyHonors else { return nil }
+        let crownName = edition.payload.crown?.names?.first
+        let shameName = edition.payload.shame?.names?.first
+        guard crownName != nil || shameName != nil else { return nil }
+        return WeeklyHonorsPresentation(
+            week: edition.weekNumber,
+            crownName: crownName,
+            crownPoints: edition.payload.crown?.pts,
+            shameName: shameName,
+            shamePoints: edition.payload.shame?.pts
+        )
     }
 
     private func scorecardReadKey(_ scorecard: RegularSeasonScorecard) -> String {
@@ -5323,6 +5520,29 @@ private func footballWeekDateRangeLabel(sportId: String, week: Int) -> String {
     return "\(monthDay.string(from: start).uppercased())–\(endFormat.string(from: end).uppercased())"
 }
 
+private func footballWeekMissionKickoff(sportId: String, week: Int) -> Date? {
+    let isNFL = sportId.lowercased() == "nfl"
+    guard (isNFL ? 1...22 : 0...18).contains(week) else { return nil }
+
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "America/New_York")!
+
+    let regularSeasonStart: DateComponents
+    let weekOffset: Int
+    if isNFL {
+        regularSeasonStart = DateComponents(year: 2026, month: 9, day: 10, hour: 20, minute: 15)
+        weekOffset = max(0, week - 1)
+    } else if week == 0 {
+        regularSeasonStart = DateComponents(year: 2026, month: 8, day: 27, hour: 19)
+        weekOffset = 0
+    } else {
+        regularSeasonStart = DateComponents(year: 2026, month: 9, day: 3, hour: 19)
+        weekOffset = max(0, week - 1)
+    }
+    guard let opening = calendar.date(from: regularSeasonStart) else { return nil }
+    return calendar.date(byAdding: .day, value: weekOffset * 7, to: opening)
+}
+
 func footballKickoffDate(_ value: String?) -> Date? {
     guard let value else { return nil }
     let formatter = ISO8601DateFormatter()
@@ -5400,6 +5620,7 @@ private struct CrystalBallView: View {
     @State private var team = ""
     @State private var saving = false
     @State private var loading = true
+    @State private var loadFailed = false
     @State private var savedTeam: String?
     @State private var editing = false
     @State private var teamSearch = ""
@@ -5423,7 +5644,7 @@ private struct CrystalBallView: View {
                             Label("RECEIPT SECURED", systemImage: "checkmark.seal.fill")
                                 .font(.caption.weight(.black)).tracking(1).foregroundStyle(isNFL ? .cyan : .green)
                         }
-                        CrystalBallDeadlineView(lockAt: lockAt, sportId: membership.leagues.sportId)
+                        crystalBallDeadline
                         if canChange {
                             Button {
                                 editing = true
@@ -5448,15 +5669,15 @@ private struct CrystalBallView: View {
                 } else {
                     VStack(spacing: 18) {
                     VStack(spacing: 7) {
-                        Text(isNFL ? "SUPER BOWL FUTURES DESK" : "PRESEASON INTELLIGENCE DIVISION").font(.system(size: 9, weight: .black)).tracking(2).foregroundStyle(isNFL ? .cyan : .green)
+                        Text(isNFL ? "SUPER BOWL FUTURES DESK" : "SEASON INTELLIGENCE DIVISION").font(.system(size: 9, weight: .black)).tracking(2).foregroundStyle(isNFL ? .cyan : .green)
                         Text("THE CRYSTAL BALL").font(.system(size: 34, weight: .black)).fontWidth(.condensed)
-                        Text(isNFL ? "CALL THE SUPER BOWL CHAMPION BEFORE WEEK 1 KICKS OFF." : "CALL THE NATIONAL CHAMPION BEFORE THE RECEIPTS EXIST.")
+                        Text(isNFL ? "CALL THE SUPER BOWL CHAMPION." : "CALL THE NATIONAL CHAMPION.")
                             .font(.caption.weight(.black)).tracking(0.8).foregroundStyle(.white.opacity(0.58)).multilineTextAlignment(.center)
                     }
 
                     crystalBallArtifact.frame(maxWidth: 330, maxHeight: 330)
 
-                    CrystalBallDeadlineView(lockAt: lockAt, sportId: membership.leagues.sportId)
+                    crystalBallDeadline
 
                     VStack(alignment: .leading, spacing: 10) {
                         Text(savedTeam == nil ? "YOUR PROPHECY" : "REVISE PROPHECY")
@@ -5500,12 +5721,27 @@ private struct CrystalBallView: View {
             let openingWeek = membership.leagues.sportId.lowercased() == "nfl" ? 1 : 0
             async let loadedPick = SupabaseAPI.crystalBallPick(token: token, leagueId: membership.leagueId, userId: user.id)
             async let loadedCard = SupabaseAPI.weekCard(token: token, leagueId: membership.leagueId, weekNumber: openingWeek)
-            let existing = (try? await loadedPick)?.teamName
-            let card = try? await loadedCard
-            team = existing ?? ""
-            savedTeam = existing
-            lockAt = card?.cardGames.compactMap { footballKickoffDate($0.startTime) }.min() ?? footballKickoffDate(card?.lockTime)
+            do {
+                let existing = try await loadedPick
+                let card = try await loadedCard
+                team = existing?.teamName ?? ""
+                savedTeam = existing?.teamName
+                lockAt = card?.cardGames.compactMap { footballKickoffDate($0.startTime) }.min() ?? footballKickoffDate(card?.lockTime)
+                loadFailed = false
+            } catch {
+                loadFailed = true
+                errorMessage = "Could not load your Crystal Ball. Reopen this screen to try again."
+            }
             loading = false
+        }
+    }
+
+    @ViewBuilder private var crystalBallDeadline: some View {
+        if savedTeam == nil, let lockAt, Date() >= lockAt {
+            Text("Your first Crystal Ball pick is still available. Once saved, it cannot be changed.")
+                .font(.footnote.weight(.semibold)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        } else {
+            CrystalBallDeadlineView(lockAt: lockAt, sportId: membership.leagues.sportId)
         }
     }
 
@@ -5528,7 +5764,7 @@ private struct CrystalBallView: View {
                 .shadow(color: .green.opacity(0.38), radius: 26)
         }
     }
-    private var canChange: Bool { lockAt.map { Date() < $0 } ?? true }
+    private var canChange: Bool { !loadFailed && (savedTeam == nil || (lockAt.map { Date() < $0 } ?? true)) }
 
     private func save() async {
         guard let token = auth.token, let user = auth.user else { return }
@@ -6206,6 +6442,57 @@ func isNoPushSpread(_ value: Double) -> Bool {
         && magnitude.truncatingRemainder(dividingBy: 1) == 0.5
 }
 
+private struct WeeklyHonorsPresentation {
+    let week: Int
+    let crownName: String?
+    let crownPoints: Int?
+    let shameName: String?
+    let shamePoints: Int?
+}
+
+private struct WeeklyHonorsHomeDisplay: View {
+    let presentation: WeeklyHonorsPresentation
+    let isNFL: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Text("WEEK \(presentation.week) · HOLDING COURT").font(.system(size: 8, weight: .black)).tracking(1.4).foregroundStyle(.white.opacity(0.58))
+                Spacer()
+                Text("ON DISPLAY ALL WEEK").font(.system(size: 7, weight: .black)).tracking(1).foregroundStyle(isNFL ? .cyan : .yellow)
+            }
+            HStack(spacing: 10) {
+                if let name = presentation.crownName {
+                    honorCard(title: "THE CROWN", name: name, points: presentation.crownPoints, asset: isNFL ? "NflGridironCrownArtifact" : "InsufferableCrownArtifact", color: isNFL ? .cyan : .yellow)
+                }
+                if let name = presentation.shameName {
+                    honorCard(title: "CROWN OF SHAME", name: name, points: presentation.shamePoints, asset: "ToiletCrownCheevoArtifact", color: .red)
+                }
+            }
+        }
+        .padding(12)
+        .background(.black.opacity(0.38), in: RoundedRectangle(cornerRadius: isNFL ? 7 : 16))
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 16).stroke((isNFL ? Color.cyan : Color.yellow).opacity(0.34)))
+    }
+
+    private func honorCard(title: String, name: String, points: Int?, asset: String, color: Color) -> some View {
+        VStack(spacing: 3) {
+            ZStack {
+                RadialGradient(colors: [color.opacity(0.32), .clear], center: .center, startRadius: 3, endRadius: 48)
+                Image(asset).resizable().scaledToFit().padding(2)
+            }
+            .frame(height: 76)
+            Text(title).font(.system(size: 7, weight: .black)).tracking(1).foregroundStyle(color).multilineTextAlignment(.center)
+            Text(name.uppercased()).font(.subheadline.weight(.black)).fontWidth(.condensed).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.68)
+            if let points { Text("\(points) PTS").font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.52)) }
+        }
+        .frame(maxWidth: .infinity).padding(.horizontal, 7).padding(.vertical, 8)
+        .background(.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 11))
+        .overlay(RoundedRectangle(cornerRadius: 11).stroke(color.opacity(0.30)))
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct StatusCard: View {
     let kicker: String
     let title: String
@@ -6240,7 +6527,7 @@ private struct StatusCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(emergency ? 26 : (featured ? 22 : 18))
         .background(
-            LinearGradient(colors: emergency ? [Color.red.opacity(0.96), Color(red: 0.35, green: 0, blue: 0), .black.opacity(0.9)] : [.black.opacity(featured ? 0.58 : 0.64), accent.opacity(featured ? 0.17 : 0.08)], startPoint: .leading, endPoint: .trailing),
+            LinearGradient(colors: emergency ? [Color.red.opacity(0.96), Color(red: 0.35, green: 0, blue: 0), .black.opacity(0.9)] : [.black.opacity(featured ? 0.46 : 0.42), accent.opacity(featured ? 0.17 : 0.10)], startPoint: .leading, endPoint: .trailing),
             in: UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 22, bottomTrailingRadius: 4, topTrailingRadius: 22)
         )
         .overlay(alignment: .leading) { Rectangle().fill(emergency ? .white : accent).frame(width: emergency ? 7 : (featured ? 4 : 2)).padding(.vertical, emergency ? 8 : 12) }
@@ -6920,6 +7207,7 @@ struct YouView: View {
     @State private var activeWeekCard: WeekCard?
     @State private var submittedUserIds: Set<UUID> = []
     @State private var crystalBallPick: CrystalBallPick?
+    @State private var weeklyHonorCounts = WeeklyHonorCounts.empty
     @State private var selectedAchievement: ProfileAchievement?
     @State private var selectedTrophy: ProfileTrophy?
     @State private var earnedSwagExpanded = false
@@ -6947,6 +7235,9 @@ struct YouView: View {
                             ProfileAvatar(urlString: profile?.avatarURL, name: playerName, size: 104, borderId: profile?.equippedBorderId, accent: operationalAccent)
                             ProfileRankPlacard(progress: profileRankProgress, isOwner: true, sportId: identity.sportId)
                             Text(playerName).font(.system(size: 32, weight: .black)).fontWidth(.condensed)
+                            if let supporterNumber = profile?.foundingSupporterNumber {
+                                PatreonSupporterStamp(number: supporterNumber)
+                            }
                             HStack(spacing: 7) {
                                 profileTag(roleLabel, color: identity.isNFL ? .blue : operationalAccent)
                                 profileTag(conferenceLabel, color: identity.isNFL ? .red : primaryAccent)
@@ -6988,6 +7279,7 @@ struct YouView: View {
                                 perfectWeeks: membership.perfectWeeks,
                                 bestBetHits: membership.bestBetHits, bestBetTotal: membership.bestBetTotal,
                                 propHits: membership.propHits, propTotal: membership.propTotal,
+                                crownCount: weeklyHonorCounts.crowns, shameCount: weeklyHonorCounts.shames,
                                 sportId: identity.sportId
                             )
                             if let user = auth.user, let me = leagueStandings.first(where: { $0.userId == user.id }) {
@@ -7120,9 +7412,11 @@ struct YouView: View {
                     async let loadedStandings = SupabaseAPI.standings(token: token, leagueId: leagueId)
                     async let loadedRegularScorecards = SupabaseAPI.regularSeasonScorecards(token: token, leagueId: leagueId, userId: user.id)
                     async let loadedPostseasonScorecards = SupabaseAPI.postseasonScorecards(token: token, leagueId: leagueId, seasonKey: Calendar.current.component(.year, from: Date()), userId: user.id)
+                    async let loadedEditions = SupabaseAPI.gazetteEditions(token: token, leagueId: leagueId)
                     leagueStandings = (try? await loadedStandings) ?? []
                     regularSeasonScorecards = (try? await loadedRegularScorecards) ?? []
                     postseasonScorecards = (try? await loadedPostseasonScorecards) ?? []
+                    weeklyHonorCounts = WeeklyHonorCounts.resolve(editions: (try? await loadedEditions) ?? [], playerName: playerName)
                     if let activeMembership {
                         async let loadedCard = SupabaseAPI.weekCard(token: token, leagueId: leagueId, weekNumber: activeMembership.leagues.currentWeek)
                         async let loadedSubmissions = SupabaseAPI.weekSubmittedUserIds(token: token, leagueId: leagueId, weekNumber: activeMembership.leagues.currentWeek)
@@ -7321,6 +7615,24 @@ func closestRival(for player: Standing, in standings: [Standing]) -> Standing? {
         .first
 }
 
+private struct WeeklyHonorCounts {
+    let crowns: Int
+    let shames: Int
+    static let empty = WeeklyHonorCounts(crowns: 0, shames: 0)
+
+    static func resolve(editions: [GazetteEditionRow], playerName: String) -> WeeklyHonorCounts {
+        let target = normalized(playerName)
+        return WeeklyHonorCounts(
+            crowns: editions.filter { $0.payload.crown?.names?.contains(where: { normalized($0) == target }) == true }.count,
+            shames: editions.filter { $0.payload.shame?.names?.contains(where: { normalized($0) == target }) == true }.count
+        )
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+}
+
 private struct CareerIntelGrid: View {
     let atsCorrect: Int
     let atsTotal: Int
@@ -7331,6 +7643,8 @@ private struct CareerIntelGrid: View {
     let bestBetTotal: Int
     let propHits: Int
     let propTotal: Int
+    var crownCount: Int = 0
+    var shameCount: Int = 0
     let sportId: String
     private var isNFL: Bool { sportId.lowercased() == "nfl" }
 
@@ -7342,6 +7656,8 @@ private struct CareerIntelGrid: View {
             intelCell("\(perfectWeeks)", "PERFECT", isNFL ? .white : .cyan)
             intelCell(accuracy(bestBetHits, bestBetTotal), "BEST BET", isNFL ? .red : .purple)
             intelCell(accuracy(propHits, propTotal), "PROPS", isNFL ? .blue : .pink)
+            intelCell("\(crownCount)", "WEEKLY CROWNS", isNFL ? .cyan : .yellow)
+            intelCell("\(shameCount)", "CROWNS OF SHAME", .red)
         }
     }
 
@@ -9328,6 +9644,41 @@ private enum ProfileLoadoutError: LocalizedError {
     case verification(String)
     var errorDescription: String? {
         switch self { case .verification(let item): return "\(item) save could not be verified." }
+    }
+}
+
+private struct PatreonSupporterStamp: View {
+    let number: Int
+    var compact = false
+
+    var body: some View {
+        HStack(spacing: compact ? 4 : 6) {
+            ZStack {
+                Circle().fill(Color(red: 0.95, green: 0.31, blue: 0.45))
+                Image(systemName: "heart.fill")
+                    .font(.system(size: compact ? 7 : 9, weight: .black))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: compact ? 14 : 18, height: compact ? 14 : 18)
+            Text("PATREON FOUNDER · #\(String(format: "%02d", number))")
+                .font(.system(size: compact ? 7 : 9, weight: .black))
+                .tracking(compact ? 0.55 : 0.9)
+        }
+        .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.42))
+        .padding(.horizontal, compact ? 7 : 10)
+        .padding(.vertical, compact ? 4 : 6)
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.36, green: 0.04, blue: 0.10).opacity(0.96), .black.opacity(0.92)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: Capsule()
+        )
+        .overlay(Capsule().stroke(Color(red: 0.95, green: 0.31, blue: 0.45).opacity(0.82), lineWidth: 1))
+        .shadow(color: Color(red: 0.95, green: 0.15, blue: 0.30).opacity(0.28), radius: 7)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Patreon founding supporter number \(number)")
     }
 }
 

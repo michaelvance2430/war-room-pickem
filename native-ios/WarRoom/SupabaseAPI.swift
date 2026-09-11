@@ -104,6 +104,7 @@ struct Standing: Decodable, Identifiable, Sendable {
     let propHits: Int
     let propTotal: Int
     let isBot: Bool
+    var isDeputy: Bool = false
 
     var name: String { displayNameOverride ?? profiles?.displayName ?? "Player" }
 
@@ -128,7 +129,14 @@ struct Standing: Decodable, Identifiable, Sendable {
         case propHits = "prop_hits"
         case propTotal = "prop_total"
         case isBot = "is_bot"
+        case isDeputy = "is_deputy"
     }
+}
+
+struct MemberModerationUpdate: Decodable, Sendable {
+    let ok: Bool
+    let userId: UUID
+    let isDeputy: Bool
 }
 
 struct Profile: Decodable, Sendable {
@@ -142,6 +150,7 @@ struct Profile: Decodable, Sendable {
     let createdAt: String?
     let birthdayMMDD: String?
     let birthdayLockedAt: String?
+    let foundingSupporterNumber: Int?
     enum CodingKeys: String, CodingKey {
         case displayName = "display_name"
         case avatarURL = "avatar_url"
@@ -153,6 +162,7 @@ struct Profile: Decodable, Sendable {
         case createdAt = "created_at"
         case birthdayMMDD = "birthday_mmdd"
         case birthdayLockedAt = "birthday_locked_at"
+        case foundingSupporterNumber = "founding_supporter_number"
     }
 }
 
@@ -763,6 +773,14 @@ struct CfbPollSnapshot: Decodable, Sendable {
     let revealed: Bool
     let ownBallot: [String]
     let memberResults: [CfbMemberPollRow]
+    let revealedBallots: [CfbRevealedBallot]
+}
+
+struct CfbRevealedBallot: Decodable, Identifiable, Sendable {
+    let voterId: UUID
+    let voterName: String
+    let rankedTeamIds: [String]
+    var id: UUID { voterId }
 }
 
 struct CardGame: Decodable, Identifiable, Sendable {
@@ -2341,7 +2359,7 @@ enum SupabaseAPI {
     static func standings(token: String, leagueId: UUID) async throws -> [Standing] {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/memberships"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,user_id,total_points,weekly_points,weeks_played,display_name_override,division,fieldhouse_region,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,is_bot,profiles(display_name,avatar_url,last_seen_at,equipped_title_id,equipped_border_id,equipped_rank_id,career_rank_floor)"),
+            URLQueryItem(name: "select", value: "id,user_id,total_points,weekly_points,weeks_played,display_name_override,division,fieldhouse_region,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,is_bot,is_deputy,profiles(display_name,avatar_url,last_seen_at,equipped_title_id,equipped_border_id,equipped_rank_id,career_rank_floor,founding_supporter_number)"),
             URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
             URLQueryItem(name: "order", value: "total_points.desc"),
         ]
@@ -2371,10 +2389,28 @@ enum SupabaseAPI {
         }
     }
 
+    static func setMemberDeputy(token: String, leagueId: UUID, userId: UUID, isDeputy: Bool) async throws -> MemberModerationUpdate {
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/set_member_moderation"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "p_league_id": leagueId.uuidString.lowercased(),
+            "p_user_id": userId.uuidString.lowercased(),
+            "p_is_moderator": NSNull(),
+            "p_locker_muted": NSNull(),
+            "p_is_deputy": isDeputy,
+        ])
+        let result = try await send(request, as: MemberModerationUpdate.self)
+        guard result.ok, result.userId == userId, result.isDeputy == isDeputy else {
+            throw RequestError(message: "The server did not confirm the deputy change.")
+        }
+        return result
+    }
+
     static func profile(token: String, userId: UUID) async throws -> Profile? {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/profiles"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "display_name,avatar_url,last_seen_at,equipped_title_id,equipped_border_id,equipped_rank_id,career_rank_floor,created_at,birthday_mmdd,birthday_locked_at"),
+            URLQueryItem(name: "select", value: "display_name,avatar_url,last_seen_at,equipped_title_id,equipped_border_id,equipped_rank_id,career_rank_floor,created_at,birthday_mmdd,birthday_locked_at,founding_supporter_number"),
             URLQueryItem(name: "id", value: "eq.\(userId.uuidString.lowercased())"),
             URLQueryItem(name: "limit", value: "1"),
         ]
@@ -2720,14 +2756,13 @@ enum SupabaseAPI {
         }
     }
 
-    static func deleteAccount(token: String, password: String) async throws {
+    static func deleteAccount(token: String) async throws {
         var request = URLRequest(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/delete-account"))
         request.httpMethod = "POST"
         request.setValue(SupabaseConfiguration.publishableKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "password": password,
             "confirmation": "BURN THE DOSSIER",
         ])
         let (data, response) = try await URLSession.shared.data(for: request)
