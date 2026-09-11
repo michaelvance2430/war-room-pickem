@@ -7,9 +7,24 @@ struct WarRoomApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(auth)
-                .task {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--dispatch-navigation-preview") {
+                NavigationStack {
+                    NavigationLink("Open Dispatch") {
+                        GazetteView(previewSport: ProcessInfo.processInfo.arguments.contains("--dispatch-nfl") ? "nfl" : "cfb")
+                    }.navigationTitle("Dispatch preview")
+                }.environmentObject(auth)
+            } else { productionRoot }
+            #else
+            productionRoot
+            #endif
+        }
+    }
+
+    private var productionRoot: some View {
+        RootView()
+            .environmentObject(auth)
+            .task {
                     await auth.restore()
 
                     // If iOS still has no notification decision, "Not now" should
@@ -20,6 +35,5 @@ struct WarRoomApp: App {
                         UserDefaults.standard.set(false, forKey: "warroom.notifications.primer-seen")
                     }
                 }
-        }
     }
 }
