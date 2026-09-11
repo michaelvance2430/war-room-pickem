@@ -50,6 +50,9 @@ struct GazetteView: View {
     @State private var shareItems: [Any] = []
     @State private var promotionStatuses: [DispatchPromotionStatus] = []
     @State private var memberPoll: CfbPollSnapshot?
+    #if DEBUG
+    private var isNavigationPreview = false
+    #endif
 
     private var selected: GazetteEditionRow? {
         editions.first { $0.id == selectedId } ?? editions.first
@@ -60,6 +63,38 @@ struct GazetteView: View {
         self.membership = membership
         self.initialWeek = initialWeek
     }
+
+    #if DEBUG
+    /// Exercises the production reader, artwork, archive picker and page bindings
+    /// without accessing a player's account or modifying league data.
+    init(previewSport: String) {
+        let leagueID = "00000000-0000-0000-0000-000000000001"
+        let seasonWeeks = previewSport == "nfl" ? 18 : 13
+        let json = """
+        {"league_id":"\(leagueID)","ats_correct":0,"ats_total":0,"current_streak":0,
+        "best_week":0,"worst_week":0,"perfect_weeks":0,"best_bet_hits":0,"best_bet_total":0,
+        "prop_hits":0,"prop_total":0,"leagues":{"name":"Dispatch Preview","code":"PREVIEW",
+        "sport_id":"\(previewSport)","current_week":2,"commissioner_id":"\(leagueID)",
+        "crystal_ball_enabled":true,"regular_season_weeks":\(seasonWeeks),"max_human_members":32}}
+        """
+        membership = try! JSONDecoder().decode(LeagueMembership.self, from: Data(json.utf8))
+        initialWeek = nil
+        isNavigationPreview = true
+        let rows = [1, 2, seasonWeeks].map { week in
+            let json = """
+            {"id":"00000000-0000-0000-0000-\(String(format: "%012d", week))",
+            "week_number":\(week),"week_label":"Week \(week)","volume_label":"Volume \(week)",
+            "created_at":"2026-09-11T12:00:00Z","payload":{"sportId":"\(previewSport)",
+            "crown":{"names":["Preview Winner"],"pts":23},"shame":{"names":["Preview Rival"],"pts":4},
+            "chaosDetonation":\(week == 1 ? "{\"names\":[\"Preview Player\"]}" : "null")}}
+            """
+            return try! JSONDecoder().decode(GazetteEditionRow.self, from: Data(json.utf8))
+        }
+        _editions = State(initialValue: rows)
+        _selectedId = State(initialValue: rows.first?.id)
+        _loading = State(initialValue: false)
+    }
+    #endif
 
     var body: some View {
         ZStack {
@@ -160,6 +195,9 @@ struct GazetteView: View {
     }
 
     private func load() async {
+        #if DEBUG
+        if isNavigationPreview { return }
+        #endif
         guard let token = auth.token else { return }
         do {
             async let loadedEditions = SupabaseAPI.gazetteEditions(token: token, leagueId: membership.leagueId)
@@ -175,6 +213,9 @@ struct GazetteView: View {
     }
 
     private func loadSelectedWeekExtras() async {
+        #if DEBUG
+        if isNavigationPreview { return }
+        #endif
         await recordSelectedSecrets()
         guard membership.leagues.sportId.lowercased() == "cfb",
               let token = auth.token,
@@ -363,7 +404,8 @@ private struct GazettePaperView: View {
                         VStack(spacing: 1) {
                             Text("\(index + 1)").font(.system(size: 7, weight: .bold))
                             Text(pageNames[index]).font(.system(size: 8, weight: .black))
-                        }.frame(maxWidth: .infinity).frame(height: 38)
+                        }.frame(maxWidth: .infinity).frame(height: 44)
+                            .contentShape(Rectangle())
                             .foregroundStyle(page == index ? .black : ink.opacity(0.55))
                             .background(page == index ? Color.red : .clear)
                     }
@@ -806,6 +848,9 @@ private struct DispatchPhotoEvidence: View {
                 .overlay(Rectangle().stroke(Color.white.opacity(0.7), lineWidth: 2))
                 .saturation(0.82)
                 .contrast(1.12)
+                // Cropping does not shrink an image's hit-test region. This
+                // decorative photo must never intercept the page buttons above it.
+                .allowsHitTesting(false)
             Text(caption)
                 .font(.system(size: 8, weight: .black, design: .monospaced))
                 .tracking(0.75).foregroundStyle(.white.opacity(0.58))

@@ -8,7 +8,14 @@ struct WarRoomApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--strike-preview-cfb") {
+            if ProcessInfo.processInfo.arguments.contains("--dispatch-navigation-preview") {
+                NavigationStack {
+                    NavigationLink("Open Dispatch") {
+                        GazetteView(previewSport: ProcessInfo.processInfo.arguments.contains("--dispatch-nfl") ? "nfl" : "cfb")
+                    }
+                    .navigationTitle("Dispatch preview")
+                }.environmentObject(auth)
+            } else if ProcessInfo.processInfo.arguments.contains("--strike-preview-cfb") {
                 WeaponStrikeVideoView(presentation: StrikePresentation(resourceName: "nuke-football-1")) {}
             } else if ProcessInfo.processInfo.arguments.contains("--strike-preview-nfl") {
                 WeaponStrikeVideoView(presentation: StrikePresentation(resourceName: "nuke-football-2")) {}
