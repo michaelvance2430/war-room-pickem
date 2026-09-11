@@ -13,7 +13,7 @@ struct LeagueTrackerSetting: Decodable, Equatable, Sendable, Identifiable {
 }
 
 enum LeagueTrackerGrouping {
-    static func sport(_ id: String) -> String {
+    nonisolated static func sport(_ id: String) -> String {
         let value = id.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         return value.isEmpty ? "OTHER" : value
     }
