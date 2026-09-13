@@ -5845,32 +5845,37 @@ private struct CommissionerGameDraft: Identifiable {
 
 private struct AutomaticPropPreset: Identifiable {
     let id: String
-    let label: String
-    let question: String
-    let yes: String
-    let no: String
+    var label: String
+    var question: String
+    var yes: String
+    var no: String
     var sport: String? = nil
     var week: Int? = nil
 }
 
-enum AutomaticPropCopyPolicy {
-    static func resolved(_ source: String, cardSize: Int, sportId: String) -> String {
-        guard sportId.lowercased() == "cfb", cardSize != 5 else { return source }
-        let highTotal = cardSize * 56 + 1
-        let lowTotal = cardSize * 40
-        return source
-            .replacingOccurrences(of: "Five-game", with: "\(cardSize)-game", options: .caseInsensitive)
-            .replacingOccurrences(of: "all five games", with: "all \(cardSize) games", options: .caseInsensitive)
-            .replacingOccurrences(of: "the five games", with: "the \(cardSize) games", options: .caseInsensitive)
-            .replacingOccurrences(of: "the 5 games", with: "the \(cardSize) games", options: .caseInsensitive)
-            .replacingOccurrences(of: "of 5 games", with: "of \(cardSize) games", options: .caseInsensitive)
-            .replacingOccurrences(of: "all five", with: "all \(cardSize)", options: .caseInsensitive)
-            .replacingOccurrences(of: "five combined", with: "\(cardSize) combined", options: .caseInsensitive)
-            .replacingOccurrences(of: "281", with: "\(highTotal)")
-            .replacingOccurrences(of: "280", with: "\(highTotal - 1)")
-            .replacingOccurrences(of: "201", with: "\(lowTotal + 1)")
-            .replacingOccurrences(of: "200", with: "\(lowTotal)")
-            .replacingOccurrences(of: "5–0", with: "\(cardSize)–0")
+private extension AutomaticPropPreset {
+    func sized(_ size: Int) -> AutomaticPropPreset {
+        var copy = AutomaticPropPreset(id: id, label: AutomaticPropCopyPolicy.resolved(label, cardSize: size, sportId: ""),
+            question: AutomaticPropCopyPolicy.resolved(question, cardSize: size, sportId: ""),
+            yes: AutomaticPropCopyPolicy.resolved(yes, cardSize: size, sportId: ""),
+            no: AutomaticPropCopyPolicy.resolved(no, cardSize: size, sportId: ""), sport: sport, week: week)
+        let baseline = ["close7", "close3", "fav3"].contains(id) ? 3 : 2
+        let count = AutomaticPropCopyPolicy.count(baseline, cardSize: size)
+        let predicate: String
+        switch id {
+        case "close7": predicate = "games be decided by 7 or fewer points"
+        case "close3": predicate = "games be decided by 3 or fewer points"
+        case "fav3": predicate = "favorites cover"
+        case "cfbhomedogs": predicate = "home underdogs win straight up"
+        case "hateweekdogs": predicate = "rivalry underdogs win outright during Hate Week"
+        case "nfldogs": predicate = "underdogs win straight up"
+        default: return copy
+        }
+        copy.question = "On this \(size)-game card, will at least \(count) \(predicate)?"
+        copy.label = "\(count)+ of \(size): \(predicate)"
+        copy.yes = "Yes — at least \(count)"
+        copy.no = "No — \(count - 1) or fewer"
+        return copy
     }
 }
 
@@ -6101,7 +6106,7 @@ struct CommissionerCardBuilderView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Choose a prop", selection: $selectedPropId) {
                     ForEach(availableAutomaticProps) { preset in
-                        Text(cardSizedCopy(preset.label)).tag(preset.id)
+                        Text(preset.label).tag(preset.id)
                     }
                 }
                 .pickerStyle(.navigationLink)
@@ -6252,7 +6257,7 @@ struct CommissionerCardBuilderView: View {
         return automaticFootballProps.filter {
             ($0.sport == nil || $0.sport == sport)
             && ($0.week == nil || $0.week == operationalWeek)
-        }
+        }.map { $0.sized(targetCardSize) }
     }
 
     private func prepareProp() {
@@ -6262,9 +6267,9 @@ struct CommissionerCardBuilderView: View {
 
     private func applySelectedProp() {
         guard let preset = availableAutomaticProps.first(where: { $0.id == selectedPropId }) else { return }
-        propQuestion = cardSizedCopy(preset.question)
-        propA = cardSizedCopy(preset.yes)
-        propB = cardSizedCopy(preset.no)
+        propQuestion = preset.question
+        propA = preset.yes
+        propB = preset.no
         propPoints = 3
     }
 

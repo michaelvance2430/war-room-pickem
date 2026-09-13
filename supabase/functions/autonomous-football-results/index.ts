@@ -62,7 +62,8 @@ export function scoreRefreshPlan(cards:CardRow[],now=Date.now()):{minAgeSeconds:
 }
 
 export function settleAutomaticProp(question:string,finals:Final[]):boolean|null{
-  const q=norm(question);if(finals.length<5||finals.length>10)return null;
+  const q=norm(question);if(finals.length<1||finals.length>30)return null;
+  const threshold=Number(q.match(/at least (\d+)/)?.[1] ?? (q.includes("at least six")?6:q.includes("at least three")?3:0));
   if(q.includes("any team score 90 or more"))return finals.some((g)=>g.homeScore>=90||g.awayScore>=90);
   if(q.includes("any game finish within 3 points"))return finals.some((g)=>margin(g)<=3);
   if(q.includes("any underdog win outright"))return finals.some((g)=>(homeDog(g)&&homeWon(g))||(awayDog(g)&&awayWon(g)));
@@ -70,13 +71,13 @@ export function settleAutomaticProp(question:string,finals:Final[]):boolean|null
   if(q.includes("any team score 100 or more"))return finals.some((g)=>g.homeScore>=100||g.awayScore>=100);
   if(q.includes("both teams score 75 or more in any game"))return finals.some((g)=>g.homeScore>=75&&g.awayScore>=75);
   if(q.includes("any game finish with a 20 point margin"))return finals.some((g)=>margin(g)>=20);
-  if(q.includes("at least three underdogs win outright"))return finals.filter((g)=>(homeDog(g)&&homeWon(g))||(awayDog(g)&&awayWon(g))).length>=3;
-  if(q.includes("at least six favorites cover the spread"))return finals.filter(fav).length>=6;
+  if(threshold&&q.includes("underdogs win outright")&&!q.includes("rivalry"))return finals.filter((g)=>(homeDog(g)&&homeWon(g))||(awayDog(g)&&awayWon(g))).length>=threshold;
+  if(threshold&&q.includes("favorites cover the spread"))return finals.filter(fav).length>=threshold;
   if(q.includes("every game reach 130 combined points"))return finals.every((g)=>total(g)>=130);
-  if(q.includes("at least 3")&&q.includes("decided by 7 or fewer"))return finals.filter((g)=>margin(g)>=1&&margin(g)<=7).length>=3;
-  if(q.includes("at least 3")&&q.includes("decided by 3 or fewer"))return finals.filter((g)=>margin(g)>=1&&margin(g)<=3).length>=3;
+  if(threshold>0&&q.includes("decided by 7 or fewer"))return finals.filter((g)=>margin(g)>=1&&margin(g)<=7).length>=threshold;
+  if(threshold>0&&q.includes("decided by 3 or fewer"))return finals.filter((g)=>margin(g)>=1&&margin(g)<=3).length>=threshold;
   if(q.includes("underdog")&&q.includes("cover")&&!q.includes("every underdog")&&!q.includes("14 or more"))return finals.some(dog);
-  if(q.includes("favorites cover")&&q.includes("at least 3"))return finals.filter(fav).length>=3;
+  if(q.includes("favorites cover")&&threshold>0)return finals.filter(fav).length>=threshold;
   if(q.includes("combined score of 56 or more"))return finals.some((g)=>total(g)>=56);
   if(q.includes("combined score of 40 or fewer"))return finals.some((g)=>total(g)<=40);
   if(q.includes("highest combined final score")&&q.includes("61 or more"))return Math.max(...finals.map(total))>=61;
@@ -86,11 +87,11 @@ export function settleAutomaticProp(question:string,finals:Final[]):boolean|null
   if(q.includes("finish with 9 or fewer"))return finals.some((g)=>g.homeScore<=9||g.awayScore<=9);
   if(q.includes("finish with 46 or more"))return finals.some((g)=>g.homeScore>=46||g.awayScore>=46);
   if((q.includes("both teams scoring at least 25")||q.includes("both home and away scoring 25 or more")))return finals.some((g)=>g.homeScore>=25&&g.awayScore>=25);
-  if(q.includes("favorite cover all"))return finals.every(fav);
+  if(q.includes("favorite cover all")||q.includes("favorite cover in all"))return finals.every(fav);
   if(q.includes("every underdog cover all"))return finals.every(dog);
   if(q.includes("exactly 0 points"))return finals.some((g)=>g.homeScore===0||g.awayScore===0);
   if(q.includes("score 50 or more"))return finals.some((g)=>g.homeScore>=50||g.awayScore>=50);
-  if(q.includes("equal home and away scores"))return finals.some((g)=>g.homeScore===g.awayScore);
+  if(q.includes("equal home and away scores")||q.includes("home score equal to away score"))return finals.some((g)=>g.homeScore===g.awayScore);
   const lowSum=q.match(/sum of all (?:five|\d+) combined final scores be (\d+) or fewer/);
   if(lowSum)return finals.reduce((sum,g)=>sum+total(g),0)<=Number(lowSum[1]);
   if(q.includes("home team win all"))return finals.every(homeWon);
@@ -101,8 +102,8 @@ export function settleAutomaticProp(question:string,finals:Final[]):boolean|null
   if((q.includes("both teams scoring at least 30")||q.includes("both home and away scoring 30 or more")))return finals.some((g)=>g.homeScore>=30&&g.awayScore>=30);
   if(q.includes("score 60 or more"))return finals.some((g)=>g.homeScore>=60||g.awayScore>=60);
   if(q.includes("underdog listed at 14 or more cover"))return finals.some((g)=>Math.abs(Number(g.spread))>=14&&dog(g));
-  if(q.includes("at least 2 home underdogs win"))return finals.filter((g)=>homeDog(g)&&homeWon(g)).length>=2;
-  if(q.includes("at least 2 rivalry underdogs win"))return finals.filter((g)=>g.is_rivalry&&((homeDog(g)&&homeWon(g))||(awayDog(g)&&awayWon(g)))).length>=2;
+  if(threshold>0&&q.includes("home underdogs win"))return finals.filter((g)=>homeDog(g)&&homeWon(g)).length>=threshold;
+  if(threshold>0&&q.includes("rivalry underdogs win"))return finals.filter((g)=>g.is_rivalry&&((homeDog(g)&&homeWon(g))||(awayDog(g)&&awayWon(g)))).length>=threshold;
   if(q.includes("designated rivalry game be decided by 3"))return finals.some((g)=>g.is_rivalry&&margin(g)<=3);
   if(q.includes("combined score of 35 or fewer"))return finals.some((g)=>total(g)<=35);
   if(q.includes("finish with 13 or fewer"))return finals.some((g)=>g.homeScore<=13||g.awayScore<=13);
@@ -110,7 +111,7 @@ export function settleAutomaticProp(question:string,finals:Final[]):boolean|null
   if(q.includes("decided by 14 or more"))return finals.some((g)=>margin(g)>=14);
   if(q.includes("finish with exactly 3"))return finals.some((g)=>g.homeScore===3||g.awayScore===3);
   if(q.includes("finish with exactly 17"))return finals.some((g)=>g.homeScore===17||g.awayScore===17);
-  if(q.includes("at least 2 underdogs win straight up"))return finals.filter((g)=>(homeDog(g)&&homeWon(g))||(awayDog(g)&&awayWon(g))).length>=2;
+  if(threshold>0&&q.includes("underdogs win straight up"))return finals.filter((g)=>(homeDog(g)&&homeWon(g))||(awayDog(g)&&awayWon(g))).length>=threshold;
   return null;
 }
 

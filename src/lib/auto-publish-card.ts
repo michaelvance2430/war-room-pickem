@@ -559,7 +559,7 @@ export async function runAutoPublishCards(opts?: {
         continue;
       }
 
-      const prop = propFromPreset(rotatingPropPreset(weekNumber, sport), weekNumber);
+      const prop = propFromPreset(rotatingPropPreset(weekNumber, sport), weekNumber, games.length);
       const pub = await insertWeekCard(supabase, {
         leagueId,
         weekNumber,

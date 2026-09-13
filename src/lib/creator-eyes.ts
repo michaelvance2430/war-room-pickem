@@ -175,7 +175,7 @@ export async function ensureEyesWeekCard(
   });
   const prop: Prop = propFromPreset(
     rotatingPropPreset(weekNumber, sport),
-    weekNumber
+    weekNumber, stamped.length
   );
   const payload = {
     games: stamped,

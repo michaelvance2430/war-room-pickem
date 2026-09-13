@@ -35,6 +35,7 @@ import {
 } from "@/lib/rankings";
 import {
   defaultPropPreset,
+  slateSizedPreset,
   propFromPreset,
   propCategoriesForSport,
   presetsForCategory,
@@ -280,7 +281,7 @@ export default function WeekOpsClient() {
     if (!preset) return;
     setPropPresetId(preset.id);
     setPropCategory(preset.category);
-    setProp(propFromPreset(preset, week));
+    setProp(propFromPreset(preset, week, selectedGames.length || NEED));
     setCustomQ("");
     setCustomOpen(false);
     setError(null);
@@ -324,7 +325,7 @@ export default function WeekOpsClient() {
       const res = await publishWeekCard({
         weekNumber: week,
         games: selectedGames,
-        prop,
+        prop: getPropPreset(propPresetId) ? propFromPreset(getPropPreset(propPresetId)!, week, selectedGames.length) : prop,
       });
       if (!res.ok) {
         setError(res.error || "Publish failed");
@@ -838,7 +839,7 @@ export default function WeekOpsClient() {
               <button
                 type="button"
                 disabled={selectedIds.length !== NEED}
-                onClick={() => setStep(3)}
+                onClick={() => { applyPreset(getPropPreset(propPresetId)); setStep(3); }}
                 className="flex-1 min-h-[52px] rounded-xl bg-primary text-black font-extrabold disabled:opacity-35"
               >
                 Next · Prop
@@ -893,7 +894,7 @@ export default function WeekOpsClient() {
             )}
 
             <div className="space-y-1.5 max-h-[42vh] overflow-y-auto">
-              {presetsForCategory(propCategory, sportId).map((p) => {
+              {presetsForCategory(propCategory, sportId).map(p => slateSizedPreset(p, selectedGames.length || NEED)).map((p) => {
                 const active = propPresetId === p.id;
                 const manual = p.settle === "manual";
                 return (
@@ -1014,7 +1015,7 @@ export default function WeekOpsClient() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setStep(3)}
+                onClick={() => { applyPreset(getPropPreset(propPresetId)); setStep(3); }}
                 className="px-4 min-h-[52px] rounded-xl border border-border font-semibold"
               >
                 Back

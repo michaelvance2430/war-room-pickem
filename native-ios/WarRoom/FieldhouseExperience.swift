@@ -465,7 +465,7 @@ enum FieldhouseAuthenticatedRepository {
             leagueId: membership.leagueId,
             weekNumber: state.window,
             games: plan.games,
-            propQuestion: plan.prop.question,
+            propQuestion: plan.prop.question(cardSize: plan.games.count),
             propA: "YES",
             propB: "NO",
             propPoints: 3
@@ -1193,9 +1193,9 @@ enum FieldhousePropEvaluator {
         case .winningMargin20:
             return completed.contains { abs($0.1.awayScore - $0.1.homeScore) >= 20 }
         case .threeUnderdogsWin:
-            return completed.filter { item in item.1.straightUpWinner(in: item.0) == item.0.underdogTeam }.count >= 3
+            return completed.filter { item in item.1.straightUpWinner(in: item.0) == item.0.underdogTeam }.count >= AutomaticPropCopyPolicy.count(3, cardSize: games.count, baselineSize: 10)
         case .sixFavoritesCover:
-            return completed.filter { item in item.1.coverWinner(in: item.0) == item.0.favoriteTeam }.count >= 6
+            return completed.filter { item in item.1.coverWinner(in: item.0) == item.0.favoriteTeam }.count >= AutomaticPropCopyPolicy.count(6, cardSize: games.count, baselineSize: 10)
         case .everyGameReaches130:
             return completed.allSatisfy { $0.1.awayScore + $0.1.homeScore >= 130 }
         }
@@ -1425,6 +1425,16 @@ enum FieldhousePropKind: String, CaseIterable, Identifiable, Codable {
         case .everyGameReaches130: "Will every game reach 130 combined points?"
         }
     }
+    func question(cardSize: Int) -> String {
+        switch self {
+        case .threeUnderdogsWin:
+            return "Will at least \(AutomaticPropCopyPolicy.count(3, cardSize: cardSize, baselineSize: 10)) underdogs win outright?"
+        case .sixFavoritesCover:
+            return "Will at least \(AutomaticPropCopyPolicy.count(6, cardSize: cardSize, baselineSize: 10)) favorites cover the spread?"
+        default: return question
+        }
+    }
+
 }
 
 struct FieldhouseSeasonState: Codable, Equatable {
@@ -2014,7 +2024,7 @@ enum FieldhouseStateHydrator {
                 scoringIndex[picked.cardGameId].map { ($0, picked.confidence) }
             })
             state.scoringBestBetGame = scorecard.pick.pickGames.first(where: \.isBestBet).flatMap { scoringIndex[$0.cardGameId] }
-            state.scoringProp = FieldhousePropKind.allCases.first(where: { $0.question == scorecard.card.propQuestion }) ?? .teamScores90
+            state.scoringProp = FieldhousePropKind.allCases.first(where: { ($0.question == scorecard.card.propQuestion || $0.question(cardSize: scorecard.card.cardGames.count) == scorecard.card.propQuestion) }) ?? .teamScores90
             state.scoringPropAnswer = scorecard.pick.propChoice ?? ""
             state.scoringUsedHellfire = state.scoringCardKind.allowsHellfire && scorecard.pick.isChaos
             state.lastCertifiedWindow = scorecard.weekNumber
@@ -2035,7 +2045,7 @@ enum FieldhouseStateHydrator {
                 scoringIndex[picked.cardGameId].map { ($0, picked.confidence) }
             })
             state.scoringBestBetGame = snapshot.scoringPick?.pickGames.first(where: \.isBestBet).flatMap { scoringIndex[$0.cardGameId] }
-            state.scoringProp = FieldhousePropKind.allCases.first(where: { $0.question == scoringCard.propQuestion }) ?? .teamScores90
+            state.scoringProp = FieldhousePropKind.allCases.first(where: { ($0.question == scoringCard.propQuestion || $0.question(cardSize: scoringCard.cardGames.count) == scoringCard.propQuestion) }) ?? .teamScores90
             state.scoringPropAnswer = snapshot.scoringPick?.propChoice ?? ""
             state.scoringUsedHellfire = state.scoringCardKind.allowsHellfire && snapshot.scoringPick?.isChaos == true
         }
@@ -2057,7 +2067,7 @@ enum FieldhouseStateHydrator {
         let orderedGames = card.cardGames.sorted { $0.sortOrder < $1.sortOrder }
         state.cardKind = FieldhouseCardKind(rawValue: card.cardKind ?? "") ?? .weekly
         state.publishedGames = orderedGames.map { FieldhouseGame(cardGame: $0, window: state.window) }
-        state.publishedProp = FieldhousePropKind.allCases.first { $0.question == card.propQuestion }
+        state.publishedProp = FieldhousePropKind.allCases.first { ($0.question == card.propQuestion || $0.question(cardSize: card.cardGames.count) == card.propQuestion) }
         state.cardIsPublished = !orderedGames.isEmpty
 
         let gameIndex = Dictionary(uniqueKeysWithValues: orderedGames.enumerated().map {
@@ -3723,13 +3733,13 @@ private struct FieldhouseCardBuilder: View {
                                 Text("WEEKLY PROP · 3 POINTS · AUTO-SCORED").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(accent)
                                 Menu {
                                     ForEach(FieldhousePropKind.allCases) { prop in
-                                        Button(prop.question) { selectedProp = prop }
+                                        Button(prop.question(cardSize: cardSize)) { selectedProp = prop }
                                     }
                                 } label: {
                                     HStack(spacing: 10) {
                                         Image(systemName: selectedProp == nil ? "chevron.down.circle" : "checkmark.circle.fill")
                                             .foregroundStyle(selectedProp == nil ? accent : .green)
-                                        Text(selectedProp?.question ?? "CHOOSE AN AUTO-SCORED PROP")
+                                        Text(selectedProp?.question(cardSize: cardSize) ?? "CHOOSE AN AUTO-SCORED PROP")
                                             .font(.subheadline.weight(.bold)).multilineTextAlignment(.leading)
                                         Spacer()
                                         Image(systemName: "chevron.up.chevron.down").foregroundStyle(accent)
@@ -4280,7 +4290,7 @@ private struct FieldhousePicksPage: View {
             if state.cardKind.requiresProp {
                 VStack(alignment: .leading, spacing: 9) {
                     Text("FLOOR PROP · 3 POINTS").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(accent)
-                    Text(state.publishedProp?.question ?? "PROP NOT PUBLISHED").font(.headline.weight(.black))
+                    Text(state.publishedProp?.question(cardSize: state.publishedGames.count) ?? "PROP NOT PUBLISHED").font(.headline.weight(.black))
                     HStack(spacing: 9) { propButton("YES"); propButton("NO") }
                 }.padding(15).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.28)))
             }
@@ -4446,8 +4456,8 @@ private struct FieldhousePicksPage: View {
                 Text(result == nil ? "PENDING" : (result == true ? "YES" : "NO"))
                     .font(.caption.weight(.black)).foregroundStyle(result == nil ? accent : .green)
             }
-            Text(state.scoringProp.question).font(.subheadline.weight(.black))
-            Text(result == nil ? "Resolves automatically after all ten games are final." : "YOUR CALL · \(state.scoringPropAnswer) · \(correctCall == true ? "+3" : "+0")")
+            Text(state.scoringProp.question(cardSize: state.scoringGames.count)).font(.subheadline.weight(.black))
+            Text(result == nil ? "Resolves automatically after every game on this card is final." : "YOUR CALL · \(state.scoringPropAnswer) · \(correctCall == true ? "+3" : "+0")")
                 .font(.caption2.weight(.black)).foregroundStyle(correctCall == true ? .green : .white.opacity(0.50))
         }
         .padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 14))

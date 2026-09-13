@@ -57,7 +57,7 @@ export async function startBoredPracticeWeek(): Promise<{
       }),
     };
   });
-  const prop = propFromPreset(rotatingPropPreset(seed % 20, sid), seed % 20);
+  const prop = propFromPreset(rotatingPropPreset(seed % 20, sid), seed % 20, games.length);
   prop.id = `bored-prop-${state.runId}-${seed}`;
 
   const card: BoredLocalCard = {

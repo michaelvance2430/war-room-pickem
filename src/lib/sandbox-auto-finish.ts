@@ -207,7 +207,7 @@ export async function autoFinishRemainingWeeks(opts?: {
           ? "nfl"
           : "cfb";
       const demoGames = generateDemoSlate(week, 5, sport);
-      const prop = propFromPreset(rotatingPropPreset(week, sport), week);
+      const prop = propFromPreset(rotatingPropPreset(week, sport), week, demoGames.length);
 
       opts?.onProgress?.({ week, label, step: "Publishing card…" });
       const pub = await publishWeekCard({

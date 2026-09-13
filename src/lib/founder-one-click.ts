@@ -179,7 +179,7 @@ export async function founderPostWeek(weekNumber: number): Promise<OneClickLog> 
 
   try {
     const games = generateDemoSlate(weekNumber, 5, s);
-    const prop = propFromPreset(rotatingPropPreset(weekNumber, s), weekNumber);
+    const prop = propFromPreset(rotatingPropPreset(weekNumber, s), weekNumber, games.length);
 
     steps.push(`Publishing ${label}…`);
     const pub = await publishWeekCard({

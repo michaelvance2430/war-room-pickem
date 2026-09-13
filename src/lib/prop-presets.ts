@@ -897,7 +897,40 @@ export function rotatingPropPreset(
   return list[w % list.length];
 }
 
-export function propFromPreset(preset: PropPreset, weekNumber = 1): Prop {
+/** Resolve only new drafts. Never rewrite a published prop during settlement. */
+export function slateSizedPreset(preset: PropPreset, cardSize: number): PropPreset {
+  if (!Number.isInteger(cardSize) || cardSize < 1 || cardSize > 30) throw new Error("Prop card size must be 1–30");
+  const copy = (text: string) => text.replace(/\bfive\b/gi, String(cardSize))
+    .replace(/\b5(?=-game| games| totals| underdogs|–0|$)/g, String(cardSize));
+  const result = { ...preset, label: copy(preset.label), question: copy(preset.question), options: preset.options.map(copy) as [string, string] };
+  const predicates: Record<string, [number, string]> = {
+    "tm-spreads-3-of-5-under-7": [3, "games be decided by 7 or fewer points"],
+    "tm-spreads-3-of-5-under-3": [3, "games be decided by 3 or fewer points"],
+    "tm-favorites-3-covers": [3, "favorites cover"],
+    "fn-cfb-home-dogs-2": [2, "home underdogs win straight up"],
+    "fn-nfl-dogs-win-2-su": [2, "underdogs win straight up"],
+    "od-fumbles-3": [3, "total fumbles be lost"],
+  };
+  const rule = predicates[preset.id];
+  if (rule) {
+    const count = Math.ceil(rule[0] * cardSize / 5);
+    result.question = `On this ${cardSize}-game card, will at least ${count} ${rule[1]}?`;
+    result.label = `${count}+ ${rule[1]}`;
+    result.options = [`Yes — at least ${count}`, `No — ${count - 1} or fewer`];
+  }
+  if (preset.id === "tm-combined-280" || preset.id === "fn-combined-under-200") {
+    const high = preset.id === "tm-combined-280";
+    const threshold = high ? cardSize * 56 + 1 : cardSize * 40;
+    result.question = `Will the sum of all ${cardSize} combined final scores be ${threshold} or ${high ? "more" : "fewer"}?`;
+    result.label = `${cardSize}-game total ${high ? "over" : "under"} ${high ? threshold - 0.5 : threshold + 0.5}?`;
+    result.options = high ? [`Yes — combined ≥ ${threshold}`, `No — combined ≤ ${threshold - 1}`]
+      : [`Yes — combined ≤ ${threshold}`, `No — combined ≥ ${threshold + 1}`];
+  }
+  return result;
+}
+
+export function propFromPreset(preset: PropPreset, weekNumber = 1, cardSize = 5): Prop {
+  preset = slateSizedPreset(preset, cardSize);
   return {
     id: `prop-${preset.id}-w${weekNumber}`,
     question: preset.question,
@@ -915,6 +948,8 @@ export function matchPresetId(prop: Prop | null | undefined): string {
   const q = prop.question.trim();
   const byQuestion = PROP_PRESETS.find((p) => p.question.trim() === q);
   if (byQuestion) return byQuestion.id;
+  const sized = PROP_PRESETS.find(p => Array.from({ length: 30 }, (_, i) => slateSizedPreset(p, i + 1).question).includes(q));
+  if (sized) return sized.id;
   const byId = PROP_PRESETS.find(
     (p) =>
       prop.id === `prop-${p.id}` ||

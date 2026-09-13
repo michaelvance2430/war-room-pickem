@@ -240,7 +240,7 @@ struct WarRoomTests {
         #expect(AutomaticPropCopyPolicy.resolved("No — combined is 201+", cardSize: 8, sportId: "cfb") == "No — combined is 321+")
         #expect(AutomaticPropCopyPolicy.resolved("Will the home team win all five games straight up?", cardSize: 9, sportId: "cfb") == "Will the home team win all 9 games straight up?")
         #expect(AutomaticPropCopyPolicy.resolved("Home teams go 5–0", cardSize: 10, sportId: "cfb") == "Home teams go 10–0")
-        #expect(AutomaticPropCopyPolicy.resolved("Five-game total is 281+", cardSize: 10, sportId: "nfl") == "Five-game total is 281+")
+        #expect(AutomaticPropCopyPolicy.resolved("Five-game total is 281+", cardSize: 10, sportId: "nfl") == "10-game total is 561+")
     }
 
     @Test func newestUnseenDispatchOpensOnlyOncePerMemberAndLeague() throws {

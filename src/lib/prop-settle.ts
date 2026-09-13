@@ -62,6 +62,8 @@ export function settlePropFromScores(opts: {
   const { prop, games, boxes } = opts;
   const expected = opts.expectedGames ?? (games.length || 5);
   const presetId = matchPresetId(prop);
+  const publishedCount = Number(prop.question.match(/at least (\d+)/i)?.[1] ?? 3);
+  const publishedSum = Number(prop.question.match(/scores be (\d+)/i)?.[1] ?? (presetId === "fn-combined-under-200" ? 200 : 281));
   const byId = new Map(boxes.map((b) => [b.gameId, b]));
 
   if (presetId === CUSTOM_PROP_ID) {
@@ -170,15 +172,15 @@ export function settlePropFromScores(opts: {
     case "tm-combined-280":
     case "all-five-combined-over-280": {
       const sum = finalBoxes.reduce((s, b) => s + total(b), 0);
-      if (sum >= 281) {
-        return settle(true, `Combined totals = ${sum} (≥ 281).`);
+      if (sum >= publishedSum) {
+        return settle(true, `Combined totals = ${sum} (≥ ${publishedSum}).`);
       }
       if (!allFinal) {
         return wait(
           `Combined so far ${sum} from ${nFinal}/${expected} games. Waiting…`
         );
       }
-      return settle(false, `Combined totals = ${sum} (≤ 280).`);
+      return settle(false, `Combined totals = ${sum} (≤ ${publishedSum - 1}).`);
     }
 
     case "fn-combined-under-200": {
@@ -188,7 +190,7 @@ export function settlePropFromScores(opts: {
           `Combined so far ${sum} from ${nFinal}/${expected}. Waiting…`
         );
       }
-      return settle(sum <= 200, `Combined totals = ${sum}.`);
+      return settle(sum <= publishedSum, `Combined totals = ${sum}.`);
     }
 
     // —— Teams: margins ——
@@ -208,13 +210,13 @@ export function settlePropFromScores(opts: {
         const m = margin(b);
         return m >= 1 && m <= 7;
       }).length;
-      if (close >= 3) {
+      if (close >= publishedCount) {
         return settle(true, `${close} games decided by ≤ 7.`);
       }
       if (!allFinal) {
         const rem = expected - nFinal;
-        if (close + rem < 3) {
-          return settle(false, `Only ${close} close games; cannot reach 3.`);
+        if (close + rem < publishedCount) {
+          return settle(false, `Only ${close} close games; cannot reach ${publishedCount}.`);
         }
         return wait(`${close} close (≤7) so far. Waiting…`);
       }
@@ -227,7 +229,7 @@ export function settlePropFromScores(opts: {
         const m = margin(b);
         return m >= 1 && m <= 3;
       }).length;
-      if (close >= 3 && presetId === "tm-spreads-3-of-5-under-3") {
+      if (close >= publishedCount && presetId === "tm-spreads-3-of-5-under-3") {
         return settle(true, `${close} games decided by ≤ 3.`);
       }
       if (presetId === "any-margin-3-or-less") {
@@ -237,8 +239,8 @@ export function settlePropFromScores(opts: {
       }
       if (!allFinal) {
         const rem = expected - nFinal;
-        if (close + rem < 3) {
-          return settle(false, `Only ${close} one-score nail-biters; can't reach 3.`);
+        if (close + rem < publishedCount) {
+          return settle(false, `Only ${close} one-score nail-biters; can't reach ${publishedCount}.`);
         }
         return wait(`${close} games margin ≤ 3 so far. Waiting…`);
       }
@@ -270,20 +272,20 @@ export function settlePropFromScores(opts: {
         if (!b) continue;
         if (favoriteCovered(g, b)) favCovers += 1;
       }
-      if (favCovers >= 3) {
-        return settle(true, `Favorites covered ${favCovers} (≥ 3).`);
+      if (favCovers >= publishedCount) {
+        return settle(true, `Favorites covered ${favCovers} (≥ ${publishedCount}).`);
       }
       if (!allFinal) {
         const rem = expected - nFinal;
-        if (favCovers + rem < 3) {
+        if (favCovers + rem < publishedCount) {
           return settle(
             false,
-            `Favorites covered ${favCovers}; only ${rem} left — cannot reach 3.`
+            `Favorites covered ${favCovers}; only ${rem} left — cannot reach ${publishedCount}.`
           );
         }
         return wait(`Favorites covered ${favCovers} so far. Waiting…`);
       }
-      return settle(false, `Favorites covered ${favCovers} of ${expected} (≤ 2).`);
+      return settle(false, `Favorites covered ${favCovers} of ${expected} (≤ ${publishedCount - 1}).`);
     }
 
     case "fn-all-favorites-cover": {
@@ -296,7 +298,7 @@ export function settlePropFromScores(opts: {
           break;
         }
       }
-      return settle(all, all ? "Favorites covered all 5." : "Chalk failed at least once.");
+      return settle(all, all ? `Favorites covered all ${expected}.` : "Chalk failed at least once.");
     }
 
     case "fn-all-dogs-cover": {
@@ -309,7 +311,7 @@ export function settlePropFromScores(opts: {
           break;
         }
       }
-      return settle(all, all ? "Dogs covered all 5." : "Not a full dog sweep.");
+      return settle(all, all ? `Dogs covered all ${expected}.` : "Not a full dog sweep.");
     }
 
     // —— Teams / funny: scoring ——
@@ -367,13 +369,13 @@ export function settlePropFromScores(opts: {
     case "fn-home-teams-sweep": {
       if (!allFinal) return wait("Need all finals for home sweep.");
       const allHome = finalBoxes.every((b) => b.homeScore > b.awayScore);
-      return settle(allHome, allHome ? "Home went 5–0." : "Home lost at least one.");
+      return settle(allHome, allHome ? `Home went ${expected}–0.` : "Home lost at least one.");
     }
 
     case "fn-road-teams-sweep": {
       if (!allFinal) return wait("Need all finals for road sweep.");
       const allRoad = finalBoxes.every((b) => b.awayScore > b.homeScore);
-      return settle(allRoad, allRoad ? "Road went 5–0." : "Road lost at least one.");
+      return settle(allRoad, allRoad ? `Road went ${expected}–0.` : "Road lost at least one.");
     }
 
     // —— CFB flavor (auto) ——
@@ -451,7 +453,7 @@ export function settlePropFromScores(opts: {
         if (!b) continue;
         if (b.homeScore > b.awayScore) homeDogWins += 1;
       }
-      if (homeDogWins >= 2) {
+      if (homeDogWins >= Number(prop.question.match(/at least (\d+)/i)?.[1] ?? 2)) {
         return settle(true, `${homeDogWins} home underdogs won SU.`);
       }
       if (!allFinal) {
@@ -516,7 +518,7 @@ export function settlePropFromScores(opts: {
             : b.awayScore > b.homeScore;
         if (dogWon) dogWins += 1;
       }
-      if (dogWins >= 2) {
+      if (dogWins >= Number(prop.question.match(/at least (\d+)/i)?.[1] ?? 2)) {
         return settle(true, `${dogWins} underdogs won straight up.`);
       }
       if (!allFinal) {
