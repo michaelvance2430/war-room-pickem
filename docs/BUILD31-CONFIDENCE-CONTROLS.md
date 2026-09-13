@@ -8,3 +8,5 @@ Held for the next iOS release. This change does not upload an archive or change 
 - Existing scoring integers, save contracts, deadlines, and sport card sizes are unchanged. This does not authorize 30-game cards in formats with fixed card sizes. Brackets and ranked bowl selections do not use this confidence control.
 
 Validation: compile/run native-ios/Checks/ConfidenceCycleChecks.swift with native-ios/WarRoom/ConfidenceCycle.swift. Covers sizes 1–30, complete unique allocation, used-value skipping, and clear behavior. Full simulator app build also required before release.
+
+Validation completed September 13, 2026: full iOS Simulator build passed; men's and women's Fieldhouse two-row confidence UI checks passed. The UI checks use short drags within the slate to avoid flinging past the first game beneath the fixed tracker. GitHub backup push was blocked by automatic approval review; source remains committed locally pending explicit push authorization.
