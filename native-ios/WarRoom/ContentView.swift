@@ -688,6 +688,7 @@ private struct PicksView: View {
                             onEdit: { editingSubmittedCard = true }
                         )
                     } else {
+                        ScrollViewReader { scroll in
                         ZStack {
                         if league?.leagues.sportId.lowercased() == "nfl" { NflHomeBackdrop(phase: .regularSeason) }
                         else { PicksRecruitingBackdrop() }
@@ -741,7 +742,7 @@ private struct PicksView: View {
                                     onSide: { setSide($0, for: game.id) },
                                     onConfidence: { setConfidence($0, for: game.id) },
                                     onBestBet: { bestBetGameId = game.id }
-                                )
+                                ).id(game.id)
                             }
                         if let question = card.propQuestion {
                                     if league?.leagues.sportId.lowercased() == "nfl" { NflBroadcastSectionLabel(title: "GAME-DAY PROP", detail: "\(card.propPoints) BONUS POINTS · AUTO-SCORED") }
@@ -799,6 +800,12 @@ private struct PicksView: View {
                             .padding(.bottom, 34)
                         }
                         .refreshable { await load() }
+                    }
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        ConfidenceUsageStrip(assignments: draft.compactMapValues { $0.confidence }, total: card.cardGames.count) { game in
+                            withAnimation(.easeInOut(duration: 0.25)) { scroll.scrollTo(game, anchor: .top) }
+                        }
+                    }
                     }
                     }
                 } else {
@@ -1795,24 +1802,9 @@ private struct EditableGamePickRow: View {
                 .foregroundStyle(draft.side == nil || draft.confidence == nil ? wagerAccent : accent)
             VStack(alignment: .leading, spacing: 8) {
                 Text("CONFIDENCE").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.secondary)
-                if confidenceOptions.count > 5 {
-                    HStack(spacing: 7) {
-                        ForEach(Array(confidenceOptions.prefix(5)), id: \.self) { confidence in
-                            confidenceButton(confidence)
-                        }
-                    }
-                    HStack(spacing: 7) {
-                        ForEach(Array(confidenceOptions.dropFirst(5)), id: \.self) { confidence in
-                            confidenceButton(confidence)
-                        }
-                    }
-                } else {
-                    HStack(spacing: 7) {
-                        ForEach(confidenceOptions, id: \.self) { confidence in
-                            confidenceButton(confidence)
-                        }
-                    }
-                }
+                ConfidencePicker(current: draft.confidence, used: usedConfidences,
+                                 maximum: confidenceOptions.count, enabled: draft.side != nil,
+                                 onChange: onConfidence)
             }
             Button { onBestBet() } label: {
                 BestBetActionLabel(isSelected: isBestBet, accent: wagerAccent)
@@ -1835,23 +1827,6 @@ private struct EditableGamePickRow: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(draft.side == side ? selection : .gray.opacity(0.30))
-    }
-
-    private func confidenceButton(_ confidence: Int) -> some View {
-        let chosen = draft.confidence == confidence
-        let available = !usedConfidences.contains(confidence)
-        return Button {
-            onConfidence(draft.confidence == confidence ? nil : confidence)
-        } label: {
-            Text("\(confidence)")
-                .font(.caption.weight(.black))
-                .frame(width: 52, height: 34)
-                .foregroundStyle(chosen ? .black : (available ? .white : .white.opacity(0.22)))
-                .background(chosen ? selection : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
-        }
-        .buttonStyle(.plain)
-        .disabled(!available || draft.side == nil)
-        .accessibilityLabel(chosen ? "Clear confidence \(confidence)" : "Set confidence \(confidence)")
     }
 
     private var line: String {

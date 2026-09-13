@@ -4197,11 +4197,15 @@ private struct FieldhousePicksPage: View {
     @State private var lane: FieldhousePicksLane = .liveBoard
     @State private var now = Date()
     var body: some View {
+        ScrollViewReader { scroll in
         VStack(spacing: 0) {
             VStack(spacing: 7) {
                 laneSelector
                 if lane == .makePicks && state.cardIsPublished && !state.picksLocked && !state.pickWindowIsClosed(at: now) {
                     pickProgressHeader
+                    ConfidenceUsageStrip(assignments: state.confidenceSelections, total: state.cardKind.requiredGameCount) { game in
+                        withAnimation(.easeInOut(duration: 0.25)) { scroll.scrollTo(game, anchor: .top) }
+                    }
                 }
             }
             .padding(.horizontal, 14)
@@ -4233,6 +4237,7 @@ private struct FieldhousePicksPage: View {
                 }
                 .padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 30)
             }
+        }
         }
         .alert("Lock these picks?", isPresented: $confirmingLock) {
             Button("NOT YET", role: .cancel) {}
@@ -4270,7 +4275,7 @@ private struct FieldhousePicksPage: View {
                 }.buttonStyle(.plain).disabled(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now)).opacity(state.regularHellfiresRemaining == 0 || state.picksLocked || !state.canEditPicks(at: now) ? 0.45 : 1)
             }
                 ForEach(Array(state.publishedGames.enumerated()), id: \.element.id) { index, game in
-                    gameCard(index: index, game: game)
+                    gameCard(index: index, game: game).id(index)
                 }
             if state.cardKind.requiresProp {
                 VStack(alignment: .leading, spacing: 9) {
@@ -4533,17 +4538,14 @@ private struct FieldhousePicksPage: View {
                 .font(.caption.weight(.black)).foregroundStyle(.white.opacity(0.52))
             VStack(alignment: .leading, spacing: 8) {
                 Text("CONFIDENCE").font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.48))
-                if state.cardKind.requiredGameCount == 10 {
-                    HStack(spacing: 7) {
-                        ForEach(1...5, id: \.self) { confidenceButton($0, game: index) }
-                    }
-                    HStack(spacing: 7) {
-                        ForEach(6...10, id: \.self) { confidenceButton($0, game: index) }
-                    }
-                } else {
-                    HStack(spacing: 7) {
-                        ForEach(1...state.cardKind.requiredGameCount, id: \.self) { confidenceButton($0, game: index) }
-                    }
+                ConfidencePicker(current: state.confidenceSelections[index],
+                                 used: Set(state.confidenceSelections.filter { $0.key != index }.values),
+                                 maximum: state.cardKind.requiredGameCount,
+                                 enabled: !state.picksLocked && state.canEditPicks(at: now),
+                                 accessibilityPrefix: "fieldhouse.confidence.\(index)") { value in
+                    guard !state.picksLocked && state.canEditPicks(at: Date()) else { return }
+                    if let value { state.toggleConfidence(value, for: index) }
+                    else { state.confidenceSelections[index] = nil }
                 }
             }
             Button {
@@ -4556,21 +4558,6 @@ private struct FieldhousePicksPage: View {
             .opacity(state.picksLocked || !state.canEditPicks(at: now) ? 0.45 : 1)
             .accessibilityIdentifier("fieldhouse.best-bet.\(index)")
         }.padding(14).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(selected == nil ? .white.opacity(0.12) : accent.opacity(0.42)))
-    }
-
-    private func confidenceButton(_ value: Int, game index: Int) -> some View {
-        let chosen = state.confidenceSelections[index] == value
-        let available = state.confidenceAvailable(value, for: index)
-        return Button {
-            state.toggleConfidence(value, for: index)
-        } label: {
-            Text("\(value)").font(.caption.weight(.black)).frame(width: 52, height: 34)
-                .foregroundStyle(chosen ? .black : (available ? .white : .white.opacity(0.22)))
-                .background(chosen ? accent : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
-        }
-        .buttonStyle(.plain)
-        .disabled(!available || state.picksLocked || !state.canEditPicks(at: now))
-        .accessibilityIdentifier("fieldhouse.confidence.\(index).\(value)")
     }
 
     private func sideButton(_ team: String, game: Int, selected: String?) -> some View {

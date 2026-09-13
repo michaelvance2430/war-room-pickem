@@ -143,6 +143,8 @@ final class WarRoomUITests: XCTestCase {
         let six = app.buttons["fieldhouse.confidence.0.6"]
         let ten = app.buttons["fieldhouse.confidence.0.10"]
         XCTAssertTrue(one.waitForExistence(timeout: 2))
+        // The pinned tracker stays visible while the game controls scroll below it.
+        for _ in 0..<4 where !ten.isHittable { app.swipeUp() }
         XCTAssertTrue(ten.exists)
         XCTAssertEqual(one.frame.minY, five.frame.minY, accuracy: 1)
         XCTAssertEqual(six.frame.minY, ten.frame.minY, accuracy: 1)
