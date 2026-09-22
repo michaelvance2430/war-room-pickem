@@ -63,6 +63,7 @@
     "verify:failure-surfaces": "node scripts/verify-app-failure-surfaces.mjs",
     "verify:commissioner-journey": "node --import tsx scripts/verify-commissioner-journey.mjs",
     "verify:one-click-scoring": "node --import tsx scripts/verify-one-click-scoring.mjs",
+    "verify:autonomous-nfl-finalization": "node scripts/verify-autonomous-nfl-finalization.mjs",
     "verify:atomic-week-rescore": "node scripts/verify-atomic-week-rescore.mjs",
     "verify:deployment-credit": "node --import tsx scripts/verify-deployment-credit.mjs && node scripts/verify-deployment-credit-sql.mjs",
     "verify:late-join-lifecycle": "node --import tsx scripts/verify-late-join-lifecycle.mjs",
