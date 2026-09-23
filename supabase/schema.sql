@@ -105,7 +105,7 @@ create table if not exists public.pick_games (
   pick_id uuid not null references public.picks (id) on delete cascade,
   card_game_id uuid not null references public.card_games (id) on delete cascade,
   side text not null check (side in ('home', 'away')),
-  confidence int not null check (confidence between 1 and 5),
+  confidence int not null check (confidence between 1 and 10),
   is_best_bet boolean not null default false,
   locked_spread numeric,
   locked_favorite text,

@@ -343,7 +343,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 /**
- * Pure random legal card: random sides, conf 1–5 once each, random BB, random prop.
+ * Pure random legal card: random sides, confidence 1–N once each (up to 10), random BB, random prop.
  * No favorites bias — coin flip only.
  */
 export function generateChaosCard(opts: {
@@ -356,7 +356,7 @@ export function generateChaosCard(opts: {
 } {
   const games = opts.games;
   const confs = shuffle(
-    [1, 2, 3, 4, 5].slice(0, Math.max(1, games.length))
+    Array.from({ length: Math.min(10, Math.max(1, games.length)) }, (_, i) => i + 1)
   );
   const picks: Record<string, UserPick> = {};
   games.forEach((g, i) => {
