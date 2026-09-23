@@ -119,10 +119,10 @@ function isCompleteValidCard(
     const p = cardPicks[g.id];
     if (!p?.pick) return false;
     const c = p.confidence ?? 0;
-    if (c < 1 || c > 5) return false;
+    if (c < 1 || c > Math.min(10, cardGames.length)) return false;
     confs.push(c);
   }
-  const expected = [1, 2, 3, 4, 5].slice(0, cardGames.length);
+  const expected = Array.from({ length: Math.min(10, cardGames.length) }, (_, i) => i + 1);
   if ([...confs].sort((a, b) => a - b).join() !== expected.join()) {
     return false;
   }
@@ -1179,7 +1179,7 @@ export default function PicksClient() {
       !(chaosArmed || chaosLockedWeek) &&
       (!saved || editing);
 
-  const confidenceOptions = [1, 2, 3, 4, 5];
+  const confidenceOptions = Array.from({ length: Math.min(10, games.length) }, (_, i) => i + 1);
 
   function snapshotNow() {
     return {
@@ -1499,9 +1499,9 @@ export default function PicksClient() {
         const confs = cardGames
           .map((g) => lockedPicks[g.id].confidence)
           .sort((a, b) => a - b);
-        const expected = [1, 2, 3, 4, 5].slice(0, cardGames.length);
+        const expected = Array.from({ length: Math.min(10, cardGames.length) }, (_, i) => i + 1);
         if (confs.join() !== expected.join()) {
-          setSaveError("Use each confidence 1–5 exactly once.");
+          setSaveError(`Use each confidence 1–${Math.min(10, cardGames.length)} exactly once.`);
           setSaving(false);
           return;
         }
@@ -1640,9 +1640,9 @@ export default function PicksClient() {
     const confs = cardGames
       .map((g) => lockedPicks[g.id].confidence)
       .sort((a, b) => a - b);
-    const expected = [1, 2, 3, 4, 5].slice(0, cardGames.length);
+    const expected = Array.from({ length: Math.min(10, cardGames.length) }, (_, i) => i + 1);
     if (confs.join() !== expected.join()) {
-      setSaveError("Use each confidence 1–5 exactly once.");
+      setSaveError(`Use each confidence 1–${Math.min(10, cardGames.length)} exactly once.`);
       setSaving(false);
       return;
     }
