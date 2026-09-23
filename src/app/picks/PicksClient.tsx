@@ -3052,7 +3052,7 @@ export default function PicksClient() {
       <span className="text-[10px] uppercase tracking-wider text-muted font-semibold">
                           Confidence
                         </span>
-      <div className="flex gap-2 items-center">
+      <div className="grid grid-cols-5 gap-2 w-full max-w-[252px] sm:flex sm:max-w-none sm:w-auto sm:items-center">
                           {confidenceOptions.map((c) => {
                             const usedElsewhere = Object.entries(picks).some(
                               ([id, p]) => id !== game.id && p.confidence === c
@@ -3081,7 +3081,7 @@ export default function PicksClient() {
                                       : `Set confidence ${c}`
                                 }
                                 onClick={() => selectConfidence(game.id, c)}
-                                className={`w-11 h-11 min-w-[44px] rounded-xl text-base font-bold transition touch-manipulation active:scale-95 ${
+                                className={`w-full aspect-square min-w-0 sm:w-11 sm:h-11 sm:min-w-[44px] rounded-xl text-base font-bold transition touch-manipulation active:scale-95 ${
                                   selected
                                     ? "bg-primary text-black shadow-[0_0_12px_rgba(34,197,94,0.35)]"
                                     : usedElsewhere || locked
