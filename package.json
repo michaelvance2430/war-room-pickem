@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "description": "War Room Pick'Em — owned by Mike Vance. All rights reserved.",
   "scripts": {
+    "verify:autonomous-football-finalization": "node scripts/verify-autonomous-football-finalization.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
